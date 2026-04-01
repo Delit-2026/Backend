@@ -1,6 +1,6 @@
 ---
 name: PR 템플릿
-about: PR템플릿에 맞게 PR을 생성해 주세요
+about: 해당 양식에 맞게 PR을 생성해 주세요
 title: ''
 labels: ''
 assignees: ''
