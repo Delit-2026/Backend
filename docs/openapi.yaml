@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Dealit API
+  description: Dealit backend API documentation
+  contact:
+    name: Dealit Team
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Local server
+tags:
+- name: Health
+  description: Application health check
+paths:
+  /api/v1/health:
+    get:
+      tags:
+      - Health
+      summary: Health check
+      description: Returns basic application status
+      operationId: health
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+components: {}
