@@ -1,6 +1,8 @@
 spring:
   application:
     name: dealit
+  config:
+    import: optional:file:.env[.properties]
   profiles:
     default: local
 
