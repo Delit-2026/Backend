@@ -27,6 +27,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 		HttpServletResponse response,
 		AuthenticationException authException
 	) throws IOException {
+		// 필터에서 넣어둔 에러 코드를 우선 사용하고, 없으면 기본 인증 오류 코드로 응답한다.
 		String code = (String) request.getAttribute("auth_error_code");
 		String message = (String) request.getAttribute("auth_error_message");
 
@@ -40,6 +41,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 		response.setStatus(HttpStatus.UNAUTHORIZED.value());
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+		// Security 예외를 프론트에서 처리하기 쉬운 JSON 형식으로 통일한다.
 		objectMapper.writeValue(response.getWriter(), body);
 	}
 }
