@@ -1,5 +1,6 @@
 package com.dealit.dealit.global.error;
 
+import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -43,6 +44,12 @@ public class GlobalExceptionHandler {
 	@ResponseStatus(HttpStatus.CONFLICT)
 	public ErrorResponse handleDuplicateMemberException(DuplicateMemberException exception) {
 		return ErrorResponse.of(HttpStatus.CONFLICT.value(), "DUPLICATE_MEMBER", exception.getMessage(), List.of());
+	}
+
+	@ExceptionHandler(InvalidCredentialsException.class)
+	@ResponseStatus(HttpStatus.UNAUTHORIZED)
+	public ErrorResponse handleInvalidCredentialsException(InvalidCredentialsException exception) {
+		return ErrorResponse.of(HttpStatus.UNAUTHORIZED.value(), "INVALID_CREDENTIALS", exception.getMessage(), List.of());
 	}
 
 	private ErrorResponse.FieldErrorDetail toFieldErrorDetail(FieldError fieldError) {
