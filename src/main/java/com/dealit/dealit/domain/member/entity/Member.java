@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.member.entity;
 
+import com.dealit.dealit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -12,8 +13,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Getter
 @Entity
 @Table(
@@ -24,7 +23,7 @@ import java.time.LocalDateTime;
 	}
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Member {
+public class Member extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,15 +57,6 @@ public class Member {
 	@Column(name = "is_verified", nullable = false)
 	private boolean verified;
 
-	@Column(name = "created_at")
-	private LocalDateTime createdAt;
-
-	@Column(name = "updated_at")
-	private LocalDateTime updatedAt;
-
-	@Column(name = "deleted_at")
-	private LocalDateTime deletedAt;
-
 	@Builder
 	private Member(
 		String loginId,
@@ -77,10 +67,7 @@ public class Member {
 		String nickname,
 		String intro,
 		String profileImage,
-		boolean verified,
-		LocalDateTime createdAt,
-		LocalDateTime updatedAt,
-		LocalDateTime deletedAt
+		boolean verified
 	) {
 		this.loginId = loginId;
 		this.password = password;
@@ -91,9 +78,6 @@ public class Member {
 		this.intro = intro;
 		this.profileImage = profileImage;
 		this.verified = verified;
-		this.createdAt = createdAt;
-		this.updatedAt = updatedAt;
-		this.deletedAt = deletedAt;
 	}
 
 	public static Member create(
@@ -103,7 +87,6 @@ public class Member {
 		String phoneNumber,
 		String name
 	) {
-		LocalDateTime now = LocalDateTime.now();
 		return Member.builder()
 			.loginId(loginId)
 			.password(encodedPassword)
@@ -112,8 +95,6 @@ public class Member {
 			.name(name)
 			.nickname("PENDING")
 			.verified(false)
-			.createdAt(now)
-			.updatedAt(now)
 			.build();
 	}
 
@@ -122,6 +103,5 @@ public class Member {
 			throw new IllegalStateException("memberId must be generated before assigning nickname");
 		}
 		this.nickname = "Dealit#" + memberId;
-		this.updatedAt = LocalDateTime.now();
 	}
 }

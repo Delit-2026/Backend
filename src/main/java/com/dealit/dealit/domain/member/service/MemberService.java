@@ -1,8 +1,8 @@
 package com.dealit.dealit.domain.member.service;
 
-import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.dto.SignUpRequest;
 import com.dealit.dealit.domain.member.dto.SignUpResponse;
+import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;

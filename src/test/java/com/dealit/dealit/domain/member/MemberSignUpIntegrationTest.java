@@ -54,12 +54,12 @@ class MemberSignUpIntegrationTest {
 			.andExpect(jsonPath("$.memberId").isNumber())
 			.andExpect(jsonPath("$.loginId").value("dealit-user"))
 			.andExpect(jsonPath("$.email").value("user@dealit.com"))
-			.andExpect(jsonPath("$.nickname").value("Dealit#1"));
+			.andExpect(jsonPath("$.nickname").value(org.hamcrest.Matchers.startsWith("Dealit#")));
 
 		Member savedMember = memberRepository.findAll().getFirst();
 		assertThat(savedMember.getPassword()).isNotEqualTo("Password123!");
 		assertThat(passwordEncoder.matches("Password123!", savedMember.getPassword())).isTrue();
-		assertThat(savedMember.getNickname()).isEqualTo("Dealit#1");
+		assertThat(savedMember.getNickname()).isEqualTo("Dealit#" + savedMember.getMemberId());
 		assertThat(savedMember.isVerified()).isFalse();
 	}
 
