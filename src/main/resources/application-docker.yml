@@ -9,9 +9,9 @@ spring:
       port: ${REDIS_PORT:6379}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
-    show-sql: false
+        format_sql: ${JPA_FORMAT_SQL:true}
+    show-sql: ${JPA_SHOW_SQL:false}
