@@ -14,22 +14,22 @@ import java.util.List;
 
 @Schema(description = "경매 상품 임시저장 요청")
 public record SaveAuctionDraftRequest(
-	@Schema(description = "상품명", example = "Apple Watch Series 9")
-	@NotBlank(message = "name is required.")
-	@Size(max = 100, message = "name must be 100 characters or fewer.")
+	@Schema(description = "상품명", example = "애플워치 시리즈 9")
+	@NotBlank(message = "상품명은 필수입니다.")
+	@Size(max = 100, message = "상품명은 100자 이하여야 합니다.")
 	String name,
 
-	@Schema(description = "상품 설명", example = "Box opened, lightly used, includes charger.")
-	@NotBlank(message = "description is required.")
-	@Size(max = 2000, message = "description must be 2000 characters or fewer.")
+	@Schema(description = "상품 설명", example = "개봉 후 몇 번 사용하지 않았고 충전기도 함께 드립니다.")
+	@NotBlank(message = "상품 설명은 필수입니다.")
+	@Size(max = 2000, message = "상품 설명은 2000자 이하여야 합니다.")
 	String description,
 
 	@Schema(description = "판매 유형", example = "AUCTION")
-	@NotNull(message = "saleType is required.")
+	@NotNull(message = "판매 유형은 필수입니다.")
 	ProductSaleType saleType,
 
 	@Schema(description = "카테고리 ID", example = "101")
-	@NotNull(message = "categoryId is required.")
+	@NotNull(message = "카테고리 ID는 필수입니다.")
 	Long categoryId,
 
 	@Schema(description = "일반 판매가", example = "120000", nullable = true)
@@ -45,12 +45,12 @@ public record SaveAuctionDraftRequest(
 	boolean allowOffer,
 
 	@Schema(description = "상품 이미지 목록")
-	@NotEmpty(message = "images must contain at least one image.")
+	@NotEmpty(message = "이미지는 최소 1장 이상 등록해야 합니다.")
 	List<@Valid ProductImagePayload> images,
 
-	@Schema(description = "거래 위치", example = "Seoul Gangnam-gu")
-	@NotBlank(message = "location is required.")
-	@Size(max = 100, message = "location must be 100 characters or fewer.")
+	@Schema(description = "거래 위치", example = "서울 강남구")
+	@NotBlank(message = "거래 위치는 필수입니다.")
+	@Size(max = 100, message = "거래 위치는 100자 이하여야 합니다.")
 	String location,
 
 	@Schema(description = "임시저장 ID", example = "5", nullable = true)

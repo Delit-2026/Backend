@@ -50,7 +50,7 @@ public class AuctionService {
 	@Transactional
 	public UploadAuctionImageResponse uploadImage(MultipartFile file) {
 		if (file == null || file.isEmpty()) {
-			throw new InvalidAuctionRequestException("file is required.");
+			throw new InvalidAuctionRequestException("이미지 파일은 필수입니다.");
 		}
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
@@ -178,13 +178,13 @@ public class AuctionService {
 
 		List<AuctionProductImage> images = auctionProductImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
 		if (images.size() != imageIds.size()) {
-			throw new AuctionImageNotFoundException("One or more images do not exist.");
+			throw new AuctionImageNotFoundException("존재하지 않는 이미지가 포함되어 있습니다.");
 		}
 
 		Map<Long, AuctionProductImage> imagesById = new LinkedHashMap<>();
 		for (AuctionProductImage image : images) {
 			if (image.getProduct() != null) {
-				throw new InvalidAuctionRequestException("One or more images are already assigned to another product.");
+				throw new InvalidAuctionRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
 			}
 			imagesById.put(image.getImageId(), image);
 		}
@@ -195,29 +195,29 @@ public class AuctionService {
 
 	private void validateDuplicateImageIds(List<Long> imageIds, Collection<Long> storedImageIds) {
 		if (storedImageIds.size() != imageIds.size()) {
-			throw new InvalidAuctionRequestException("Duplicate imageId values are not allowed.");
+			throw new InvalidAuctionRequestException("중복된 이미지 ID는 허용되지 않습니다.");
 		}
 	}
 
 	private void validateRequestBySaleType(CreateAuctionRequest request) {
 		if (request.saleType() == ProductSaleType.AUCTION) {
 			if (request.startPrice() == null) {
-				throw new InvalidAuctionRequestException("startPrice is required when saleType is AUCTION.");
+				throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 			}
 			if (request.auctionEndAt() == null) {
-				throw new InvalidAuctionRequestException("auctionEndAt is required when saleType is AUCTION.");
+				throw new InvalidAuctionRequestException("경매 판매에서는 종료 시각이 필수입니다.");
 			}
 			if (request.startPrice().signum() <= 0) {
-				throw new InvalidAuctionRequestException("startPrice must be greater than 0.");
+				throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
 			}
 			return;
 		}
 
 		if (request.price() == null) {
-			throw new InvalidAuctionRequestException("price is required when saleType is REGULAR.");
+			throw new InvalidAuctionRequestException("일반 판매에서는 판매가가 필수입니다.");
 		}
 		if (request.price().signum() <= 0) {
-			throw new InvalidAuctionRequestException("price must be greater than 0.");
+			throw new InvalidAuctionRequestException("판매가는 0보다 커야 합니다.");
 		}
 	}
 
@@ -226,7 +226,7 @@ public class AuctionService {
 			return AuctionStatus.ON_SALE;
 		}
 		if (auctionEndAt != null && auctionEndAt.isBefore(now)) {
-			throw new InvalidAuctionRequestException("auctionEndAt must be in the future.");
+			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
 		}
 		return AuctionStatus.AUCTION_LIVE;
 	}
@@ -235,7 +235,7 @@ public class AuctionService {
 		try {
 			return objectMapper.writeValueAsString(request);
 		} catch (JsonProcessingException exception) {
-			throw new InvalidAuctionRequestException("Failed to serialize draft payload.");
+			throw new InvalidAuctionRequestException("임시저장 데이터를 처리하는 중 오류가 발생했습니다.");
 		}
 	}
 }

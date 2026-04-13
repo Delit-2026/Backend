@@ -8,17 +8,17 @@ import jakarta.validation.constraints.Positive;
 @Schema(description = "상품 이미지 메타데이터")
 public record ProductImagePayload(
 	@Schema(description = "업로드된 이미지 ID", example = "1")
-	@NotNull(message = "imageId is required.")
-	@Positive(message = "imageId must be greater than 0.")
+	@NotNull(message = "이미지 ID는 필수입니다.")
+	@Positive(message = "이미지 ID는 1 이상이어야 합니다.")
 	Long imageId,
 
 	@Schema(description = "이미지 URL", example = "https://cdn.dealit.local/auction/images/1.jpg")
-	@NotBlank(message = "imageUrl is required.")
+	@NotBlank(message = "이미지 URL은 필수입니다.")
 	String imageUrl,
 
 	@Schema(description = "정렬 순서", example = "1")
-	@NotNull(message = "sortOrder is required.")
-	@Positive(message = "sortOrder must be greater than 0.")
+	@NotNull(message = "정렬 순서는 필수입니다.")
+	@Positive(message = "정렬 순서는 1 이상이어야 합니다.")
 	Integer sortOrder
 ) {
 }
