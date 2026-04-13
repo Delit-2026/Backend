@@ -58,6 +58,9 @@ public class AuctionProduct extends BaseEntity {
 	@Column(name = "start_price", precision = 15, scale = 2)
 	private BigDecimal startPrice;
 
+	@Column(name = "auction_start_at")
+	private OffsetDateTime auctionStartAt;
+
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
@@ -81,6 +84,7 @@ public class AuctionProduct extends BaseEntity {
 		Long categoryId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		String location,
 		Long draftId,
@@ -92,6 +96,7 @@ public class AuctionProduct extends BaseEntity {
 		this.categoryId = categoryId;
 		this.price = price;
 		this.startPrice = startPrice;
+		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
 		this.location = location;
 		this.draftId = draftId;
@@ -105,6 +110,7 @@ public class AuctionProduct extends BaseEntity {
 		Long categoryId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		String location,
 		Long draftId,
@@ -117,6 +123,7 @@ public class AuctionProduct extends BaseEntity {
 			categoryId,
 			price,
 			startPrice,
+			auctionStartAt,
 			auctionEndAt,
 			location,
 			draftId,

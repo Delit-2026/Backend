@@ -79,6 +79,7 @@ public class AuctionService {
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
+				request.auctionStartAt(),
 				request.auctionEndAt(),
 				normalizeBlank(request.location()),
 				payloadJson,
@@ -93,6 +94,7 @@ public class AuctionService {
 						request.categoryId(),
 						request.price(),
 						request.startPrice(),
+						request.auctionStartAt(),
 						request.auctionEndAt(),
 						normalizeBlank(request.location()),
 						payloadJson,
@@ -107,6 +109,7 @@ public class AuctionService {
 					request.categoryId(),
 					request.price(),
 					request.startPrice(),
+					request.auctionStartAt(),
 					request.auctionEndAt(),
 					normalizeBlank(request.location()),
 					payloadJson,
@@ -152,10 +155,16 @@ public class AuctionService {
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
+				request.auctionStartAt(),
 				request.auctionEndAt(),
 				request.location().trim(),
 				request.draftId(),
-				determineStatus(request.saleType(), request.auctionEndAt(), OffsetDateTime.now(ZoneOffset.UTC))
+				determineStatus(
+					request.saleType(),
+					request.auctionStartAt(),
+					request.auctionEndAt(),
+					OffsetDateTime.now(ZoneOffset.UTC)
+				)
 			)
 		);
 
@@ -202,11 +211,17 @@ public class AuctionService {
 			if (request.startPrice() == null) {
 				throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 			}
+			if (request.auctionStartAt() == null) {
+				throw new InvalidAuctionRequestException("경매 판매에서는 시작 시각이 필수입니다.");
+			}
 			if (request.auctionEndAt() == null) {
 				throw new InvalidAuctionRequestException("경매 판매에서는 종료 시각이 필수입니다.");
 			}
 			if (request.startPrice().signum() <= 0) {
 				throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
+			}
+			if (!request.auctionStartAt().isBefore(request.auctionEndAt())) {
+				throw new InvalidAuctionRequestException("경매 시작 시각은 종료 시각보다 빨라야 합니다.");
 			}
 			return;
 		}
@@ -219,9 +234,17 @@ public class AuctionService {
 		}
 	}
 
-	private AuctionStatus determineStatus(ProductSaleType saleType, OffsetDateTime auctionEndAt, OffsetDateTime now) {
+	private AuctionStatus determineStatus(
+		ProductSaleType saleType,
+		OffsetDateTime auctionStartAt,
+		OffsetDateTime auctionEndAt,
+		OffsetDateTime now
+	) {
 		if (saleType == ProductSaleType.REGULAR) {
 			return AuctionStatus.ON_SALE;
+		}
+		if (auctionStartAt != null && auctionStartAt.isAfter(now)) {
+			return AuctionStatus.AUCTION_SCHEDULED;
 		}
 		if (auctionEndAt != null && auctionEndAt.isBefore(now)) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
@@ -244,6 +267,7 @@ public class AuctionService {
 		boolean hasCategory = request.categoryId() != null;
 		boolean hasPrice = request.price() != null;
 		boolean hasStartPrice = request.startPrice() != null;
+		boolean hasAuctionStartAt = request.auctionStartAt() != null;
 		boolean hasAuctionEndAt = request.auctionEndAt() != null;
 		boolean hasImages = request.images() != null && !request.images().isEmpty();
 		boolean hasLocation = normalizeBlank(request.location()) != null;
@@ -255,6 +279,7 @@ public class AuctionService {
 			!hasCategory &&
 			!hasPrice &&
 			!hasStartPrice &&
+			!hasAuctionStartAt &&
 			!hasAuctionEndAt &&
 			!hasImages &&
 			!hasLocation

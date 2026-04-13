@@ -39,6 +39,9 @@ public record CreateAuctionRequest(
 	@Schema(description = "경매 시작가", example = "80000", nullable = true)
 	BigDecimal startPrice,
 
+	@Schema(description = "경매 시작 시각", example = "2026-04-15T10:00:00Z", nullable = true)
+	OffsetDateTime auctionStartAt,
+
 	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
 	OffsetDateTime auctionEndAt,
 

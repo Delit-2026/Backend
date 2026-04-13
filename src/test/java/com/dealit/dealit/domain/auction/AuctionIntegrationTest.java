@@ -72,8 +72,8 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("경매 판매에서 시작가가 없으면 비즈니스 검증 오류를 반환한다")
-	void createAuctionFailsWhenStartPriceMissing() throws Exception {
+	@DisplayName("경매 시작 시각이 미래면 AUCTION_SCHEDULED 상태를 반환한다")
+	void createAuctionScheduledSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -83,7 +83,40 @@ class AuctionIntegrationTest {
 					  "saleType": "AUCTION",
 					  "categoryId": 44,
 					  "price": null,
-					  "startPrice": null,
+					  "startPrice": 500000,
+					  "auctionStartAt": "2099-04-15T10:00:00Z",
+					  "auctionEndAt": "2099-04-15T12:00:00Z",
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "https://cdn.dealit.local/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "Busan",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.productId").isNumber())
+			.andExpect(jsonPath("$.saleType").value("AUCTION"))
+			.andExpect(jsonPath("$.status").value("AUCTION_SCHEDULED"));
+	}
+
+	@Test
+	@DisplayName("경매 판매에서 시작 시각이 없으면 비즈니스 검증 오류를 반환한다")
+	void createAuctionFailsWhenStartTimeMissing() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Rolex Datejust",
+					  "description": "Authentic watch in good condition.",
+					  "saleType": "AUCTION",
+					  "categoryId": 44,
+					  "price": null,
+					  "startPrice": 500000,
+					  "auctionStartAt": null,
 					  "auctionEndAt": "2099-04-15T12:00:00Z",
 					  "images": [
 					    {
@@ -98,6 +131,6 @@ class AuctionIntegrationTest {
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("경매 판매에서는 시작가가 필수입니다."));
+			.andExpect(jsonPath("$.message").value("경매 판매에서는 시작 시각이 필수입니다."));
 	}
 }
