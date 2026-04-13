@@ -44,12 +44,10 @@ public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMessageReportRepository chatMessageReportRepository;
     private final MemberRepository memberRepository;
+    private final ProductOwnershipPort productOwnershipPort;
+    private final ProductSummaryPort productSummaryPort;
 
-    /**
-     * 채팅방 생성
-     */
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
-        // 1) 기본 검증
         if (currentUserId == null) {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
@@ -60,10 +58,8 @@ public class ChatService {
             throw new IllegalArgumentException("자기 자신과는 채팅방을 생성할 수 없습니다.");
         }
 
-        // 2) 중복 채팅방 체크 (양방향)
-        // TODO: 실제로는 상품 소유자 기반으로 seller/buyer 판별
-        Long sellerId = currentUserId;
-        Long buyerId = request.receiverId();
+        Long sellerId = resolveSellerIdFromProduct(request.productId(), currentUserId, request.receiverId());
+        Long buyerId = sellerId.equals(currentUserId) ? request.receiverId() : currentUserId;
 
         boolean duplicated =
                 chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
@@ -77,22 +73,21 @@ public class ChatService {
             throw new DuplicateChatRoomException("이미 동일 상품/참여자의 채팅방이 존재합니다.");
         }
 
-        // 3) 저장
         ChatRoom saved = chatRoomRepository.save(
                 ChatRoom.create(sellerId, buyerId, request.productId(), ChatType.GENERAL)
         );
 
         MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
         MemberSnapshot receiver = resolveMemberSnapshot(request.receiverId());
+        ProductSummaryPort.ProductSummary product = productSummaryPort.getSummaryByProductId(request.productId());
 
-        // 4) 응답
         return new CreateChatRoomResponse(
                 saved.getRoomId(),
                 saved.getChatType(),
                 new CreateChatRoomResponse.ProductInfo(
-                        request.productId(),
-                        "상품#" + request.productId(), // TODO: product 도메인 연동 시 실제 상품명으로 교체
-                        null,                         // TODO: product 도메인 연동 시 썸네일로 교체
+                        product.productId(),
+                        product.name(),
+                        product.thumbnailUrl(),
                         "GENERAL",
                         "ACTIVE"
                 ),
@@ -119,9 +114,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 채팅방 목록 조회 (페이징)
-     */
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long currentUserId, int page, int size) {
         if (currentUserId == null) {
@@ -138,6 +130,7 @@ public class ChatService {
                 .map(room -> {
                     Long opponentId = room.getOpponentId(currentUserId);
                     MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
+                    ProductSummaryPort.ProductSummary product = productSummaryPort.getSummaryByProductId(room.getProductId());
 
                     ChatMessage lastMessage = chatMessageRepository.findLatestMessage(room.getRoomId()).orElse(null);
                     int unreadCount = (int) chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
@@ -159,9 +152,9 @@ public class ChatService {
                                     opponent.profileImageUrl()
                             ),
                             new ChatRoomListItemResponse.ProductInfo(
-                                    room.getProductId(),
-                                    "상품#" + room.getProductId(), // TODO: product 도메인 연동 시 실제 상품명
-                                    null                           // TODO: product 도메인 연동 시 썸네일
+                                    product.productId(),
+                                    product.name(),
+                                    product.thumbnailUrl()
                             ),
                             room.getChatType(),
                             lastMessageInfo,
@@ -181,9 +174,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 메시지 목록 조회 (페이징)
-     */
     @Transactional(readOnly = true)
     public ChatMessageListResponse getChatMessages(Long roomId, Long currentUserId, int page, int size) {
         if (roomId == null) {
@@ -224,9 +214,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 메시지 전송
-     */
     public SendChatMessageResponse sendMessage(Long roomId, SendChatMessageRequest request, Long currentUserId) {
         if (roomId == null) {
             throw new IllegalArgumentException("roomId는 필수입니다.");
@@ -264,9 +251,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 읽음 처리
-     */
     public MarkChatRoomAsReadResponse markAsRead(Long roomId, Long currentUserId) {
         if (roomId == null) {
             throw new IllegalArgumentException("roomId는 필수입니다.");
@@ -287,9 +271,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 전체 안읽음 개수
-     */
     @Transactional(readOnly = true)
     public UnreadCountResponse getUnreadCount(Long currentUserId) {
         if (currentUserId == null) {
@@ -305,9 +286,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 메시지 신고
-     */
     public ReportChatMessageResponse reportMessage(Long messageId, ReportChatMessageRequest request, Long currentUserId) {
         if (messageId == null) {
             throw new IllegalArgumentException("messageId는 필수입니다.");
@@ -342,9 +320,6 @@ public class ChatService {
         );
     }
 
-    /**
-     * 메시지 삭제 (선택 API)
-     */
     public void deleteMessage(Long messageId, Long currentUserId) {
         if (messageId == null) {
             throw new IllegalArgumentException("messageId는 필수입니다.");
@@ -360,9 +335,15 @@ public class ChatService {
             throw new ChatForbiddenException("본인이 보낸 메시지만 삭제할 수 있습니다.");
         }
 
-        // 현재는 하드 삭제
-        // TODO: 프로젝트 soft-delete 규칙에 맞춰 전환 필요
         chatMessageRepository.delete(message);
+    }
+
+    private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
+        Long ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
+        if (!ownerId.equals(currentUserId) && !ownerId.equals(receiverId)) {
+            throw new IllegalArgumentException("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");
+        }
+        return ownerId;
     }
 
     private MemberSnapshot resolveMemberSnapshot(Long memberId) {
