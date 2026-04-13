@@ -32,7 +32,7 @@ class AuctionIntegrationTest {
 	@BeforeEach
 	void setUp() {
 		auctionProductImageRepository.deleteAll();
-		uploadedImage = auctionProductImageRepository.saveAndFlush(
+		uploadedImage = auctionProductImageRepository.save(
 			AuctionProductImage.createTemporary(
 				"https://cdn.dealit.local/auction/images/test-image.jpg",
 				"test-image.jpg"
@@ -100,6 +100,6 @@ class AuctionIntegrationTest {
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("startPrice is required when saleType is AUCTION."));
+			.andExpect(jsonPath("$.message").value("경매 판매에서는 시작가가 필수입니다."));
 	}
 }

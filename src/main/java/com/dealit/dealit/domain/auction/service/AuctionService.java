@@ -55,7 +55,7 @@ public class AuctionService {
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
 		String sanitizedFilename = originalFilename.replaceAll("\\s+", "-");
-		AuctionProductImage savedImage = auctionProductImageRepository.saveAndFlush(
+		AuctionProductImage savedImage = auctionProductImageRepository.save(
 			AuctionProductImage.createTemporary(IMAGE_BASE_URL + sanitizedFilename, originalFilename)
 		);
 
@@ -114,7 +114,7 @@ public class AuctionService {
 					savedAt
 				));
 
-		AuctionDraft savedDraft = auctionDraftRepository.saveAndFlush(draft);
+		AuctionDraft savedDraft = auctionDraftRepository.save(draft);
 		return new SaveAuctionDraftResponse(savedDraft.getDraftId(), savedDraft.getSavedAt());
 	}
 

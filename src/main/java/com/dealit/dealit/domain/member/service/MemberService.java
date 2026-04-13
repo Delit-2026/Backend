@@ -29,7 +29,7 @@ public class MemberService {
 			normalizeBlank(request.name())
 		);
 
-		Member savedMember = memberRepository.saveAndFlush(member);
+		Member savedMember = memberRepository.save(member);
 		savedMember.assignDefaultNickname();
 
 		return new SignUpResponse(
