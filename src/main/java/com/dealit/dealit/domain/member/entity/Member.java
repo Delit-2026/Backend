@@ -1,13 +1,7 @@
 package com.dealit.dealit.domain.member.entity;
 
 import com.dealit.dealit.global.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,10 +17,15 @@ import lombok.NoArgsConstructor;
 	}
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+		name = "member_seq_generator",
+		sequenceName = "member_seq",
+		allocationSize = 1
+)
 public class Member extends BaseEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "member_seq_generator")
 	@Column(name = "member_id")
 	private Long memberId;
 
