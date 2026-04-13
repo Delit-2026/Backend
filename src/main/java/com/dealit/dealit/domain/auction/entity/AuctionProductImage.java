@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,10 +19,15 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "auction_product_image")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+	name = "auction_product_image_seq_generator",
+	sequenceName = "auction_product_image_seq",
+	allocationSize = 1
+)
 public class AuctionProductImage extends BaseEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "auction_product_image_seq_generator")
 	@Column(name = "image_id")
 	private Long imageId;
 

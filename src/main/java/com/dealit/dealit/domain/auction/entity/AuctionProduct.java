@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -26,10 +27,15 @@ import java.util.List;
 @Entity
 @Table(name = "auction_product")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+	name = "auction_product_seq_generator",
+	sequenceName = "auction_product_seq",
+	allocationSize = 1
+)
 public class AuctionProduct extends BaseEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "auction_product_seq_generator")
 	@Column(name = "product_id")
 	private Long productId;
 

@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -22,10 +23,15 @@ import java.time.OffsetDateTime;
 @Entity
 @Table(name = "auction_draft")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+	name = "auction_draft_seq_generator",
+	sequenceName = "auction_draft_seq",
+	allocationSize = 1
+)
 public class AuctionDraft extends BaseEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "auction_draft_seq_generator")
 	@Column(name = "draft_id")
 	private Long draftId;
 
