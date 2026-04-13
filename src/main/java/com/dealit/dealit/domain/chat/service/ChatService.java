@@ -1,35 +1,39 @@
 package com.dealit.dealit.domain.chat.service;
 
-import com.dealit.dealit.domain.chat.dto.*;
+import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
+import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
+import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
+import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
+import com.dealit.dealit.domain.chat.dto.MarkChatRoomAsReadResponse;
+import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
+import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
+import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.UnreadCountResponse;
+import com.dealit.dealit.domain.chat.entity.ChatMessage;
+import com.dealit.dealit.domain.chat.entity.ChatMessageReport;
+import com.dealit.dealit.domain.chat.entity.ChatRoom;
+import com.dealit.dealit.domain.chat.entity.ChatType;
+import com.dealit.dealit.domain.chat.exception.ChatForbiddenException;
+import com.dealit.dealit.domain.chat.exception.ChatMessageNotFoundException;
+import com.dealit.dealit.domain.chat.exception.ChatRoomNotFoundException;
+import com.dealit.dealit.domain.chat.exception.DuplicateChatReportException;
+import com.dealit.dealit.domain.chat.exception.DuplicateChatRoomException;
 import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
-import com.dealit.dealit.domain.chat.entity.ChatRoom;
-import com.dealit.dealit.domain.chat.entity.ChatType;
-import com.dealit.dealit.domain.chat.exception.DuplicateChatRoomException;
-import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
-import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
-import com.dealit.dealit.domain.chat.entity.ChatMessage;
-import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
-import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
-import com.dealit.dealit.domain.chat.exception.ChatRoomNotFoundException;
-import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
-import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
-import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
-import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
-import com.dealit.dealit.domain.chat.entity.ChatMessageReport;
-import com.dealit.dealit.domain.chat.exception.ChatForbiddenException;
-import com.dealit.dealit.domain.chat.exception.ChatMessageNotFoundException;
-import com.dealit.dealit.domain.chat.exception.DuplicateChatReportException;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberRepository;
+import java.time.LocalDateTime;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +43,7 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMessageReportRepository chatMessageReportRepository;
+    private final MemberRepository memberRepository;
 
     /**
      * 채팅방 생성
@@ -56,8 +61,9 @@ public class ChatService {
         }
 
         // 2) 중복 채팅방 체크 (양방향)
-        Long sellerId = currentUserId;      // TODO: 실제로는 상품 소유자 기반으로 결정
-        Long buyerId = request.receiverId(); // TODO: 실제로는 currentUser/receiver 역할 판별 필요
+        // TODO: 실제로는 상품 소유자 기반으로 seller/buyer 판별
+        Long sellerId = currentUserId;
+        Long buyerId = request.receiverId();
 
         boolean duplicated =
                 chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
@@ -76,20 +82,31 @@ public class ChatService {
                 ChatRoom.create(sellerId, buyerId, request.productId(), ChatType.GENERAL)
         );
 
-        // 4) 응답 (최소 구현; product/participant 상세는 추후 User/Product 조회 붙여서 고도화)
+        MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
+        MemberSnapshot receiver = resolveMemberSnapshot(request.receiverId());
+
+        // 4) 응답
         return new CreateChatRoomResponse(
                 saved.getRoomId(),
                 saved.getChatType(),
                 new CreateChatRoomResponse.ProductInfo(
                         request.productId(),
-                        "",
-                        null,
+                        "상품#" + request.productId(), // TODO: product 도메인 연동 시 실제 상품명으로 교체
+                        null,                         // TODO: product 도메인 연동 시 썸네일로 교체
                         "GENERAL",
                         "ACTIVE"
                 ),
                 List.of(
-                        new CreateChatRoomResponse.ParticipantInfo(currentUserId, "나", "SELLER"),
-                        new CreateChatRoomResponse.ParticipantInfo(request.receiverId(), "상대", "BUYER")
+                        new CreateChatRoomResponse.ParticipantInfo(
+                                currentUserId,
+                                currentUser.nickname(),
+                                sellerId.equals(currentUserId) ? "SELLER" : "BUYER"
+                        ),
+                        new CreateChatRoomResponse.ParticipantInfo(
+                                request.receiverId(),
+                                receiver.nickname(),
+                                sellerId.equals(request.receiverId()) ? "SELLER" : "BUYER"
+                        )
                 ),
                 false,
                 new CreateChatRoomResponse.ActionButtons(
@@ -120,9 +137,9 @@ public class ChatService {
         List<ChatRoomListItemResponse> content = roomPage.getContent().stream()
                 .map(room -> {
                     Long opponentId = room.getOpponentId(currentUserId);
+                    MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
 
                     ChatMessage lastMessage = chatMessageRepository.findLatestMessage(room.getRoomId()).orElse(null);
-
                     int unreadCount = (int) chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
 
                     ChatRoomListItemResponse.LastMessageInfo lastMessageInfo = (lastMessage == null)
@@ -138,18 +155,18 @@ public class ChatService {
                             room.getRoomId(),
                             new ChatRoomListItemResponse.OpponentInfo(
                                     opponentId,
-                                    "상대",     // TODO: member 조회 붙이면 실제 닉네임
-                                    null        // TODO: member 조회 붙이면 프로필 이미지
+                                    opponent.nickname(),
+                                    opponent.profileImageUrl()
                             ),
                             new ChatRoomListItemResponse.ProductInfo(
                                     room.getProductId(),
-                                    "",         // TODO: product 조회 붙이면 상품명
-                                    null        // TODO: product 조회 붙이면 썸네일
+                                    "상품#" + room.getProductId(), // TODO: product 도메인 연동 시 실제 상품명
+                                    null                           // TODO: product 도메인 연동 시 썸네일
                             ),
                             room.getChatType(),
                             lastMessageInfo,
                             unreadCount,
-                            room.getUpdatedAt() // BaseEntity updatedAt 사용
+                            room.getUpdatedAt()
                     );
                 })
                 .toList();
@@ -176,7 +193,6 @@ public class ChatService {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
 
-        // room 존재 + 참여 권한 체크
         chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
                 .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
 
@@ -222,23 +238,20 @@ public class ChatService {
             throw new IllegalArgumentException("요청 본문이 없습니다.");
         }
 
-        // room 존재 + 참여 권한 체크
         ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
                 .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
 
-        // 메시지 생성/저장
+        MemberSnapshot sender = resolveMemberSnapshot(currentUserId);
+
         ChatMessage saved = chatMessageRepository.save(
                 ChatMessage.create(
                         room.getRoomId(),
                         currentUserId,
-                        "나", // TODO: member 조회 연동 후 실제 닉네임으로 교체
+                        sender.nickname(),
                         request.messageType(),
                         request.content()
                 )
         );
-
-        // (선택) room updatedAt 갱신이 필요하면 room 엔티티에 touch() 메서드 추가 후 호출
-        // room.touch();
 
         return new SendChatMessageResponse(
                 saved.getMessageId(),
@@ -262,11 +275,9 @@ public class ChatService {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
 
-        // room 존재 + 참여 권한 확인
         chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
                 .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
 
-        // 내가 보낸 메시지는 제외하고 읽음 처리
         chatMessageRepository.markAllAsRead(roomId, currentUserId);
 
         return new MarkChatRoomAsReadResponse(
@@ -286,8 +297,6 @@ public class ChatService {
         }
 
         long count = chatMessageRepository.countTotalUnreadForUser(currentUserId);
-
-        // DTO가 int라서 안전 변환
         int totalUnread = count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
 
         return new UnreadCountResponse(
@@ -310,17 +319,14 @@ public class ChatService {
             throw new IllegalArgumentException("요청 본문이 없습니다.");
         }
 
-        // 메시지 존재 확인
         ChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new ChatMessageNotFoundException("신고할 메시지를 찾을 수 없습니다."));
 
-        // 중복 신고 방지
         boolean alreadyReported = chatMessageReportRepository.existsActiveReport(messageId, currentUserId);
         if (alreadyReported) {
             throw new DuplicateChatReportException("이미 신고한 메시지입니다.");
         }
 
-        // 신고 저장
         ChatMessageReport saved = chatMessageReportRepository.save(
                 ChatMessageReport.create(
                         message.getMessageId(),
@@ -357,5 +363,25 @@ public class ChatService {
         // 현재는 하드 삭제
         // TODO: 프로젝트 soft-delete 규칙에 맞춰 전환 필요
         chatMessageRepository.delete(message);
+    }
+
+    private MemberSnapshot resolveMemberSnapshot(Long memberId) {
+        return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
+                .map(member -> new MemberSnapshot(
+                        normalizeNickname(member),
+                        member.getProfileImage()
+                ))
+                .orElse(new MemberSnapshot("User#" + memberId, null));
+    }
+
+    private String normalizeNickname(Member member) {
+        String nickname = member.getNickname();
+        if (nickname == null || nickname.isBlank()) {
+            return "User#" + member.getMemberId();
+        }
+        return nickname;
+    }
+
+    private record MemberSnapshot(String nickname, String profileImageUrl) {
     }
 }

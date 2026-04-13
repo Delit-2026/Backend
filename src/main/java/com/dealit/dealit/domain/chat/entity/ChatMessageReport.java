@@ -1,7 +1,15 @@
 package com.dealit.dealit.domain.chat.entity;
 
-import com.dealit.dealit.global.entity.BaseEntity; // TODO: 실제 BaseEntity 경로로 수정
-import jakarta.persistence.*;
+import com.dealit.dealit.global.entity.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -23,10 +31,15 @@ import lombok.NoArgsConstructor;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+        name = "chat_message_report_seq_generator",
+        sequenceName = "chat_message_report_seq",
+        allocationSize = 1
+)
 public class ChatMessageReport extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "chat_message_report_seq_generator")
     @Column(name = "report_id")
     private Long reportId;
 
