@@ -34,9 +34,6 @@ public record SaveAuctionDraftRequest(
 	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
 	OffsetDateTime auctionEndAt,
 
-	@Schema(description = "가격 제안 허용 여부", example = "false", nullable = true)
-	Boolean allowOffer,
-
 	@Schema(description = "상품 이미지 목록", nullable = true)
 	List<@Valid ProductImagePayload> images,
 
@@ -56,7 +53,6 @@ public record SaveAuctionDraftRequest(
 			request.price(),
 			request.startPrice(),
 			request.auctionEndAt(),
-			request.allowOffer(),
 			request.images(),
 			request.location(),
 			request.draftId()

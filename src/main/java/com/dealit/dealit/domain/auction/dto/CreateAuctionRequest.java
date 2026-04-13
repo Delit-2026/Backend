@@ -42,9 +42,6 @@ public record CreateAuctionRequest(
 	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
 	OffsetDateTime auctionEndAt,
 
-	@Schema(description = "가격 제안 허용 여부", example = "false")
-	boolean allowOffer,
-
 	@ArraySchema(schema = @Schema(implementation = ProductImagePayload.class), minItems = 1)
 	@NotEmpty(message = "이미지는 최소 1장 이상 등록해야 합니다.")
 	List<@Valid ProductImagePayload> images,

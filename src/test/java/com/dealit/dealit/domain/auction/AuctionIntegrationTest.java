@@ -54,7 +54,6 @@ class AuctionIntegrationTest {
 					  "price": 1350000,
 					  "startPrice": null,
 					  "auctionEndAt": null,
-					  "allowOffer": false,
 					  "images": [
 					    {
 					      "imageId": %d,
@@ -86,7 +85,6 @@ class AuctionIntegrationTest {
 					  "price": null,
 					  "startPrice": null,
 					  "auctionEndAt": "2099-04-15T12:00:00Z",
-					  "allowOffer": false,
 					  "images": [
 					    {
 					      "imageId": %d,

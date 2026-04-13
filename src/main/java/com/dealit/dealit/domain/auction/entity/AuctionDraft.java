@@ -57,9 +57,6 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
-	@Column(name = "allow_offer")
-	private Boolean allowOffer;
-
 	@Column(name = "location", length = 100)
 	private String location;
 
@@ -78,7 +75,6 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -90,7 +86,6 @@ public class AuctionDraft extends BaseEntity {
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionEndAt = auctionEndAt;
-		this.allowOffer = allowOffer;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;
@@ -104,7 +99,6 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -117,7 +111,6 @@ public class AuctionDraft extends BaseEntity {
 			price,
 			startPrice,
 			auctionEndAt,
-			allowOffer,
 			location,
 			payloadJson,
 			savedAt
@@ -132,7 +125,6 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -144,7 +136,6 @@ public class AuctionDraft extends BaseEntity {
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionEndAt = auctionEndAt;
-		this.allowOffer = allowOffer;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;

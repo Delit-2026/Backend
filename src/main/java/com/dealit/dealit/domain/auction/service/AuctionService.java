@@ -80,7 +80,6 @@ public class AuctionService {
 				request.price(),
 				request.startPrice(),
 				request.auctionEndAt(),
-				request.allowOffer(),
 				normalizeBlank(request.location()),
 				payloadJson,
 				savedAt
@@ -95,7 +94,6 @@ public class AuctionService {
 						request.price(),
 						request.startPrice(),
 						request.auctionEndAt(),
-						request.allowOffer(),
 						normalizeBlank(request.location()),
 						payloadJson,
 						savedAt
@@ -110,7 +108,6 @@ public class AuctionService {
 					request.price(),
 					request.startPrice(),
 					request.auctionEndAt(),
-					request.allowOffer(),
 					normalizeBlank(request.location()),
 					payloadJson,
 					savedAt
@@ -156,7 +153,6 @@ public class AuctionService {
 				request.price(),
 				request.startPrice(),
 				request.auctionEndAt(),
-				request.allowOffer(),
 				request.location().trim(),
 				request.draftId(),
 				determineStatus(request.saleType(), request.auctionEndAt(), OffsetDateTime.now(ZoneOffset.UTC))
@@ -249,7 +245,6 @@ public class AuctionService {
 		boolean hasPrice = request.price() != null;
 		boolean hasStartPrice = request.startPrice() != null;
 		boolean hasAuctionEndAt = request.auctionEndAt() != null;
-		boolean hasAllowOffer = request.allowOffer() != null;
 		boolean hasImages = request.images() != null && !request.images().isEmpty();
 		boolean hasLocation = normalizeBlank(request.location()) != null;
 
@@ -261,7 +256,6 @@ public class AuctionService {
 			!hasPrice &&
 			!hasStartPrice &&
 			!hasAuctionEndAt &&
-			!hasAllowOffer &&
 			!hasImages &&
 			!hasLocation
 		) {

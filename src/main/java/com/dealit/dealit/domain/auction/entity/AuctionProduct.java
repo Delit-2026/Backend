@@ -61,9 +61,6 @@ public class AuctionProduct extends BaseEntity {
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
-	@Column(name = "allow_offer", nullable = false)
-	private boolean allowOffer;
-
 	@Column(name = "location", nullable = false, length = 100)
 	private String location;
 
@@ -85,7 +82,6 @@ public class AuctionProduct extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		boolean allowOffer,
 		String location,
 		Long draftId,
 		AuctionStatus status
@@ -97,7 +93,6 @@ public class AuctionProduct extends BaseEntity {
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionEndAt = auctionEndAt;
-		this.allowOffer = allowOffer;
 		this.location = location;
 		this.draftId = draftId;
 		this.status = status;
@@ -111,7 +106,6 @@ public class AuctionProduct extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		boolean allowOffer,
 		String location,
 		Long draftId,
 		AuctionStatus status
@@ -124,7 +118,6 @@ public class AuctionProduct extends BaseEntity {
 			price,
 			startPrice,
 			auctionEndAt,
-			allowOffer,
 			location,
 			draftId,
 			status
