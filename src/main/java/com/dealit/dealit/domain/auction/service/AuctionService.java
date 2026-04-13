@@ -66,50 +66,52 @@ public class AuctionService {
 
 	@Transactional
 	public SaveAuctionDraftResponse saveDraft(SaveAuctionDraftRequest request) {
+		validateDraftRequest(request);
+
 		OffsetDateTime savedAt = OffsetDateTime.now(ZoneOffset.UTC);
 		String payloadJson = serializeDraft(request);
 
 		AuctionDraft draft = request.draftId() == null
 			? AuctionDraft.create(
-				request.name().trim(),
-				request.description().trim(),
+				normalizeBlank(request.name()),
+				normalizeBlank(request.description()),
 				request.saleType(),
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
 				request.auctionEndAt(),
 				request.allowOffer(),
-				request.location().trim(),
+				normalizeBlank(request.location()),
 				payloadJson,
 				savedAt
 			)
 			: auctionDraftRepository.findById(request.draftId())
 				.map(existingDraft -> {
 					existingDraft.update(
-						request.name().trim(),
-						request.description().trim(),
+						normalizeBlank(request.name()),
+						normalizeBlank(request.description()),
 						request.saleType(),
 						request.categoryId(),
 						request.price(),
 						request.startPrice(),
 						request.auctionEndAt(),
 						request.allowOffer(),
-						request.location().trim(),
+						normalizeBlank(request.location()),
 						payloadJson,
 						savedAt
 					);
 					return existingDraft;
 				})
 				.orElseGet(() -> AuctionDraft.create(
-					request.name().trim(),
-					request.description().trim(),
+					normalizeBlank(request.name()),
+					normalizeBlank(request.description()),
 					request.saleType(),
 					request.categoryId(),
 					request.price(),
 					request.startPrice(),
 					request.auctionEndAt(),
 					request.allowOffer(),
-					request.location().trim(),
+					normalizeBlank(request.location()),
 					payloadJson,
 					savedAt
 				));
@@ -237,5 +239,42 @@ public class AuctionService {
 		} catch (JsonProcessingException exception) {
 			throw new InvalidAuctionRequestException("임시저장 데이터를 처리하는 중 오류가 발생했습니다.");
 		}
+	}
+
+	private void validateDraftRequest(SaveAuctionDraftRequest request) {
+		boolean hasSaleType = request.saleType() != null;
+		boolean hasName = normalizeBlank(request.name()) != null;
+		boolean hasDescription = normalizeBlank(request.description()) != null;
+		boolean hasCategory = request.categoryId() != null;
+		boolean hasPrice = request.price() != null;
+		boolean hasStartPrice = request.startPrice() != null;
+		boolean hasAuctionEndAt = request.auctionEndAt() != null;
+		boolean hasAllowOffer = request.allowOffer() != null;
+		boolean hasImages = request.images() != null && !request.images().isEmpty();
+		boolean hasLocation = normalizeBlank(request.location()) != null;
+
+		if (
+			!hasSaleType &&
+			!hasName &&
+			!hasDescription &&
+			!hasCategory &&
+			!hasPrice &&
+			!hasStartPrice &&
+			!hasAuctionEndAt &&
+			!hasAllowOffer &&
+			!hasImages &&
+			!hasLocation
+		) {
+			throw new InvalidAuctionRequestException("임시저장할 내용이 없습니다.");
+		}
+	}
+
+	private String normalizeBlank(String value) {
+		if (value == null) {
+			return null;
+		}
+
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
 	}
 }

@@ -35,17 +35,17 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "draft_id")
 	private Long draftId;
 
-	@Column(name = "name", nullable = false, length = 100)
+	@Column(name = "name", length = 100)
 	private String name;
 
-	@Column(name = "description", nullable = false, length = 2000)
+	@Column(name = "description", length = 2000)
 	private String description;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "sale_type", nullable = false, length = 20)
+	@Column(name = "sale_type", length = 20)
 	private ProductSaleType saleType;
 
-	@Column(name = "category_id", nullable = false)
+	@Column(name = "category_id")
 	private Long categoryId;
 
 	@Column(name = "price", precision = 15, scale = 2)
@@ -57,10 +57,10 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
-	@Column(name = "allow_offer", nullable = false)
-	private boolean allowOffer;
+	@Column(name = "allow_offer")
+	private Boolean allowOffer;
 
-	@Column(name = "location", nullable = false, length = 100)
+	@Column(name = "location", length = 100)
 	private String location;
 
 	@Lob
@@ -78,7 +78,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		boolean allowOffer,
+		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -104,7 +104,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		boolean allowOffer,
+		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -132,7 +132,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionEndAt,
-		boolean allowOffer,
+		Boolean allowOffer,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt

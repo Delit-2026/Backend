@@ -3,9 +3,6 @@ package com.dealit.dealit.domain.auction.dto;
 import com.dealit.dealit.domain.auction.ProductSaleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -15,21 +12,17 @@ import java.util.List;
 @Schema(description = "경매 상품 임시저장 요청")
 public record SaveAuctionDraftRequest(
 	@Schema(description = "상품명", example = "애플워치 시리즈 9")
-	@NotBlank(message = "상품명은 필수입니다.")
 	@Size(max = 100, message = "상품명은 100자 이하여야 합니다.")
 	String name,
 
 	@Schema(description = "상품 설명", example = "개봉 후 몇 번 사용하지 않았고 충전기도 함께 드립니다.")
-	@NotBlank(message = "상품 설명은 필수입니다.")
 	@Size(max = 2000, message = "상품 설명은 2000자 이하여야 합니다.")
 	String description,
 
 	@Schema(description = "판매 유형", example = "AUCTION")
-	@NotNull(message = "판매 유형은 필수입니다.")
 	ProductSaleType saleType,
 
 	@Schema(description = "카테고리 ID", example = "101")
-	@NotNull(message = "카테고리 ID는 필수입니다.")
 	Long categoryId,
 
 	@Schema(description = "일반 판매가", example = "120000", nullable = true)
@@ -41,15 +34,13 @@ public record SaveAuctionDraftRequest(
 	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
 	OffsetDateTime auctionEndAt,
 
-	@Schema(description = "가격 제안 허용 여부", example = "false")
-	boolean allowOffer,
+	@Schema(description = "가격 제안 허용 여부", example = "false", nullable = true)
+	Boolean allowOffer,
 
-	@Schema(description = "상품 이미지 목록")
-	@NotEmpty(message = "이미지는 최소 1장 이상 등록해야 합니다.")
+	@Schema(description = "상품 이미지 목록", nullable = true)
 	List<@Valid ProductImagePayload> images,
 
 	@Schema(description = "거래 위치", example = "서울 강남구")
-	@NotBlank(message = "거래 위치는 필수입니다.")
 	@Size(max = 100, message = "거래 위치는 100자 이하여야 합니다.")
 	String location,
 
