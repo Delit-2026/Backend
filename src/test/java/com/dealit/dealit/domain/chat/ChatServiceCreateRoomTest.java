@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
+import com.dealit.dealit.domain.chat.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
@@ -74,5 +75,34 @@ class ChatServiceCreateRoomTest {
         assertThatThrownBy(() -> chatService.createChatRoom(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");
+    }
+
+    @Test
+    @DisplayName("상품이 없으면 ProductNotFoundException을 전파한다 (strict)")
+    void createChatRoom_fail_whenProductNotFound() {
+        ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+        ChatMessageRepository chatMessageRepository = mock(ChatMessageRepository.class);
+        ChatMessageReportRepository chatMessageReportRepository = mock(ChatMessageReportRepository.class);
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
+        ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
+
+        when(productOwnershipPort.getOwnerIdByProductId(404L))
+                .thenThrow(new ProductNotFoundException("유효한 상품을 찾을 수 없습니다. productId=404"));
+
+        ChatService chatService = new ChatService(
+                chatRoomRepository,
+                chatMessageRepository,
+                chatMessageReportRepository,
+                memberRepository,
+                productOwnershipPort,
+                productSummaryPort
+        );
+
+        CreateChatRoomRequest request = new CreateChatRoomRequest(404L, 2L);
+
+        assertThatThrownBy(() -> chatService.createChatRoom(request, 1L))
+                .isInstanceOf(ProductNotFoundException.class)
+                .hasMessageContaining("productId=404");
     }
 }
