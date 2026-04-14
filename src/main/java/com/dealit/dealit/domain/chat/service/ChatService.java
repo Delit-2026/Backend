@@ -346,12 +346,7 @@ public class ChatService {
     }
 
     private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
-        Long ownerId;
-        try {
-            ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
-        } catch (ProductNotFoundException e) {
-            ownerId = currentUserId;
-        }
+        Long ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
 
         if (!ownerId.equals(currentUserId) && !ownerId.equals(receiverId)) {
             throw new IllegalArgumentException("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");

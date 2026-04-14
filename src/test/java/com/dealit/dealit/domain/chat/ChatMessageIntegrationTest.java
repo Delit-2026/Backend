@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
@@ -10,6 +11,8 @@ import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
 import com.dealit.dealit.domain.chat.entity.ChatMessageType;
 import com.dealit.dealit.domain.chat.service.ChatService;
+import com.dealit.dealit.domain.chat.service.ProductOwnershipPort;
+import com.dealit.dealit.domain.chat.service.ProductSummaryPort;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import jakarta.persistence.EntityManager;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -34,17 +38,25 @@ class ChatMessageIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    @MockitoBean
+    private ProductOwnershipPort productOwnershipPort;
+
+    @MockitoBean
+    private ProductSummaryPort productSummaryPort;
+
     @Test
     @DisplayName("fallback 계약: room API에서 닉네임 공백은 User#id, null 필드는 null 유지")
     void fallbackForRoomApis() {
         Member seller = createMember("seller");
         Member buyer = createMember("buyer");
         String buyerFallbackNickname = "User#" + buyer.getMemberId();
+        Long productId = 100L;
 
         setNicknameBlank(buyer.getMemberId());
+        stubProduct(productId, seller.getMemberId(), null);
 
         CreateChatRoomResponse created = chatService.createChatRoom(
-                new CreateChatRoomRequest(100L, buyer.getMemberId()),
+                new CreateChatRoomRequest(productId, buyer.getMemberId()),
                 seller.getMemberId()
         );
 
@@ -69,11 +81,13 @@ class ChatMessageIntegrationTest {
         Member seller = createMember("seller");
         Member buyer = createMember("buyer");
         String buyerFallbackNickname = "User#" + buyer.getMemberId();
+        Long productId = 200L;
 
         setNicknameBlank(buyer.getMemberId());
+        stubProduct(productId, seller.getMemberId(), null);
 
         CreateChatRoomResponse created = chatService.createChatRoom(
-                new CreateChatRoomRequest(200L, buyer.getMemberId()),
+                new CreateChatRoomRequest(productId, buyer.getMemberId()),
                 seller.getMemberId()
         );
 
@@ -114,5 +128,11 @@ class ChatMessageIntegrationTest {
                 "010-0000-0000",
                 prefix
         ));
+    }
+
+    private void stubProduct(Long productId, Long sellerId, String thumbnailUrl) {
+        when(productOwnershipPort.getOwnerIdByProductId(productId)).thenReturn(sellerId);
+        when(productSummaryPort.getSummaryByProductId(productId))
+                .thenReturn(new ProductSummaryPort.ProductSummary(productId, "test-product", thumbnailUrl));
     }
 }
