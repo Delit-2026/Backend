@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
+    Optional<ChatMessage> findByMessageIdAndDeletedAtIsNull(Long messageId);
+
     @Query("""
         SELECT m
         FROM ChatMessage m
