@@ -51,9 +51,9 @@ class AuthIntegrationTest {
 			null,
 			"홍길동"
 		);
-		savedMember = memberRepository.saveAndFlush(member);
+		savedMember = memberRepository.save(member);
 		savedMember.assignDefaultNickname();
-		memberRepository.saveAndFlush(savedMember);
+		memberRepository.save(savedMember);
 	}
 
 	@Test

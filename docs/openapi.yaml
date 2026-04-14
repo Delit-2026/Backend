@@ -8,16 +8,169 @@ info:
 servers:
 - url: http://localhost:8080
   description: Local server
+security:
+- bearerAuth: []
 tags:
 - name: Health
-  description: Application health check
+  description: 애플리케이션 상태 확인 API
+- name: Auction
+  description: 경매 상품 등록 API
+- name: Member
+  description: 회원 API
+- name: Auth
+  description: 인증 API
 paths:
+  /api/v1/members/signup:
+    post:
+      tags:
+      - Member
+      summary: 회원가입
+      description: 신규 회원을 생성합니다.
+      operationId: signUp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignUpRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SignUpResponse"
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: 로그인
+      description: 로그인 성공 시 JWT Access Token을 발급합니다.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+  /api/v1/auction:
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 등록
+      description: 프론트가 가공한 최종 payload로 상품을 등록한다.
+      operationId: createAuction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuctionRequest"
+        required: true
+      responses:
+        "201":
+          description: 상품 등록 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateAuctionResponse"
+  /api/v1/auction/price/recommend:
+    post:
+      tags:
+      - Auction
+      summary: 가격 추천
+      description: 상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.
+      operationId: recommendPrice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendPriceRequest"
+        required: true
+      responses:
+        "200":
+          description: 가격 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendPriceResponse"
+  /api/v1/auction/image:
+    post:
+      tags:
+      - Auction
+      summary: 상품 이미지 업로드
+      description: 경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.
+      operationId: uploadImage
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: 이미지 업로드 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UploadAuctionImageResponse"
+  /api/v1/auction/draft:
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 임시저장
+      description: 등록 직전 폼 데이터를 draft 상태로 저장한다.
+      operationId: saveDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveAuctionDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: 임시저장 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SaveAuctionDraftResponse"
+  /api/v1/auction/category/recommend:
+    post:
+      tags:
+      - Auction
+      summary: 카테고리 추천
+      description: 입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.
+      operationId: recommendCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendCategoryRequest"
+        required: true
+      responses:
+        "200":
+          description: 카테고리 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendCategoryResponse"
   /api/v1/health:
     get:
       tags:
       - Health
-      summary: Health check
-      description: Returns basic application status
+      summary: 상태 확인
+      description: 애플리케이션의 기본 상태 정보를 반환합니다.
       operationId: health
       responses:
         "200":
@@ -27,4 +180,418 @@ paths:
               schema:
                 type: object
                 additionalProperties: {}
-components: {}
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Auth
+      summary: 내 정보 조회
+      description: 현재 인증된 회원의 기본 정보를 조회합니다.
+      operationId: me
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CurrentMemberResponse"
+components:
+  schemas:
+    SignUpRequest:
+      type: object
+      description: 회원가입 요청
+      properties:
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+          maxLength: 30
+          minLength: 0
+        password:
+          type: string
+          description: 비밀번호
+          example: 비밀번호123!
+          maxLength: 30
+          minLength: 8
+        email:
+          type: string
+          format: email
+          description: 이메일
+          example: hong@example.com
+          maxLength: 100
+          minLength: 0
+        name:
+          type: string
+          description: 이름
+          example: 홍길동
+          maxLength: 30
+          minLength: 0
+      required:
+      - email
+      - loginId
+      - password
+    SignUpResponse:
+      type: object
+      description: 회원가입 응답
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+          example: 1
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+        email:
+          type: string
+          description: 이메일
+          example: hong@example.com
+        nickname:
+          type: string
+          description: 자동 생성 닉네임
+          example: 당근한입
+        createdAt:
+          type: string
+          format: date-time
+          description: 생성 시각
+    LoginRequest:
+      type: object
+      description: 로그인 요청
+      properties:
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+          maxLength: 30
+          minLength: 0
+        password:
+          type: string
+          description: 비밀번호
+          example: 비밀번호123!
+          maxLength: 30
+          minLength: 8
+      required:
+      - loginId
+      - password
+    LoginResponse:
+      type: object
+      description: 로그인 응답
+      properties:
+        accessToken:
+          type: string
+          description: 액세스 토큰
+        tokenType:
+          type: string
+          description: 토큰 타입
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          description: 만료 시간(ms)
+          example: 3600000
+    CreateAuctionRequest:
+      type: object
+      description: 경매 상품 등록 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 맥북 에어 M1
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 얼마 안 사용해서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        auctionStartAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-15T10:00:00Z
+        auctionEndAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-04-15T12:00:00Z
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 5
+      required:
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - saleType
+    ProductImagePayload:
+      type: object
+      description: 상품 이미지 메타데이터
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: https://cdn.dealit.local/auction/images/1.jpg
+          minLength: 1
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+      required:
+      - imageId
+      - imageUrl
+      - sortOrder
+    CreateAuctionResponse:
+      type: object
+      description: 경매 상품 등록 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 등록된 상품 ID
+          example: 1001
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - AUCTION_SCHEDULED
+          - AUCTION_LIVE
+          example: AUCTION_LIVE
+    RecommendPriceRequest:
+      type: object
+      description: 가격 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치 OLED
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 사용하지 않아서 깨끗합니다
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+      required:
+      - description
+      - name
+      - saleType
+    RecommendPriceResponse:
+      type: object
+      description: 가격 추천 응답
+      properties:
+        recommendedPrice:
+          type: number
+          description: 추천 판매가
+          example: 250000
+        startPrice:
+          type: number
+          description: 추천 시작가
+          example: 180000
+    UploadAuctionImageResponse:
+      type: object
+      description: 상품 이미지 업로드 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 301
+        imageUrl:
+          type: string
+          description: 업로드된 이미지 URL
+          example: https://cdn.dealit.local/auction/images/301-sample.jpg
+    SaveAuctionDraftRequest:
+      type: object
+      description: 경매 상품 임시저장 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 애플워치 시리즈 9
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 개봉 후 몇 번 사용하지 않았고 충전기도 함께 드립니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        auctionStartAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-15T10:00:00Z
+        auctionEndAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-04-15T12:00:00Z
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 5
+    SaveAuctionDraftResponse:
+      type: object
+      description: 경매 상품 임시저장 응답
+      properties:
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 10
+        savedAt:
+          type: string
+          format: date-time
+          description: 저장 시각
+          example: 2026-04-12T20:00:00Z
+    RecommendCategoryRequest:
+      type: object
+      description: 카테고리 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 독과 조이콘이 포함된 중고 제품입니다.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - description
+      - name
+    RecommendCategoryResponse:
+      type: object
+      description: 카테고리 추천 응답
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+          description: 추천 카테고리 ID
+          example: 200
+        categoryName:
+          type: string
+          description: 추천 카테고리명
+          example: 디지털/가전
+    CurrentMemberResponse:
+      type: object
+      description: 현재 인증된 회원 정보
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+          example: 1
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+        email:
+          type: string
+          description: 이메일
+          example: hong@example.com
+        nickname:
+          type: string
+          description: 닉네임
+          example: 당근한입
+  securitySchemes:
+    bearerAuth:
+      type: http
+      name: Authorization
+      in: header
+      scheme: bearer
+      bearerFormat: JWT

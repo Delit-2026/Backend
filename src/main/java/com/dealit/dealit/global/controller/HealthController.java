@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.OffsetDateTime;
 import java.util.Map;
 
-@Tag(name = "Health", description = "Application health check")
+@Tag(name = "Health", description = "애플리케이션 상태 확인 API")
 @RestController
 @RequestMapping("/api/v1")
 public class HealthController {
 
-	@Operation(summary = "Health check", description = "Returns basic application status")
+	@Operation(summary = "상태 확인", description = "애플리케이션의 기본 상태 정보를 반환합니다.")
 	@GetMapping("/health")
 	public Map<String, Object> health() {
 		return Map.of(

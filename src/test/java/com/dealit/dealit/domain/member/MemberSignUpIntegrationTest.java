@@ -66,7 +66,7 @@ class MemberSignUpIntegrationTest {
 	@Test
 	@DisplayName("중복 이메일로 회원가입하면 충돌 오류를 반환한다")
 	void signUpFailsWhenEmailDuplicated() throws Exception {
-		memberRepository.saveAndFlush(Member.create(
+		memberRepository.save(Member.create(
 			"existing-user",
 			passwordEncoder.encode("Password123!"),
 			"user@dealit.com",
