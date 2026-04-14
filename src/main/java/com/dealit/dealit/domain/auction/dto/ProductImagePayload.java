@@ -12,7 +12,7 @@ public record ProductImagePayload(
 	@Positive(message = "이미지 ID는 1 이상이어야 합니다.")
 	Long imageId,
 
-	@Schema(description = "이미지 URL", example = "https://cdn.dealit.local/auction/images/1.jpg")
+	@Schema(description = "이미지 URL", example = "http://localhost:8080/auction/images/1-sample.jpg")
 	@NotBlank(message = "이미지 URL은 필수입니다.")
 	String imageUrl,
 
