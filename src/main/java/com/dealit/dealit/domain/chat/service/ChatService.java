@@ -21,6 +21,7 @@ import com.dealit.dealit.domain.chat.exception.ChatMessageNotFoundException;
 import com.dealit.dealit.domain.chat.exception.ChatRoomNotFoundException;
 import com.dealit.dealit.domain.chat.exception.DuplicateChatReportException;
 import com.dealit.dealit.domain.chat.exception.DuplicateChatRoomException;
+import com.dealit.dealit.domain.chat.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
@@ -61,12 +62,13 @@ public class ChatService {
         Long sellerId = resolveSellerIdFromProduct(request.productId(), currentUserId, request.receiverId());
         Long buyerId = sellerId.equals(currentUserId) ? request.receiverId() : currentUserId;
 
-        boolean duplicated =
-                chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
+        if (sellerId.equals(buyerId)) {
+            throw new IllegalArgumentException("seller/buyer가 동일할 수 없습니다.");
+        }
+
+        boolean duplicated = chatRoomRepository
+                .findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
                         sellerId, buyerId, request.productId()
-                ).isPresent()
-                        || chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
-                        buyerId, sellerId, request.productId()
                 ).isPresent();
 
         if (duplicated) {
@@ -79,7 +81,7 @@ public class ChatService {
 
         MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
         MemberSnapshot receiver = resolveMemberSnapshot(request.receiverId());
-        ProductSummaryPort.ProductSummary product = productSummaryPort.getSummaryByProductId(request.productId());
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(request.productId());
 
         return new CreateChatRoomResponse(
                 saved.getRoomId(),
@@ -130,10 +132,12 @@ public class ChatService {
                 .map(room -> {
                     Long opponentId = room.getOpponentId(currentUserId);
                     MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
-                    ProductSummaryPort.ProductSummary product = productSummaryPort.getSummaryByProductId(room.getProductId());
+                    ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
 
                     ChatMessage lastMessage = chatMessageRepository.findLatestMessage(room.getRoomId()).orElse(null);
-                    int unreadCount = (int) chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
+
+                    long unreadCountLong = chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
+                    int unreadCount = unreadCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadCountLong;
 
                     ChatRoomListItemResponse.LastMessageInfo lastMessageInfo = (lastMessage == null)
                             ? null
@@ -264,9 +268,12 @@ public class ChatService {
 
         chatMessageRepository.markAllAsRead(roomId, currentUserId);
 
+        long unreadAfter = chatMessageRepository.countUnreadByRoomId(roomId, currentUserId);
+        int unreadCountAfter = unreadAfter > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadAfter;
+
         return new MarkChatRoomAsReadResponse(
                 roomId,
-                0,
+                unreadCountAfter,
                 LocalDateTime.now()
         );
     }
@@ -297,7 +304,7 @@ public class ChatService {
             throw new IllegalArgumentException("요청 본문이 없습니다.");
         }
 
-        ChatMessage message = chatMessageRepository.findById(messageId)
+        ChatMessage message = chatMessageRepository.findByMessageIdAndDeletedAtIsNull(messageId)
                 .orElseThrow(() -> new ChatMessageNotFoundException("신고할 메시지를 찾을 수 없습니다."));
 
         boolean alreadyReported = chatMessageReportRepository.existsActiveReport(messageId, currentUserId);
@@ -328,22 +335,36 @@ public class ChatService {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
 
-        ChatMessage message = chatMessageRepository.findById(messageId)
+        ChatMessage message = chatMessageRepository.findByMessageIdAndDeletedAtIsNull(messageId)
                 .orElseThrow(() -> new ChatMessageNotFoundException("삭제할 메시지를 찾을 수 없습니다."));
 
         if (!message.getSenderId().equals(currentUserId)) {
             throw new ChatForbiddenException("본인이 보낸 메시지만 삭제할 수 있습니다.");
         }
 
-        chatMessageRepository.delete(message);
+        message.softDelete();
     }
 
     private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
-        Long ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
+        Long ownerId;
+        try {
+            ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
+        } catch (ProductNotFoundException e) {
+            ownerId = currentUserId;
+        }
+
         if (!ownerId.equals(currentUserId) && !ownerId.equals(receiverId)) {
             throw new IllegalArgumentException("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");
         }
         return ownerId;
+    }
+
+    private ProductSummaryPort.ProductSummary resolveProductSummaryOrFallback(Long productId) {
+        try {
+            return productSummaryPort.getSummaryByProductId(productId);
+        } catch (ProductNotFoundException e) {
+            return new ProductSummaryPort.ProductSummary(productId, null, null);
+        }
     }
 
     private MemberSnapshot resolveMemberSnapshot(Long memberId) {

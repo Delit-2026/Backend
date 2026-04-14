@@ -11,6 +11,7 @@ import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.chat.service.ChatService;
 import com.dealit.dealit.domain.chat.service.ProductOwnershipPort;
+import com.dealit.dealit.domain.chat.service.ProductSummaryPort;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,7 @@ class ChatServiceCreateRoomTest {
         ChatMessageReportRepository chatMessageReportRepository = mock(ChatMessageReportRepository.class);
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
+        ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
 
         when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(anyLong(), anyLong(), anyLong()))
                 .thenReturn(Optional.empty());
@@ -35,7 +37,8 @@ class ChatServiceCreateRoomTest {
                 chatMessageRepository,
                 chatMessageReportRepository,
                 memberRepository,
-                productOwnershipPort
+                productOwnershipPort,
+                productSummaryPort
         );
 
         CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 1L);
@@ -53,15 +56,17 @@ class ChatServiceCreateRoomTest {
         ChatMessageReportRepository chatMessageReportRepository = mock(ChatMessageReportRepository.class);
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
+        ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
 
-        when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(999L); // currentUser(1), receiver(2) 아님
+        when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(999L);
 
         ChatService chatService = new ChatService(
                 chatRoomRepository,
                 chatMessageRepository,
                 chatMessageReportRepository,
                 memberRepository,
-                productOwnershipPort
+                productOwnershipPort,
+                productSummaryPort
         );
 
         CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 2L);
