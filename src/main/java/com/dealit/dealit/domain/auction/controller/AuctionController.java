@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auction.controller;
 
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
+import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
@@ -19,6 +20,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,6 +44,14 @@ public class AuctionController {
 	@PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public UploadAuctionImageResponse uploadImage(@RequestPart("file") MultipartFile file) {
 		return auctionService.uploadImage(file);
+	}
+
+	@Operation(summary = "상품 이미지 삭제", description = "등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.")
+	@ApiResponse(responseCode = "200", description = "이미지 삭제 성공",
+		content = @Content(schema = @Schema(implementation = DeleteAuctionImageResponse.class)))
+	@DeleteMapping("/image/{imageId}")
+	public DeleteAuctionImageResponse deleteImage(@PathVariable Long imageId) {
+		return auctionService.deleteImage(imageId);
 	}
 
 	@Operation(summary = "경매 상품 임시저장", description = "등록 직전 폼 데이터를 draft 상태로 저장한다.")

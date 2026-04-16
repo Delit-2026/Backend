@@ -125,6 +125,27 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UploadAuctionImageResponse"
+  /api/v1/auction/image/{imageId}:
+    delete:
+      tags:
+      - Auction
+      summary: 상품 이미지 삭제
+      description: 등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.
+      operationId: deleteImage
+      parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 이미지 삭제 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeleteAuctionImageResponse"
   /api/v1/auction/draft:
     post:
       tags:
@@ -371,7 +392,7 @@ components:
         imageUrl:
           type: string
           description: 이미지 URL
-          example: https://cdn.dealit.local/auction/images/1.jpg
+          example: http://localhost:8080/auction/images/1-sample.jpg
           minLength: 1
         sortOrder:
           type: integer
@@ -458,7 +479,23 @@ components:
         imageUrl:
           type: string
           description: 업로드된 이미지 URL
-          example: https://cdn.dealit.local/auction/images/301-sample.jpg
+          example: http://localhost:8080/auction/images/301-sample.jpg
+    DeleteAuctionImageResponse:
+      type: object
+      description: 상품 이미지 삭제 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 삭제된 이미지 ID
+          example: 5
+        deleted:
+          type: boolean
+          description: 삭제 성공 여부
+          example: true
+      required:
+      - imageId
+      - deleted
     SaveAuctionDraftRequest:
       type: object
       description: 경매 상품 임시저장 요청
