@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.ProductSaleType;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
+import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
 import com.dealit.dealit.domain.auction.dto.ProductImagePayload;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
@@ -20,6 +21,7 @@ import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
+import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -40,11 +42,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuctionService {
 
-	private static final String IMAGE_BASE_URL = "https://cdn.dealit.local/auction/images/";
-
 	private final AuctionProductRepository auctionProductRepository;
 	private final AuctionProductImageRepository auctionProductImageRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
+	private final AuctionImageStorage auctionImageStorage;
+	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
 
 	@Transactional
@@ -54,14 +56,30 @@ public class AuctionService {
 		}
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
-		String sanitizedFilename = originalFilename.replaceAll("\\s+", "-");
 		AuctionProductImage savedImage = auctionProductImageRepository.save(
-			AuctionProductImage.createTemporary(IMAGE_BASE_URL + sanitizedFilename, originalFilename)
+			AuctionProductImage.createTemporary("", originalFilename)
 		);
 
-		String imageUrl = IMAGE_BASE_URL + savedImage.getImageId() + "-" + sanitizedFilename;
-		savedImage.updateImageUrl(imageUrl);
-		return new UploadAuctionImageResponse(savedImage.getImageId(), imageUrl);
+		String storedFileName = auctionImageStorage.store(savedImage.getImageId(), file, originalFilename);
+		savedImage.updateImageUrl(imageUrlService.toAuctionImagePath(storedFileName));
+		return new UploadAuctionImageResponse(
+			savedImage.getImageId(),
+			imageUrlService.toPublicUrl(savedImage.getImageUrl())
+		);
+	}
+
+	@Transactional
+	public DeleteAuctionImageResponse deleteImage(Long imageId) {
+		AuctionProductImage image = auctionProductImageRepository.findByImageIdAndDeletedAtIsNull(imageId)
+			.orElseThrow(() -> new AuctionImageNotFoundException("존재하지 않는 이미지입니다."));
+
+		if (image.getProduct() != null) {
+			throw new InvalidAuctionRequestException("이미 상품에 연결된 이미지는 삭제할 수 없습니다.");
+		}
+
+		auctionImageStorage.delete(image.getImageUrl());
+		image.softDelete();
+		return new DeleteAuctionImageResponse(image.getImageId(), true);
 	}
 
 	@Transactional
@@ -175,7 +193,16 @@ public class AuctionService {
 		}
 		auctionProductImageRepository.saveAll(imagesById.values());
 
-		return new CreateAuctionResponse(product.getProductId(), product.getSaleType(), product.getStatus());
+		CreateAuctionResponse.AuctionScheduleResponse auction = product.getSaleType() == ProductSaleType.AUCTION
+			? buildAuctionScheduleResponse(product)
+			: null;
+
+		return new CreateAuctionResponse(
+			product.getProductId(),
+			product.getSaleType(),
+			product.getStatus(),
+			auction
+		);
 	}
 
 	private Map<Long, AuctionProductImage> loadRequestedImages(List<ProductImagePayload> imagePayloads) {
@@ -198,6 +225,18 @@ public class AuctionService {
 
 		validateDuplicateImageIds(imageIds, imagesById.keySet());
 		return imagesById;
+	}
+
+	private CreateAuctionResponse.AuctionScheduleResponse buildAuctionScheduleResponse(AuctionProduct product) {
+		if (product.getAuctionStartAt() == null || product.getAuctionEndAt() == null) {
+			throw new InvalidAuctionRequestException("경매 응답에는 시작 시각과 종료 시각이 반드시 포함되어야 합니다.");
+		}
+
+		return new CreateAuctionResponse.AuctionScheduleResponse(
+			product.getStatus(),
+			product.getAuctionStartAt(),
+			product.getAuctionEndAt()
+		);
 	}
 
 	private void validateDuplicateImageIds(List<Long> imageIds, Collection<Long> storedImageIds) {

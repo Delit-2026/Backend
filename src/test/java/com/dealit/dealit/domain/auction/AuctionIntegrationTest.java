@@ -2,17 +2,33 @@ package com.dealit.dealit.domain.auction;
 
 import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
 import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,17 +43,87 @@ class AuctionIntegrationTest {
 	@Autowired
 	private AuctionProductImageRepository auctionProductImageRepository;
 
+	@Value("${app.images.storage-root}")
+	private String imageStorageRoot;
+
 	private AuctionProductImage uploadedImage;
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws IOException {
 		auctionProductImageRepository.deleteAll();
+		deleteStoredImages();
 		uploadedImage = auctionProductImageRepository.save(
 			AuctionProductImage.createTemporary(
-				"https://cdn.dealit.local/auction/images/test-image.jpg",
+				"/auction/images/test-image.jpg",
 				"test-image.jpg"
 			)
 		);
+	}
+
+	@AfterEach
+	void tearDown() throws IOException {
+		deleteStoredImages();
+	}
+
+	@Test
+	@DisplayName("이미지 업로드 응답은 브라우저에서 접근 가능한 절대 URL을 반환하고 정적 서빙된다")
+	void uploadAuctionImageReturnsAccessibleUrl() throws Exception {
+		byte[] imageBytes = "test-image".getBytes();
+		MockMultipartFile file = new MockMultipartFile(
+			"file",
+			"스크린샷 2026-04-14 오전 11.28.49.png",
+			MediaType.IMAGE_PNG_VALUE,
+			imageBytes
+		);
+
+		mockMvc.perform(multipart("/api/v1/auction/image").file(file))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.imageId").isNumber())
+			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/auction/images/")))
+			.andExpect(jsonPath("$.imageUrl").value(containsString("%EC%8A%A4%ED%81%AC")))
+			.andReturn();
+
+		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+			.filter(image -> image.getOriginalFileName().equals("스크린샷 2026-04-14 오전 11.28.49.png"))
+			.findFirst()
+			.orElseThrow();
+
+		mockMvc.perform(get(savedImage.getImageUrl()))
+			.andExpect(status().isOk())
+			.andExpect(content().bytes(imageBytes));
+	}
+
+	@Test
+	@DisplayName("임시 업로드 이미지는 imageId 기준으로 삭제할 수 있다")
+	void deleteAuctionImageSuccess() throws Exception {
+		byte[] imageBytes = "delete-me".getBytes();
+		MockMultipartFile file = new MockMultipartFile(
+			"file",
+			"delete-target.png",
+			MediaType.IMAGE_PNG_VALUE,
+			imageBytes
+		);
+
+		mockMvc.perform(multipart("/api/v1/auction/image").file(file))
+			.andExpect(status().isOk());
+
+		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+			.filter(image -> image.getOriginalFileName().equals("delete-target.png"))
+			.findFirst()
+			.orElseThrow();
+
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.imageId", is(savedImage.getImageId().intValue())))
+			.andExpect(jsonPath("$.deleted").value(true));
+
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId()))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("AUCTION_IMAGE_NOT_FOUND"));
+
+		Path deletedFilePath = Path.of(imageStorageRoot)
+			.resolve(savedImage.getImageUrl().replaceFirst("^/auction/images/", "auction/images/"));
+		org.assertj.core.api.Assertions.assertThat(Files.exists(deletedFilePath)).isFalse();
 	}
 
 	@Test
@@ -57,7 +143,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "https://cdn.dealit.local/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -68,7 +154,8 @@ class AuctionIntegrationTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.productId").isNumber())
 			.andExpect(jsonPath("$.saleType").value("REGULAR"))
-			.andExpect(jsonPath("$.status").value("ON_SALE"));
+			.andExpect(jsonPath("$.status").value("ON_SALE"))
+			.andExpect(jsonPath("$.auction").value(nullValue()));
 	}
 
 	@Test
@@ -89,7 +176,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "https://cdn.dealit.local/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -100,7 +187,10 @@ class AuctionIntegrationTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.productId").isNumber())
 			.andExpect(jsonPath("$.saleType").value("AUCTION"))
-			.andExpect(jsonPath("$.status").value("AUCTION_SCHEDULED"));
+			.andExpect(jsonPath("$.status").value("AUCTION_SCHEDULED"))
+			.andExpect(jsonPath("$.auction.status").value("AUCTION_SCHEDULED"))
+			.andExpect(jsonPath("$.auction.startAt").value("2099-04-15T10:00:00Z"))
+			.andExpect(jsonPath("$.auction.endAt").value("2099-04-15T12:00:00Z"));
 	}
 
 	@Test
@@ -121,7 +211,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "https://cdn.dealit.local/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -132,5 +222,23 @@ class AuctionIntegrationTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
 			.andExpect(jsonPath("$.message").value("경매 판매에서는 시작 시각이 필수입니다."));
+	}
+
+	private void deleteStoredImages() throws IOException {
+		Path storageRoot = Path.of(imageStorageRoot);
+		if (!Files.exists(storageRoot)) {
+			return;
+		}
+
+		try (var paths = Files.walk(storageRoot)) {
+			paths.sorted(Comparator.reverseOrder())
+				.forEach(path -> {
+					try {
+						Files.deleteIfExists(path);
+					} catch (IOException exception) {
+						throw new RuntimeException(exception);
+					}
+				});
+		}
 	}
 }

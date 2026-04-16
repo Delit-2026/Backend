@@ -46,6 +46,7 @@ out/
 *.log
 nginx/logs/*
 !nginx/logs/.gitkeep
+uploads/
 
 ### OS files ###
 .DS_Store

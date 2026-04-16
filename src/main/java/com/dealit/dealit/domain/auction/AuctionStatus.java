@@ -4,5 +4,6 @@ public enum AuctionStatus {
 	DRAFT,
 	ON_SALE,
 	AUCTION_SCHEDULED,
-	AUCTION_LIVE
+	AUCTION_LIVE,
+	ENDED
 }

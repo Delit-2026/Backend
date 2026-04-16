@@ -22,3 +22,8 @@ management:
   health:
     redis:
       enabled: false
+
+app:
+  images:
+    public-base-url: http://localhost:8080
+    storage-root: ${java.io.tmpdir}/dealit-test-uploads

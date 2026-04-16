@@ -15,3 +15,7 @@ spring:
       hibernate:
         format_sql: ${JPA_FORMAT_SQL:true}
     show-sql: ${JPA_SHOW_SQL:false}
+
+app:
+  images:
+    public-base-url: ${APP_IMAGES_PUBLIC_BASE_URL:http://localhost}
