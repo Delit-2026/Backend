@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
@@ -127,6 +128,19 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("카테고리 목록 조회는 계층형 트리 구조를 반환한다")
+	void getCategoriesReturnsHierarchy() throws Exception {
+		mockMvc.perform(get("/api/v1/auction/categories"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(3)))
+			.andExpect(jsonPath("$[0].nameKo").value("전자기기"))
+			.andExpect(jsonPath("$[0].children", hasSize(4)))
+			.andExpect(jsonPath("$[0].children[0].nameKo").value("스마트폰"))
+			.andExpect(jsonPath("$[0].children[0].children", hasSize(3)))
+			.andExpect(jsonPath("$[0].children[0].children[0].nameKo").value("아이폰"));
+	}
+
+	@Test
 	@DisplayName("일반 판매 상품 등록에 성공하면 ON_SALE 상태를 반환한다")
 	void createRegularAuctionSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
@@ -136,7 +150,7 @@ class AuctionIntegrationTest {
 					  "name": "MacBook Air M2",
 					  "description": "Lightly used and includes charger.",
 					  "saleType": "REGULAR",
-					  "categoryId": 12,
+					  "categoryId": 19,
 					  "price": 1350000,
 					  "startPrice": null,
 					  "auctionEndAt": null,
@@ -156,6 +170,36 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.saleType").value("REGULAR"))
 			.andExpect(jsonPath("$.status").value("ON_SALE"))
 			.andExpect(jsonPath("$.auction").value(nullValue()));
+	}
+
+	@Test
+	@DisplayName("상위 카테고리로 상품 등록을 시도하면 검증 오류를 반환한다")
+	void createAuctionFailsWhenCategoryIsNotLeaf() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "MacBook Air M2",
+					  "description": "Lightly used and includes charger.",
+					  "saleType": "REGULAR",
+					  "categoryId": 5,
+					  "price": 1350000,
+					  "startPrice": null,
+					  "auctionEndAt": null,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "Seoul",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.message").value("최하위 카테고리만 선택할 수 있습니다."));
 	}
 
 	@Test
