@@ -13,9 +13,10 @@ public class StaticResourceConfig implements WebMvcConfigurer {
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
-		String location = imageProperties.auctionImageDirectory().toUri().toString();
-
 		registry.addResourceHandler(ImageProperties.AUCTION_IMAGE_PATH_PREFIX + "**")
-			.addResourceLocations(location);
+			.addResourceLocations(imageProperties.auctionImageDirectory().toUri().toString());
+
+		registry.addResourceHandler(ImageProperties.PROFILE_IMAGE_PATH_PREFIX + "**")
+			.addResourceLocations(imageProperties.profileImageDirectory().toUri().toString());
 	}
 }

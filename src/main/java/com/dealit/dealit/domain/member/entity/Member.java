@@ -57,8 +57,11 @@ public class Member extends BaseEntity {
 	@Column(name = "intro", length = 500)
 	private String intro;
 
-	@Column(name = "profile_image", length = 255)
+	@Column(name = "profile_image", length = 500)
 	private String profileImage;
+
+	@Column(name = "location", length = 100)
+	private String location;
 
 	@Column(name = "is_verified", nullable = false)
 	private boolean verified;
@@ -73,6 +76,7 @@ public class Member extends BaseEntity {
 		String nickname,
 		String intro,
 		String profileImage,
+		String location,
 		boolean verified
 	) {
 		this.loginId = loginId;
@@ -83,6 +87,7 @@ public class Member extends BaseEntity {
 		this.nickname = nickname;
 		this.intro = intro;
 		this.profileImage = profileImage;
+		this.location = location;
 		this.verified = verified;
 	}
 
@@ -109,5 +114,19 @@ public class Member extends BaseEntity {
 			throw new IllegalStateException("memberId must be generated before assigning nickname");
 		}
 		this.nickname = "Dealit#" + memberId;
+	}
+
+	public void updateProfile(String nickname, String intro, String profileImage) {
+		this.nickname = nickname;
+		this.intro = intro;
+		this.profileImage = profileImage;
+	}
+
+	public void updateLocation(String location) {
+		this.location = location;
+	}
+
+	public void updateProfileImage(String profileImage) {
+		this.profileImage = profileImage;
 	}
 }

@@ -23,6 +23,14 @@ public class ImageUrlService {
 		return toPublicUrl(toAuctionImagePath(storedFileName));
 	}
 
+	public String toProfileImagePath(String storedFileName) {
+		return imageProperties.profileImagePath(storedFileName);
+	}
+
+	public String toProfileImageUrl(String storedFileName) {
+		return toPublicUrl(toProfileImagePath(storedFileName));
+	}
+
 	public String toPublicUrl(String imagePathOrUrl) {
 		String normalizedPath = normalizePath(imagePathOrUrl);
 		if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
