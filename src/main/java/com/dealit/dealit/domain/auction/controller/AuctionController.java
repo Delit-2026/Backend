@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auction.controller;
 
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
+import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Tag(name = "Auction", description = "경매 상품 등록 API")
 @RestController
@@ -68,6 +72,14 @@ public class AuctionController {
 	@PostMapping("/category/recommend")
 	public RecommendCategoryResponse recommendCategory(@Valid @RequestBody RecommendCategoryRequest request) {
 		return auctionService.recommendCategory(request);
+	}
+
+	@Operation(summary = "카테고리 목록 조회", description = "상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.")
+	@ApiResponse(responseCode = "200", description = "카테고리 조회 성공",
+		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class)))
+	@GetMapping("/categories")
+	public List<CategoryOptionResponse> getCategories() {
+		return auctionService.getCategories();
 	}
 
 	@Operation(summary = "가격 추천", description = "상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.")
