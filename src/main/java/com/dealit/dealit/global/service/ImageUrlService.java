@@ -39,6 +39,20 @@ public class ImageUrlService {
 		return imageProperties.normalizedPublicBaseUrl() + UriUtils.encodePath(normalizedPath, StandardCharsets.UTF_8);
 	}
 
+	public String toStoragePath(String imagePathOrUrl) {
+		String normalizedPath = normalizePath(imagePathOrUrl);
+		String publicBaseUrl = imageProperties.normalizedPublicBaseUrl();
+
+		if (normalizedPath.startsWith(publicBaseUrl)) {
+			return normalizedPath.substring(publicBaseUrl.length());
+		}
+		if (normalizedPath.startsWith(LEGACY_CDN_BASE_URL)) {
+			return normalizedPath.substring(LEGACY_CDN_BASE_URL.length());
+		}
+
+		return normalizedPath;
+	}
+
 	private String normalizePath(String imagePathOrUrl) {
 		if (imagePathOrUrl == null || imagePathOrUrl.isBlank()) {
 			throw new IllegalArgumentException("imagePathOrUrl must not be blank");

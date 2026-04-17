@@ -33,11 +33,15 @@ public class ProfileService {
 		Member member = loadActiveMember(memberId);
 		String nickname = request.nickname().trim();
 		validateNicknameNotDuplicated(nickname, member.getMemberId());
+		String bio = request.bio() != null ? normalizeBlank(request.bio()) : member.getIntro();
+		String profileImage = request.profileImageUrl() != null
+			? normalizeProfileImage(request.profileImageUrl())
+			: member.getProfileImage();
 
 		member.updateProfile(
 			nickname,
-			normalizeBlank(request.bio()),
-			normalizeBlank(request.profileImageUrl())
+			bio,
+			profileImage
 		);
 
 		return toResponse(member);
@@ -95,6 +99,15 @@ public class ProfileService {
 		}
 
 		return imageUrlService.toPublicUrl(profileImage);
+	}
+
+	private String normalizeProfileImage(String profileImageUrl) {
+		String normalized = normalizeBlank(profileImageUrl);
+		if (normalized == null) {
+			return null;
+		}
+
+		return imageUrlService.toStoragePath(normalized);
 	}
 
 	private String normalizeBlank(String value) {

@@ -132,8 +132,36 @@ class ProfileIntegrationTest {
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
 		assertThat(updatedMember.getNickname()).isEqualTo("비드마스터");
 		assertThat(updatedMember.getIntro()).isEqualTo("빠르고 매너 있는 거래를 좋아합니다.");
-		assertThat(updatedMember.getProfileImage()).isEqualTo("http://localhost:8080/profile/images/sample.png");
+		assertThat(updatedMember.getProfileImage()).isEqualTo("/profile/images/sample.png");
 		assertThat(updatedMember.getLocation()).isEqualTo("서울특별시 강남구");
+	}
+
+	@Test
+	@DisplayName("프로필 수정 요청에서 소개글과 이미지가 누락되면 기존 값을 유지한다")
+	void updateProfilePreservesBioAndImageWhenFieldsMissing() throws Exception {
+		savedMember.updateProfile(
+			savedMember.getNickname(),
+			"기존 소개글",
+			"/profile/images/existing.png"
+		);
+		memberRepository.save(savedMember);
+
+		mockMvc.perform(patch("/api/v1/users/me/profile")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "nickname": "새닉네임"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.nickname").value("새닉네임"))
+			.andExpect(jsonPath("$.bio").value("기존 소개글"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile/images/existing.png"));
+
+		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
+		assertThat(updatedMember.getIntro()).isEqualTo("기존 소개글");
+		assertThat(updatedMember.getProfileImage()).isEqualTo("/profile/images/existing.png");
 	}
 
 	@Test

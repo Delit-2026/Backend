@@ -282,7 +282,7 @@ paths:
         schema:
           type: string
           maxLength: 30
-          minLength: 0
+          minLength: 1
       responses:
         "200":
           description: OK
