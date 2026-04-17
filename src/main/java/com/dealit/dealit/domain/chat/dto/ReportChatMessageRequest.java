@@ -4,5 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ReportChatMessageRequest(
-        @NotBlank @Size(min = 1, max = 255) String reason
+        @NotBlank @Size(min = 1, max = 255) String reason,
+        @Size(max = 1000) String description
 ) {}

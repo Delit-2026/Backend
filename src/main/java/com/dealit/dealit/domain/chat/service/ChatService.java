@@ -1,17 +1,6 @@
 package com.dealit.dealit.domain.chat.service;
 
-import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
-import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
-import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
-import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
-import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
-import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
-import com.dealit.dealit.domain.chat.dto.MarkChatRoomAsReadResponse;
-import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
-import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
-import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
-import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
-import com.dealit.dealit.domain.chat.dto.UnreadCountResponse;
+import com.dealit.dealit.domain.chat.dto.*;
 import com.dealit.dealit.domain.chat.entity.ChatMessage;
 import com.dealit.dealit.domain.chat.entity.ChatMessageReport;
 import com.dealit.dealit.domain.chat.entity.ChatRoom;
@@ -273,6 +262,7 @@ public class ChatService {
 
         return new MarkChatRoomAsReadResponse(
                 roomId,
+                "채팅방 메시지가 모두 읽음 처리되었습니다.",
                 unreadCountAfter,
                 LocalDateTime.now()
         );
@@ -323,11 +313,12 @@ public class ChatService {
         return new ReportChatMessageResponse(
                 saved.getReportId(),
                 saved.getMessageId(),
+                saved.getReason(),
                 LocalDateTime.now()
         );
     }
 
-    public void deleteMessage(Long messageId, Long currentUserId) {
+    public DeleteChatMessageResponse deleteMessage(Long messageId, Long currentUserId) {
         if (messageId == null) {
             throw new IllegalArgumentException("messageId는 필수입니다.");
         }
@@ -343,6 +334,12 @@ public class ChatService {
         }
 
         message.softDelete();
+
+        return new DeleteChatMessageResponse(
+                "채팅 메시지가 삭제되었습니다.",
+                messageId,
+                message.getDeletedAt()
+        );
     }
 
     private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
