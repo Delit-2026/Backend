@@ -57,6 +57,10 @@ public class ProfileImageStorage {
 	}
 
 	private String sanitizeFilename(String originalFilename) {
+		if (originalFilename == null || originalFilename.isBlank()) {
+			return "profile.jpg";
+		}
+
 		String fileNameOnly = Path.of(originalFilename).getFileName().toString().trim();
 		String normalized = fileNameOnly
 			.replaceAll("\\s+", "-")

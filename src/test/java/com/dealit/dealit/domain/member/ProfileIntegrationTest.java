@@ -253,6 +253,27 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("프로필 이미지 원본 파일명이 비어 있어도 기본 파일명으로 업로드한다")
+	void uploadProfileImageSuccessWhenOriginalFilenameBlank() throws Exception {
+		byte[] imageBytes = "profile-image".getBytes();
+		MockMultipartFile file = new MockMultipartFile(
+			"file",
+			"",
+			MediaType.IMAGE_PNG_VALUE,
+			imageBytes
+		);
+
+		mockMvc.perform(multipart("/api/v1/users/me/profile-image")
+				.file(file)
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/profile/images/")));
+
+		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
+		assertThat(updatedMember.getProfileImage()).endsWith("-profile.jpg");
+	}
+
+	@Test
 	@DisplayName("허용되지 않은 프로필 이미지 형식이면 400을 반환한다")
 	void uploadProfileImageFailsWhenContentTypeInvalid() throws Exception {
 		MockMultipartFile file = new MockMultipartFile(
