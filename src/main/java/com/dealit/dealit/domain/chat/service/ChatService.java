@@ -1,6 +1,19 @@
 package com.dealit.dealit.domain.chat.service;
 
-import com.dealit.dealit.domain.chat.dto.*;
+import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
+import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomUpdatedEvent;
+import com.dealit.dealit.domain.chat.dto.ChatUnreadCountUpdatedEvent;
+import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
+import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
+import com.dealit.dealit.domain.chat.dto.MarkChatRoomAsReadResponse;
+import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
+import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
+import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.UnreadCountResponse;
 import com.dealit.dealit.domain.chat.entity.ChatMessage;
 import com.dealit.dealit.domain.chat.entity.ChatMessageReport;
 import com.dealit.dealit.domain.chat.entity.ChatRoom;
@@ -36,6 +49,7 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final ProductOwnershipPort productOwnershipPort;
     private final ProductSummaryPort productSummaryPort;
+    private final ChatSseService chatSseService;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
         if (currentUserId == null) {
@@ -71,8 +85,9 @@ public class ChatService {
         MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
         MemberSnapshot receiver = resolveMemberSnapshot(request.receiverId());
         ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(request.productId());
+        LocalDateTime now = LocalDateTime.now();
 
-        return new CreateChatRoomResponse(
+        CreateChatRoomResponse response = new CreateChatRoomResponse(
                 saved.getRoomId(),
                 saved.getChatType(),
                 new CreateChatRoomResponse.ProductInfo(
@@ -101,8 +116,11 @@ public class ChatService {
                         null,
                         null
                 ),
-                LocalDateTime.now()
+                now
         );
+
+        publishRoomAndUnreadUpdates(saved, sellerId, buyerId, now);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -118,43 +136,7 @@ public class ChatService {
         Page<ChatRoom> roomPage = chatRoomRepository.findAllByParticipant(currentUserId, pageable);
 
         List<ChatRoomListItemResponse> content = roomPage.getContent().stream()
-                .map(room -> {
-                    Long opponentId = room.getOpponentId(currentUserId);
-                    MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
-                    ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
-
-                    ChatMessage lastMessage = chatMessageRepository.findLatestMessage(room.getRoomId()).orElse(null);
-
-                    long unreadCountLong = chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
-                    int unreadCount = unreadCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadCountLong;
-
-                    ChatRoomListItemResponse.LastMessageInfo lastMessageInfo = (lastMessage == null)
-                            ? null
-                            : new ChatRoomListItemResponse.LastMessageInfo(
-                            lastMessage.getMessageId(),
-                            lastMessage.getMessageType().name(),
-                            lastMessage.getContent(),
-                            lastMessage.getSentAt()
-                    );
-
-                    return new ChatRoomListItemResponse(
-                            room.getRoomId(),
-                            new ChatRoomListItemResponse.OpponentInfo(
-                                    opponentId,
-                                    opponent.nickname(),
-                                    opponent.profileImageUrl()
-                            ),
-                            new ChatRoomListItemResponse.ProductInfo(
-                                    product.productId(),
-                                    product.name(),
-                                    product.thumbnailUrl()
-                            ),
-                            room.getChatType(),
-                            lastMessageInfo,
-                            unreadCount,
-                            room.getUpdatedAt()
-                    );
-                })
+                .map(room -> buildRoomListItem(room, currentUserId))
                 .toList();
 
         return new ChatRoomListResponse(
@@ -186,14 +168,14 @@ public class ChatService {
         Page<ChatMessage> messagePage = chatMessageRepository.findByRoomId(roomId, pageable);
 
         List<ChatMessageResponse> content = messagePage.getContent().stream()
-                .map(m -> new ChatMessageResponse(
-                        m.getMessageId(),
-                        m.getSenderId(),
-                        m.getSenderNickname(),
-                        m.getMessageType(),
-                        m.getContent(),
-                        m.isRead(),
-                        m.getSentAt()
+                .map(message -> new ChatMessageResponse(
+                        message.getMessageId(),
+                        message.getSenderId(),
+                        message.getSenderNickname(),
+                        message.getMessageType(),
+                        message.getContent(),
+                        message.isRead(),
+                        message.getSentAt()
                 ))
                 .toList();
 
@@ -233,7 +215,7 @@ public class ChatService {
                 )
         );
 
-        return new SendChatMessageResponse(
+        SendChatMessageResponse response = new SendChatMessageResponse(
                 saved.getMessageId(),
                 saved.getRoomId(),
                 saved.getSenderId(),
@@ -242,6 +224,9 @@ public class ChatService {
                 saved.isRead(),
                 saved.getSentAt()
         );
+
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), saved.getSentAt());
+        return response;
     }
 
     public MarkChatRoomAsReadResponse markAsRead(Long roomId, Long currentUserId) {
@@ -252,20 +237,25 @@ public class ChatService {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
 
-        chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+        ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
                 .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
 
         chatMessageRepository.markAllAsRead(roomId, currentUserId);
 
         long unreadAfter = chatMessageRepository.countUnreadByRoomId(roomId, currentUserId);
         int unreadCountAfter = unreadAfter > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadAfter;
+        LocalDateTime now = LocalDateTime.now();
 
-        return new MarkChatRoomAsReadResponse(
+        MarkChatRoomAsReadResponse response = new MarkChatRoomAsReadResponse(
                 roomId,
                 "채팅방 메시지가 모두 읽음 처리되었습니다.",
                 unreadCountAfter,
-                LocalDateTime.now()
+                now
         );
+
+        publishRoomUpdate(room, currentUserId, now);
+        publishUnreadCountUpdate(currentUserId, now);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -333,7 +323,75 @@ public class ChatService {
             throw new ChatForbiddenException("본인이 보낸 메시지만 삭제할 수 있습니다.");
         }
 
+        ChatRoom room = chatRoomRepository.findById(message.getRoomId())
+                .orElseThrow(ChatRoomNotFoundException::new);
+
         message.softDelete();
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now());
+    }
+
+    private void publishRoomAndUnreadUpdates(ChatRoom room, Long sellerId, Long buyerId, LocalDateTime emittedAt) {
+        publishRoomUpdate(room, sellerId, emittedAt);
+        publishRoomUpdate(room, buyerId, emittedAt);
+        publishUnreadCountUpdate(sellerId, emittedAt);
+        publishUnreadCountUpdate(buyerId, emittedAt);
+    }
+
+    private void publishRoomUpdate(ChatRoom room, Long userId, LocalDateTime emittedAt) {
+        chatSseService.publishRoomUpdated(
+                userId,
+                ChatRoomUpdatedEvent.of(buildRoomListItem(room, userId), emittedAt)
+        );
+    }
+
+    private void publishUnreadCountUpdate(Long userId, LocalDateTime emittedAt) {
+        long count = chatMessageRepository.countTotalUnreadForUser(userId);
+        int totalUnread = count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+        chatSseService.publishUnreadCountUpdated(
+                userId,
+                ChatUnreadCountUpdatedEvent.of(totalUnread, emittedAt)
+        );
+    }
+
+    private ChatRoomListItemResponse buildRoomListItem(ChatRoom room, Long currentUserId) {
+        Long opponentId = room.getOpponentId(currentUserId);
+        MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+        ChatMessage lastMessage = chatMessageRepository.findLatestMessage(room.getRoomId()).orElse(null);
+
+        long unreadCountLong = chatMessageRepository.countUnreadByRoomId(room.getRoomId(), currentUserId);
+        int unreadCount = unreadCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadCountLong;
+
+        ChatRoomListItemResponse.LastMessageInfo lastMessageInfo = (lastMessage == null)
+                ? null
+                : new ChatRoomListItemResponse.LastMessageInfo(
+                lastMessage.getMessageId(),
+                lastMessage.getMessageType().name(),
+                lastMessage.getContent(),
+                lastMessage.getSentAt()
+        );
+
+        LocalDateTime updatedAt = lastMessage != null
+                ? lastMessage.getSentAt()
+                : room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now();
+
+        return new ChatRoomListItemResponse(
+                room.getRoomId(),
+                new ChatRoomListItemResponse.OpponentInfo(
+                        opponentId,
+                        opponent.nickname(),
+                        opponent.profileImageUrl()
+                ),
+                new ChatRoomListItemResponse.ProductInfo(
+                        product.productId(),
+                        product.name(),
+                        product.thumbnailUrl()
+                ),
+                room.getChatType(),
+                lastMessageInfo,
+                unreadCount,
+                updatedAt
+        );
     }
 
     private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
@@ -348,7 +406,7 @@ public class ChatService {
     private ProductSummaryPort.ProductSummary resolveProductSummaryOrFallback(Long productId) {
         try {
             return productSummaryPort.getSummaryByProductId(productId);
-        } catch (ProductNotFoundException e) {
+        } catch (ProductNotFoundException exception) {
             return new ProductSummaryPort.ProductSummary(productId, null, null);
         }
     }
