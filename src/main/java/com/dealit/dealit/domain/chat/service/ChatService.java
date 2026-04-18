@@ -318,7 +318,7 @@ public class ChatService {
         );
     }
 
-    public DeleteChatMessageResponse deleteMessage(Long messageId, Long currentUserId) {
+    public void deleteMessage(Long messageId, Long currentUserId) {
         if (messageId == null) {
             throw new IllegalArgumentException("messageId는 필수입니다.");
         }
@@ -334,12 +334,6 @@ public class ChatService {
         }
 
         message.softDelete();
-
-        return new DeleteChatMessageResponse(
-                "채팅 메시지가 삭제되었습니다.",
-                messageId,
-                message.getDeletedAt()
-        );
     }
 
     private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
