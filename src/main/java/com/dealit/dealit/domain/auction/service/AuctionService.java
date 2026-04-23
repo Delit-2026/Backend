@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auction.service;
 
 import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.ProductSaleType;
+import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
@@ -16,11 +17,13 @@ import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
 import com.dealit.dealit.domain.auction.entity.AuctionDraft;
 import com.dealit.dealit.domain.auction.entity.AuctionProduct;
 import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
+import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
+import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,14 +40,17 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AuctionService {
 
 	private final AuctionProductRepository auctionProductRepository;
 	private final AuctionProductImageRepository auctionProductImageRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
+	private final CategoryRepository categoryRepository;
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
@@ -138,7 +144,6 @@ public class AuctionService {
 		return new SaveAuctionDraftResponse(savedDraft.getDraftId(), savedDraft.getSavedAt());
 	}
 
-	@Transactional(readOnly = true)
 	public RecommendCategoryResponse recommendCategory(RecommendCategoryRequest request) {
 		String combined = (request.name() + " " + request.description()).toLowerCase();
 		if (combined.contains("watch") || combined.contains("iphone") || combined.contains("switch")) {
@@ -150,7 +155,33 @@ public class AuctionService {
 		return new RecommendCategoryResponse(999L, "Others");
 	}
 
-	@Transactional(readOnly = true)
+	public List<CategoryOptionResponse> getCategories() {
+		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
+
+		for (Category category : categories) {
+			nodesById.put(category.getId(), new CategoryNode(category));
+		}
+
+		List<CategoryNode> roots = new ArrayList<>();
+		for (Category category : categories) {
+			CategoryNode node = nodesById.get(category.getId());
+			if (category.getParentId() == null) {
+				roots.add(node);
+				continue;
+			}
+
+			CategoryNode parent = nodesById.get(category.getParentId());
+			if (parent != null) {
+				parent.children().add(node);
+			}
+		}
+
+		return roots.stream()
+			.map(this::toCategoryResponse)
+			.toList();
+	}
+
 	public RecommendPriceResponse recommendPrice(RecommendPriceRequest request) {
 		int textWeight = request.name().trim().length() * 10 + request.description().trim().length() * 2;
 		BigDecimal recommendedPrice = BigDecimal.valueOf(Math.max(10000, textWeight * 100L));
@@ -164,6 +195,7 @@ public class AuctionService {
 	@Transactional
 	public CreateAuctionResponse createAuction(CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
+		validateCategorySelection(request.categoryId());
 
 		AuctionProduct product = auctionProductRepository.save(
 			AuctionProduct.create(
@@ -242,6 +274,15 @@ public class AuctionService {
 	private void validateDuplicateImageIds(List<Long> imageIds, Collection<Long> storedImageIds) {
 		if (storedImageIds.size() != imageIds.size()) {
 			throw new InvalidAuctionRequestException("중복된 이미지 ID는 허용되지 않습니다.");
+		}
+	}
+
+	private void validateCategorySelection(Long categoryId) {
+		Category category = categoryRepository.findById(categoryId)
+			.orElseThrow(() -> new InvalidAuctionRequestException("존재하지 않는 카테고리입니다."));
+
+		if (category.getDepth() == null || category.getDepth() != 3) {
+			throw new InvalidAuctionRequestException("최하위 카테고리만 선택할 수 있습니다.");
 		}
 	}
 
@@ -334,5 +375,28 @@ public class AuctionService {
 
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private CategoryOptionResponse toCategoryResponse(CategoryNode node) {
+		Category category = node.category();
+		return new CategoryOptionResponse(
+			category.getId(),
+			category.getNameKo(),
+			category.getNameEn(),
+			category.getDepth(),
+			category.getParentId(),
+			node.children().stream()
+				.map(this::toCategoryResponse)
+				.toList()
+		);
+	}
+
+	private record CategoryNode(
+		Category category,
+		List<CategoryNode> children
+	) {
+		private CategoryNode(Category category) {
+			this(category, new ArrayList<>());
+		}
 	}
 }
