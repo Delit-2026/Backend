@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.member.service;
 
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationResponse;
@@ -26,6 +27,12 @@ public class ProfileService {
 	@Transactional(readOnly = true)
 	public MyPageProfileResponse getMyPageProfile(Long memberId) {
 		return toResponse(loadActiveMember(memberId));
+	}
+
+	@Transactional(readOnly = true)
+	public MyLocationResponse getMyLocation(Long memberId) {
+		Member member = loadActiveMember(memberId);
+		return new MyLocationResponse(member.getLocation());
 	}
 
 	@Transactional

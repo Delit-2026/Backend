@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.member.controller;
 
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
+import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyProfileRequest;
@@ -34,6 +35,12 @@ public class ProfileController {
 	@GetMapping("/mypage")
 	public MyPageProfileResponse getMyPageProfile(@AuthenticationPrincipal AuthenticatedMember member) {
 		return profileService.getMyPageProfile(member.memberId());
+	}
+
+	@Operation(summary = "내 지역 조회", description = "현재 로그인한 사용자의 지역 정보를 조회합니다.")
+	@GetMapping("/location")
+	public MyLocationResponse getMyLocation(@AuthenticationPrincipal AuthenticatedMember member) {
+		return profileService.getMyLocation(member.memberId());
 	}
 
 	@Operation(summary = "프로필 수정", description = "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.")
