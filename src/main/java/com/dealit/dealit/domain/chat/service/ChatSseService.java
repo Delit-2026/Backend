@@ -6,6 +6,7 @@ import com.dealit.dealit.domain.chat.dto.ChatUnreadCountUpdatedEvent;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class ChatSseService {
     private static final long DEFAULT_TIMEOUT_MS = 30L * 60L * 1000L;
 
     private final ChatSseEmitterRepository emitterRepository;
+    private final Optional<ChatSseRedisEventPublisher> redisEventPublisher;
 
     public SseEmitter subscribe(Long userId) {
         String emitterId = UUID.randomUUID().toString();
@@ -33,11 +35,20 @@ public class ChatSseService {
     }
 
     public void publishRoomUpdated(Long userId, ChatRoomUpdatedEvent event) {
-        sendToUser(userId, "chat.room.updated", event);
+        publishToUser(userId, "chat.room.updated", event);
     }
 
     public void publishUnreadCountUpdated(Long userId, ChatUnreadCountUpdatedEvent event) {
-        sendToUser(userId, "chat.unread-count.updated", event);
+        publishToUser(userId, "chat.unread-count.updated", event);
+    }
+
+    public void publishRemote(Long userId, String eventName, Object payload) {
+        sendToUser(userId, eventName, payload);
+    }
+
+    private void publishToUser(Long userId, String eventName, Object payload) {
+        sendToUser(userId, eventName, payload);
+        redisEventPublisher.ifPresent(publisher -> publisher.publish(userId, eventName, payload));
     }
 
     private void sendToUser(Long userId, String eventName, Object payload) {
