@@ -3,6 +3,8 @@ package com.dealit.dealit.global.error;
 import com.dealit.dealit.domain.auction.exception.AuctionException;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
+import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
+import com.dealit.dealit.domain.member.exception.MemberException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +58,12 @@ public class GlobalExceptionHandler {
 			.body(ErrorResponse.of(HttpStatus.CONFLICT.value(), "DUPLICATE_MEMBER", exception.getMessage(), List.of()));
 	}
 
+	@ExceptionHandler(DuplicateNicknameException.class)
+	public ResponseEntity<ErrorResponse> handleDuplicateNicknameException(DuplicateNicknameException exception) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(ErrorResponse.of(HttpStatus.CONFLICT.value(), "DUPLICATE_NICKNAME", exception.getMessage(), List.of()));
+	}
+
 	@ExceptionHandler(InvalidCredentialsException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidCredentialsException(InvalidCredentialsException exception) {
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -64,6 +72,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(AuctionException.class)
 	public ResponseEntity<ErrorResponse> handleAuctionException(AuctionException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(MemberException.class)
+	public ResponseEntity<ErrorResponse> handleMemberException(MemberException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}
