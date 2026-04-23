@@ -1,5 +1,7 @@
 package com.dealit.dealit.domain.member.service;
 
+import com.dealit.dealit.domain.member.dto.LoginIdCheckResponse;
+import com.dealit.dealit.domain.member.dto.NicknameCheckResponse;
 import com.dealit.dealit.domain.member.dto.SignUpRequest;
 import com.dealit.dealit.domain.member.dto.SignUpResponse;
 import com.dealit.dealit.domain.member.entity.Member;
@@ -39,6 +41,24 @@ public class MemberService {
 			savedMember.getEmail(),
 			savedMember.getNickname(),
 			savedMember.getCreatedAt()
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public LoginIdCheckResponse checkLoginIdAvailability(String loginId) {
+		String normalizedLoginId = loginId.trim();
+		return new LoginIdCheckResponse(
+			normalizedLoginId,
+			!memberRepository.existsByLoginId(normalizedLoginId)
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public NicknameCheckResponse checkNicknameAvailability(String nickname) {
+		String normalizedNickname = nickname.trim();
+		return new NicknameCheckResponse(
+			normalizedNickname,
+			!memberRepository.existsByNickname(normalizedNickname)
 		);
 	}
 

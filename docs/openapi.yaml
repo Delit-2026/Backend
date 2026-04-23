@@ -17,9 +17,36 @@ tags:
   description: 경매 상품 등록 API
 - name: Member
   description: 회원 API
+- name: Profile
+  description: 마이페이지 프로필 API
 - name: Auth
   description: 인증 API
 paths:
+  /api/v1/users/me/profile-image:
+    post:
+      tags:
+      - Profile
+      summary: 프로필 이미지 업로드
+      description: 현재 로그인한 사용자의 프로필 이미지를 업로드합니다.
+      operationId: uploadProfileImage
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UploadProfileImageResponse"
   /api/v1/members/signup:
     post:
       tags:
@@ -165,6 +192,104 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/RecommendCategoryResponse"
+  /api/v1/users/me/profile:
+    patch:
+      tags:
+      - Profile
+      summary: 프로필 수정
+      description: "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다."
+      operationId: updateProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyProfileRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyPageProfileResponse"
+  /api/v1/users/me/location:
+    patch:
+      tags:
+      - Profile
+      summary: 지역 수정
+      description: 현재 로그인한 사용자의 지역 정보를 수정합니다.
+      operationId: updateLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyLocationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UpdateMyLocationResponse"
+  /api/v1/users/me/mypage:
+    get:
+      tags:
+      - Profile
+      summary: 마이페이지 프로필 조회
+      description: 현재 로그인한 사용자의 마이페이지 프로필 정보를 조회합니다.
+      operationId: getMyPageProfile
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyPageProfileResponse"
+  /api/v1/members/nickname/check:
+    get:
+      tags:
+      - Member
+      summary: 닉네임 중복 확인
+      description: 프로필 설정 화면에서 닉네임 사용 가능 여부를 확인합니다.
+      operationId: checkNickname
+      parameters:
+      - name: nickname
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 30
+          minLength: 2
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NicknameCheckResponse"
+  /api/v1/members/login-id/check:
+    get:
+      tags:
+      - Member
+      summary: 로그인 아이디 중복 확인
+      description: 회원가입 화면에서 로그인 아이디 사용 가능 여부를 확인합니다.
+      operationId: checkLoginId
+      parameters:
+      - name: loginId
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 30
+          minLength: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LoginIdCheckResponse"
   /api/v1/health:
     get:
       tags:
@@ -231,6 +356,11 @@ paths:
                 $ref: "#/components/schemas/DeleteAuctionImageResponse"
 components:
   schemas:
+    UploadProfileImageResponse:
+      type: object
+      properties:
+        profileImageUrl:
+          type: string
     SignUpRequest:
       type: object
       description: 회원가입 요청
@@ -630,6 +760,82 @@ components:
           type: string
           description: 추천 카테고리명
           example: 디지털/가전
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 30
+          minLength: 2
+        bio:
+          type: string
+          maxLength: 500
+          minLength: 0
+        profileImageUrl:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - nickname
+    MyPageProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        email:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+        location:
+          type: string
+        rating:
+          type: number
+          format: double
+        warningCount:
+          type: integer
+          format: int32
+        biddingCount:
+          type: integer
+          format: int32
+        sellingCount:
+          type: integer
+          format: int32
+        wishlistCount:
+          type: integer
+          format: int32
+    UpdateMyLocationRequest:
+      type: object
+      properties:
+        location:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - location
+    UpdateMyLocationResponse:
+      type: object
+      properties:
+        location:
+          type: string
+    NicknameCheckResponse:
+      type: object
+      properties:
+        nickname:
+          type: string
+        available:
+          type: boolean
+    LoginIdCheckResponse:
+      type: object
+      properties:
+        loginId:
+          type: string
+        available:
+          type: boolean
     CurrentMemberResponse:
       type: object
       description: 현재 인증된 회원 정보
