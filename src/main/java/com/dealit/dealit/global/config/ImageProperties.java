@@ -12,6 +12,7 @@ public record ImageProperties(
 ) {
 
 	public static final String AUCTION_IMAGE_PATH_PREFIX = "/auction/images/";
+	public static final String PRODUCT_IMAGE_PATH_PREFIX = "/product/images/";
 	public static final String PROFILE_IMAGE_PATH_PREFIX = "/profile/images/";
 
 	public Path auctionImageDirectory() {
@@ -22,12 +23,20 @@ public record ImageProperties(
 		return Paths.get(storageRoot).resolve("profile").resolve("images");
 	}
 
+	public Path productImageDirectory() {
+		return Paths.get(storageRoot).resolve("product").resolve("images");
+	}
+
 	public String auctionImagePath(String storedFileName) {
 		return AUCTION_IMAGE_PATH_PREFIX + storedFileName;
 	}
 
 	public String profileImagePath(String storedFileName) {
 		return PROFILE_IMAGE_PATH_PREFIX + storedFileName;
+	}
+
+	public String productImagePath(String storedFileName) {
+		return PRODUCT_IMAGE_PATH_PREFIX + storedFileName;
 	}
 
 	public String normalizedPublicBaseUrl() {
