@@ -308,17 +308,17 @@ public class ProductService {
 	}
 
 	private String resolveLocation(Member member, String requestLocation) {
-		String memberLocation = normalizeBlank(member.getLocation());
-		if (memberLocation != null) {
-			return memberLocation;
+		String location = normalizeBlank(requestLocation);
+		if (location != null) {
+			return location;
 		}
 
-		String location = normalizeBlank(requestLocation);
-		if (location == null) {
+		String memberLocation = normalizeBlank(member.getLocation());
+		if (memberLocation == null) {
 			throw new InvalidProductRequestException("거래 위치는 필수입니다.");
 		}
 
-		return location;
+		return memberLocation;
 	}
 
 	private String serializeDraft(SaveProductDraftRequest request) {
