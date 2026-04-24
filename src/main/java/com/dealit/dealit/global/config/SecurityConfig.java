@@ -59,8 +59,8 @@ public class SecurityConfig {
 					"/actuator/health",
 					"/actuator/info"
 				).permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/products/image").permitAll()
-				.requestMatchers(HttpMethod.DELETE, "/api/v1/products/image/*").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/products/image").authenticated()
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/products/image/*").authenticated()
 				.requestMatchers(HttpMethod.GET, "/api/v1/products/categories").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/products/category/recommend").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/products/price/recommend").permitAll()
