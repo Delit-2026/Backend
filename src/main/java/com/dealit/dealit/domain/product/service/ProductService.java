@@ -22,6 +22,7 @@ import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductDraft;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.exception.ProductAccessDeniedException;
 import com.dealit.dealit.domain.product.exception.InvalidProductRequestException;
 import com.dealit.dealit.domain.product.exception.ProductImageNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
@@ -59,13 +60,14 @@ public class ProductService {
 	private final ObjectMapper objectMapper;
 
 	@Transactional
-	public UploadProductImageResponse uploadImage(MultipartFile file) {
+	public UploadProductImageResponse uploadImage(Long memberId, MultipartFile file) {
 		if (file == null || file.isEmpty()) {
 			throw new InvalidProductRequestException("이미지 파일은 필수입니다.");
 		}
 
+		loadActiveMember(memberId);
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
-		ProductImage savedImage = productImageRepository.save(ProductImage.createTemporary("", originalFilename));
+		ProductImage savedImage = productImageRepository.save(ProductImage.createTemporary("", originalFilename, memberId));
 
 		String storedFileName = productImageStorage.store(savedImage.getImageId(), file, originalFilename);
 		savedImage.updateImageUrl(imageUrlService.toProductImagePath(storedFileName));
@@ -73,9 +75,13 @@ public class ProductService {
 	}
 
 	@Transactional
-	public DeleteProductImageResponse deleteImage(Long imageId) {
+	public DeleteProductImageResponse deleteImage(Long memberId, Long imageId) {
 		ProductImage image = productImageRepository.findByImageIdAndDeletedAtIsNull(imageId)
 			.orElseThrow(() -> new ProductImageNotFoundException("존재하지 않는 이미지입니다."));
+
+		if (!image.getMemberId().equals(memberId)) {
+			throw new ProductAccessDeniedException("본인이 업로드한 이미지만 삭제할 수 있습니다.");
+		}
 
 		if (image.getProduct() != null) {
 			throw new InvalidProductRequestException("이미 상품에 연결된 이미지는 삭제할 수 없습니다.");

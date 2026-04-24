@@ -41,16 +41,20 @@ public class ProductImage extends BaseEntity {
 	@Column(name = "original_file_name", nullable = false, length = 255)
 	private String originalFileName;
 
+	@Column(name = "member_id", nullable = false)
+	private Long memberId;
+
 	@Column(name = "sort_order")
 	private Integer sortOrder;
 
-	private ProductImage(String imageUrl, String originalFileName) {
+	private ProductImage(String imageUrl, String originalFileName, Long memberId) {
 		this.imageUrl = imageUrl;
 		this.originalFileName = originalFileName;
+		this.memberId = memberId;
 	}
 
-	public static ProductImage createTemporary(String imageUrl, String originalFileName) {
-		return new ProductImage(imageUrl, originalFileName);
+	public static ProductImage createTemporary(String imageUrl, String originalFileName, Long memberId) {
+		return new ProductImage(imageUrl, originalFileName, memberId);
 	}
 
 	public void updateImageUrl(String imageUrl) {
