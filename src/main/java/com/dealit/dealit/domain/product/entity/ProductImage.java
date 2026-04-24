@@ -15,6 +15,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.Objects;
+
 @Getter
 @Entity
 @Table(name = "product_image")
@@ -64,5 +66,21 @@ public class ProductImage extends BaseEntity {
 	public void assignToProduct(Product product, int sortOrder) {
 		this.product = product;
 		this.sortOrder = sortOrder;
+	}
+
+	@Override
+	public boolean equals(Object object) {
+		if (this == object) {
+			return true;
+		}
+		if (!(object instanceof ProductImage other)) {
+			return false;
+		}
+		return imageId != null && Objects.equals(imageId, other.imageId);
+	}
+
+	@Override
+	public int hashCode() {
+		return imageId != null ? imageId.hashCode() : System.identityHashCode(this);
 	}
 }
