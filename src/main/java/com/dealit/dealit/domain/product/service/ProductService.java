@@ -288,17 +288,11 @@ public class ProductService {
 		if (!hasSaleType && !hasName && !hasDescription && !hasCategory && !hasPrice && !hasAllowOffer && !hasImages && !hasLocation) {
 			throw new InvalidProductRequestException("임시저장할 내용이 없습니다.");
 		}
-		if (request.saleType() != ProductSaleType.REGULAR) {
+		if (request.saleType() != null && request.saleType() != ProductSaleType.REGULAR) {
 			throw new InvalidProductRequestException("일반 상품 임시저장에서는 판매 유형이 REGULAR여야 합니다.");
 		}
-		if (request.price() == null) {
-			throw new InvalidProductRequestException("일반 판매에서는 판매가가 필수입니다.");
-		}
-		if (request.price().signum() <= 0) {
+		if (request.price() != null && request.price().signum() <= 0) {
 			throw new InvalidProductRequestException("판매가는 0보다 커야 합니다.");
-		}
-		if (request.allowOffer() == null) {
-			throw new InvalidProductRequestException("가격 제안 허용 여부는 필수입니다.");
 		}
 	}
 
