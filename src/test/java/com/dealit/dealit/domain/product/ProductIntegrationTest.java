@@ -64,6 +64,7 @@ class ProductIntegrationTest {
 
 	private ProductImage uploadedImage;
 	private Member member;
+	private Member otherMember;
 
 	@BeforeEach
 	void setUp() throws IOException {
@@ -75,8 +76,11 @@ class ProductIntegrationTest {
 		member = memberRepository.save(Member.create("product-user", "password", "product@example.com", null, "상품회원"));
 		member.assignDefaultNickname();
 		member.updateLocation("서울 강남구");
+		otherMember = memberRepository.save(Member.create("product-user-2", "password", "product2@example.com", null, "다른회원"));
+		otherMember.assignDefaultNickname();
+		otherMember.updateLocation("서울 서초구");
 		uploadedImage = productImageRepository.save(
-			ProductImage.createTemporary("/product/images/test-image.jpg", "test-image.jpg")
+			ProductImage.createTemporary("/product/images/test-image.jpg", "test-image.jpg", member.getMemberId())
 		);
 	}
 
@@ -108,9 +112,26 @@ class ProductIntegrationTest {
 			.findFirst()
 			.orElseThrow();
 
+		org.assertj.core.api.Assertions.assertThat(savedImage.getMemberId()).isEqualTo(member.getMemberId());
+
 		mockMvc.perform(get(savedImage.getImageUrl()))
 			.andExpect(status().isOk())
 			.andExpect(content().bytes(imageBytes));
+	}
+
+	@Test
+	@DisplayName("비로그인 사용자는 일반 상품 이미지를 업로드할 수 없다")
+	void uploadProductImageRequiresAuthentication() throws Exception {
+		byte[] imageBytes = "test-image".getBytes();
+		MockMultipartFile file = new MockMultipartFile(
+			"file",
+			"regular-product.png",
+			MediaType.IMAGE_PNG_VALUE,
+			imageBytes
+		);
+
+		mockMvc.perform(multipart("/api/v1/products/image").file(file))
+			.andExpect(status().isUnauthorized());
 	}
 
 	@Test
@@ -196,7 +217,27 @@ class ProductIntegrationTest {
 			.andExpect(jsonPath("$.deleted").value(true));
 	}
 
+	@Test
+	@DisplayName("다른 사용자는 업로드하지 않은 일반 상품 이미지를 삭제할 수 없다")
+	void deleteProductImageFailsWhenNotOwner() throws Exception {
+		mockMvc.perform(delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId()))
+			.with(authentication(authenticatedMember(otherMember)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("PRODUCT_ACCESS_DENIED"));
+	}
+
+	@Test
+	@DisplayName("비로그인 사용자는 일반 상품 이미지를 삭제할 수 없다")
+	void deleteProductImageRequiresAuthentication() throws Exception {
+		mockMvc.perform(delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId()))
+			.andExpect(status().isUnauthorized());
+	}
+
 	private UsernamePasswordAuthenticationToken authenticatedMember() {
+		return authenticatedMember(member);
+	}
+
+	private UsernamePasswordAuthenticationToken authenticatedMember(Member member) {
 		AuthenticatedMember principal = new AuthenticatedMember(member.getMemberId(), member.getLoginId(), "ROLE_USER");
 		return new UsernamePasswordAuthenticationToken(
 			principal,
