@@ -19,17 +19,23 @@ public class MemberService {
 
 	private final MemberRepository memberRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final EmailVerificationService emailVerificationService;
 
 	@Transactional
 	public SignUpResponse signUp(SignUpRequest request) {
 		validateDuplicate(request);
 
+		String normalizedEmail = normalizeEmail(request.email());
+		boolean verified = normalizedEmail != null
+			&& emailVerificationService.consumeVerifiedStatus(normalizedEmail);
+
 		Member member = Member.create(
 			request.loginId().trim(),
 			passwordEncoder.encode(request.password()),
-			request.email().trim().toLowerCase(),
+			normalizedEmail,
 			null,
-			normalizeBlank(request.name())
+			normalizeBlank(request.name()),
+			verified
 		);
 
 		Member savedMember = memberRepository.save(member);
@@ -63,10 +69,10 @@ public class MemberService {
 	}
 
 	private void validateDuplicate(SignUpRequest request) {
-		String normalizedEmail = request.email().trim().toLowerCase();
+		String normalizedEmail = normalizeEmail(request.email());
 		String normalizedLoginId = request.loginId().trim();
 
-		if (memberRepository.existsByEmail(normalizedEmail)) {
+		if (normalizedEmail != null && memberRepository.existsByEmail(normalizedEmail)) {
 			throw new DuplicateMemberException("이미 가입된 이메일입니다.");
 		}
 
@@ -82,5 +88,10 @@ public class MemberService {
 
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private String normalizeEmail(String email) {
+		String normalized = normalizeBlank(email);
+		return normalized == null ? null : normalized.toLowerCase();
 	}
 }

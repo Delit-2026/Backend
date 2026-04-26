@@ -1,6 +1,8 @@
 package com.dealit.dealit.domain.member.service;
 
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.member.LocationSource;
+import com.dealit.dealit.domain.member.dto.LocationDetails;
 import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
@@ -32,7 +34,15 @@ public class ProfileService {
 	@Transactional(readOnly = true)
 	public MyLocationResponse getMyLocation(Long memberId) {
 		Member member = loadActiveMember(memberId);
-		return new MyLocationResponse(member.getLocation());
+		LocationDetails locationDetails = toLocationDetails(member);
+		return new MyLocationResponse(
+			locationDetails.location(),
+			locationDetails.postalCode(),
+			locationDetails.roadAddress(),
+			locationDetails.jibunAddress(),
+			locationDetails.detailAddress(),
+			locationDetails.locationSource()
+		);
 	}
 
 	@Transactional
@@ -40,27 +50,43 @@ public class ProfileService {
 		Member member = loadActiveMember(memberId);
 		String nickname = request.nickname().trim();
 		validateNicknameNotDuplicated(nickname, member.getMemberId());
+		String name = request.name() != null ? normalizeBlank(request.name()) : member.getName();
 		String bio = request.bio() != null ? normalizeBlank(request.bio()) : member.getIntro();
 		String profileImage = request.profileImageUrl() != null
 			? normalizeProfileImage(request.profileImageUrl())
 			: member.getProfileImage();
 
-		member.updateProfile(
-			nickname,
-			bio,
-			profileImage
-		);
-
+		member.updateProfile(name, nickname, bio, profileImage);
 		return toResponse(member);
 	}
 
 	@Transactional
 	public UpdateMyLocationResponse updateLocation(Long memberId, UpdateMyLocationRequest request) {
 		Member member = loadActiveMember(memberId);
-		String location = request.location().trim();
-		member.updateLocation(location);
+		String roadAddress = normalizeBlank(request.roadAddress());
+		String jibunAddress = normalizeBlank(request.jibunAddress());
+		String detailAddress = normalizeBlank(request.detailAddress());
+		String postalCode = normalizeBlank(request.postalCode());
+		String location = resolveDisplayLocation(request.location(), roadAddress, jibunAddress, detailAddress);
+		LocationSource locationSource = resolveLocationSource(request.locationSource(), roadAddress, jibunAddress);
 
-		return new UpdateMyLocationResponse(location);
+		member.updateLocationDetails(
+			location,
+			postalCode,
+			roadAddress,
+			jibunAddress,
+			detailAddress,
+			locationSource
+		);
+
+		return new UpdateMyLocationResponse(
+			location,
+			postalCode,
+			roadAddress,
+			jibunAddress,
+			detailAddress,
+			locationSource
+		);
 	}
 
 	@Transactional
@@ -87,16 +113,29 @@ public class ProfileService {
 	private MyPageProfileResponse toResponse(Member member) {
 		return new MyPageProfileResponse(
 			member.getMemberId(),
+			member.getName(),
 			member.getNickname(),
 			member.getEmail(),
 			member.getIntro(),
 			toPublicProfileImageUrl(member.getProfileImage()),
 			member.getLocation(),
+			member.isVerified(),
 			0.0,
 			0,
 			0,
 			0,
 			0
+		);
+	}
+
+	private LocationDetails toLocationDetails(Member member) {
+		return new LocationDetails(
+			member.getLocation(),
+			member.getPostalCode(),
+			member.getRoadAddress(),
+			member.getJibunAddress(),
+			member.getDetailAddress(),
+			member.getLocationSource()
 		);
 	}
 
@@ -124,5 +163,35 @@ public class ProfileService {
 
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private String resolveDisplayLocation(
+		String requestLocation,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress
+	) {
+		String baseAddress = roadAddress != null ? roadAddress : jibunAddress;
+		if (baseAddress == null) {
+			return normalizeBlank(requestLocation);
+		}
+
+		return detailAddress == null ? baseAddress : baseAddress + " " + detailAddress;
+	}
+
+	private LocationSource resolveLocationSource(
+		LocationSource requestedSource,
+		String roadAddress,
+		String jibunAddress
+	) {
+		if (requestedSource != null) {
+			return requestedSource;
+		}
+
+		if (roadAddress != null || jibunAddress != null) {
+			return LocationSource.POSTCODE;
+		}
+
+		return LocationSource.MANUAL;
 	}
 }
