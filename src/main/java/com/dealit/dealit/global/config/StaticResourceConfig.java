@@ -16,6 +16,9 @@ public class StaticResourceConfig implements WebMvcConfigurer {
 		registry.addResourceHandler(ImageProperties.AUCTION_IMAGE_PATH_PREFIX + "**")
 			.addResourceLocations(imageProperties.auctionImageDirectory().toUri().toString());
 
+		registry.addResourceHandler(ImageProperties.PRODUCT_IMAGE_PATH_PREFIX + "**")
+			.addResourceLocations(imageProperties.productImageDirectory().toUri().toString());
+
 		registry.addResourceHandler(ImageProperties.PROFILE_IMAGE_PATH_PREFIX + "**")
 			.addResourceLocations(imageProperties.profileImageDirectory().toUri().toString());
 	}

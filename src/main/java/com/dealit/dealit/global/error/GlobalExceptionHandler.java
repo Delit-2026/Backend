@@ -5,6 +5,7 @@ import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.exception.MemberException;
+import com.dealit.dealit.domain.product.exception.ProductException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,6 +79,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MemberException.class)
 	public ResponseEntity<ErrorResponse> handleMemberException(MemberException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(ProductException.class)
+	public ResponseEntity<ErrorResponse> handleProductException(ProductException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}
