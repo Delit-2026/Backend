@@ -44,7 +44,8 @@ public class AuthService {
 			member.getMemberId(),
 			member.getLoginId(),
 			member.getEmail(),
-			member.getNickname()
+			member.getNickname(),
+			member.isVerified()
 		);
 	}
 }

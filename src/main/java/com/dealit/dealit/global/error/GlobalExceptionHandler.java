@@ -2,6 +2,7 @@ package com.dealit.dealit.global.error;
 
 import com.dealit.dealit.domain.auction.exception.AuctionException;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.location.exception.LocationException;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.exception.MemberException;
@@ -79,6 +80,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MemberException.class)
 	public ResponseEntity<ErrorResponse> handleMemberException(MemberException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(LocationException.class)
+	public ResponseEntity<ErrorResponse> handleLocationException(LocationException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}

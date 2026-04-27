@@ -2,7 +2,7 @@ package com.dealit.dealit.domain.member.dto;
 
 import com.dealit.dealit.domain.member.LocationSource;
 
-public record MyLocationResponse(
+public record LocationDetails(
 	String location,
 	String postalCode,
 	String roadAddress,

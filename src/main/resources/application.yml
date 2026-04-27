@@ -16,11 +16,29 @@ app:
   images:
     public-base-url: ${APP_IMAGES_PUBLIC_BASE_URL:http://localhost:${SERVER_PORT:8080}}
     storage-root: ${APP_IMAGES_STORAGE_ROOT:${user.dir}/uploads}
+  email-verification:
+    code-ttl-seconds: ${APP_EMAIL_VERIFICATION_CODE_TTL_SECONDS:300}
+    verified-ttl-seconds: ${APP_EMAIL_VERIFICATION_VERIFIED_TTL_SECONDS:1800}
+    subject: ${APP_EMAIL_VERIFICATION_SUBJECT:Dealit 이메일 인증 코드}
+    sender-address: ${APP_EMAIL_VERIFICATION_SENDER_ADDRESS:}
+  mail:
+    host: ${APP_MAIL_HOST:}
+    port: ${APP_MAIL_PORT:587}
+    username: ${APP_MAIL_USERNAME:}
+    password: ${APP_MAIL_PASSWORD:}
+    protocol: ${APP_MAIL_PROTOCOL:smtp}
+    auth: ${APP_MAIL_AUTH:true}
+    starttls-enable: ${APP_MAIL_STARTTLS_ENABLE:true}
 
 jwt:
   secret: ${JWT_SECRET:dealit-local-secret-key-dealit-local-secret-key}
   access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:3600000}
   issuer: ${JWT_ISSUER:dealit}
+
+kakao:
+  local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY:}
 
 springdoc:
   swagger-ui:

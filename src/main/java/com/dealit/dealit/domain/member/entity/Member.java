@@ -1,8 +1,11 @@
 package com.dealit.dealit.domain.member.entity;
 
+import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -42,11 +45,8 @@ public class Member extends BaseEntity {
 	@Column(name = "password", nullable = false, length = 255)
 	private String password;
 
-	@Column(name = "email", nullable = false, length = 100)
+	@Column(name = "email", length = 100)
 	private String email;
-
-	@Column(name = "phone_number", length = 15)
-	private String phoneNumber;
 
 	@Column(name = "name", length = 30)
 	private String name;
@@ -63,6 +63,22 @@ public class Member extends BaseEntity {
 	@Column(name = "location", length = 100)
 	private String location;
 
+	@Column(name = "postal_code", length = 10)
+	private String postalCode;
+
+	@Column(name = "road_address", length = 255)
+	private String roadAddress;
+
+	@Column(name = "jibun_address", length = 255)
+	private String jibunAddress;
+
+	@Column(name = "detail_address", length = 255)
+	private String detailAddress;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "location_source", length = 20)
+	private LocationSource locationSource;
+
 	@Column(name = "is_verified", nullable = false)
 	private boolean verified;
 
@@ -71,23 +87,31 @@ public class Member extends BaseEntity {
 		String loginId,
 		String password,
 		String email,
-		String phoneNumber,
 		String name,
 		String nickname,
 		String intro,
 		String profileImage,
 		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		LocationSource locationSource,
 		boolean verified
 	) {
 		this.loginId = loginId;
 		this.password = password;
 		this.email = email;
-		this.phoneNumber = phoneNumber;
 		this.name = name;
 		this.nickname = nickname;
 		this.intro = intro;
 		this.profileImage = profileImage;
 		this.location = location;
+		this.postalCode = postalCode;
+		this.roadAddress = roadAddress;
+		this.jibunAddress = jibunAddress;
+		this.detailAddress = detailAddress;
+		this.locationSource = locationSource;
 		this.verified = verified;
 	}
 
@@ -98,15 +122,44 @@ public class Member extends BaseEntity {
 		String phoneNumber,
 		String name
 	) {
+		return create(loginId, encodedPassword, email, name, false);
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String name,
+		boolean verified
+	) {
 		return Member.builder()
 			.loginId(loginId)
 			.password(encodedPassword)
 			.email(email)
-			.phoneNumber(phoneNumber)
 			.name(name)
 			.nickname("PENDING")
-			.verified(false)
+			.verified(verified)
 			.build();
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String name
+	) {
+		return create(loginId, encodedPassword, email, name, false);
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String phoneNumber,
+		String name,
+		boolean verified
+	) {
+		return create(loginId, encodedPassword, email, name, verified);
 	}
 
 	public void assignDefaultNickname() {
@@ -116,7 +169,8 @@ public class Member extends BaseEntity {
 		this.nickname = "Dealit#" + memberId;
 	}
 
-	public void updateProfile(String nickname, String intro, String profileImage) {
+	public void updateProfile(String name, String nickname, String intro, String profileImage) {
+		this.name = name;
 		this.nickname = nickname;
 		this.intro = intro;
 		this.profileImage = profileImage;
@@ -124,9 +178,39 @@ public class Member extends BaseEntity {
 
 	public void updateLocation(String location) {
 		this.location = location;
+		this.postalCode = null;
+		this.roadAddress = null;
+		this.jibunAddress = null;
+		this.detailAddress = null;
+		this.locationSource = LocationSource.MANUAL;
+	}
+
+	public void updateLocationDetails(
+		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		LocationSource locationSource
+	) {
+		this.location = location;
+		this.postalCode = postalCode;
+		this.roadAddress = roadAddress;
+		this.jibunAddress = jibunAddress;
+		this.detailAddress = detailAddress;
+		this.locationSource = locationSource;
 	}
 
 	public void updateProfileImage(String profileImage) {
 		this.profileImage = profileImage;
+	}
+
+	public void verifyEmail() {
+		this.verified = true;
+	}
+
+	public void updateEmailAndVerify(String email) {
+		this.email = email;
+		this.verified = true;
 	}
 }
