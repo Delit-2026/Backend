@@ -550,10 +550,9 @@ components:
           description: 경매 상태
           enum:
           - DRAFT
-          - AUCTION_SCHEDULED
           - AUCTION_LIVE
           - ENDED
-          example: AUCTION_SCHEDULED
+          example: AUCTION_LIVE
         startAt:
           type: string
           format: date-time
@@ -584,7 +583,6 @@ components:
           description: 상품 상태
           enum:
           - DRAFT
-          - AUCTION_SCHEDULED
           - AUCTION_LIVE
           - ENDED
           example: AUCTION_LIVE

@@ -215,8 +215,6 @@ public class AuctionService {
 				request.location().trim(),
 				request.draftId(),
 				determineStatus(
-					request.saleType(),
-					auctionPeriod.startAt(),
 					auctionPeriod.endAt(),
 					now
 				)
@@ -313,14 +311,9 @@ public class AuctionService {
 	}
 
 	private AuctionStatus determineStatus(
-		ProductSaleType saleType,
-		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		OffsetDateTime now
 	) {
-		if (auctionStartAt != null && auctionStartAt.isAfter(now)) {
-			return AuctionStatus.AUCTION_SCHEDULED;
-		}
 		if (auctionEndAt != null && auctionEndAt.isBefore(now)) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
 		}
