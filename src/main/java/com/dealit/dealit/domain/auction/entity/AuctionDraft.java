@@ -48,6 +48,9 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "category_id")
 	private Long categoryId;
 
+	@Column(name = "member_id")
+	private Long memberId;
+
 	@Column(name = "price", precision = 15, scale = 2)
 	private BigDecimal price;
 
@@ -78,6 +81,7 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -91,6 +95,7 @@ public class AuctionDraft extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
@@ -106,6 +111,7 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -120,6 +126,7 @@ public class AuctionDraft extends BaseEntity {
 			description,
 			saleType,
 			categoryId,
+			memberId,
 			price,
 			startPrice,
 			auctionStartAt,
@@ -136,6 +143,7 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -149,6 +157,7 @@ public class AuctionDraft extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;

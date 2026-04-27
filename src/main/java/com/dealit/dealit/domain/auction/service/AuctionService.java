@@ -18,12 +18,15 @@ import com.dealit.dealit.domain.auction.entity.AuctionDraft;
 import com.dealit.dealit.domain.auction.entity.AuctionProduct;
 import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
 import com.dealit.dealit.domain.auction.entity.Category;
+import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +54,7 @@ public class AuctionService {
 	private final AuctionProductImageRepository auctionProductImageRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
 	private final CategoryRepository categoryRepository;
+	private final MemberRepository memberRepository;
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
@@ -89,8 +93,9 @@ public class AuctionService {
 	}
 
 	@Transactional
-	public SaveAuctionDraftResponse saveDraft(SaveAuctionDraftRequest request) {
+	public SaveAuctionDraftResponse saveDraft(Long memberId, SaveAuctionDraftRequest request) {
 		validateDraftRequest(request);
+		Member member = loadActiveMember(memberId);
 
 		OffsetDateTime savedAt = OffsetDateTime.now(ZoneOffset.UTC);
 		String payloadJson = serializeDraft(request);
@@ -101,6 +106,7 @@ public class AuctionService {
 				normalizeBlank(request.description()),
 				request.saleType(),
 				request.categoryId(),
+				member.getMemberId(),
 				request.price(),
 				request.startPrice(),
 				null,
@@ -110,13 +116,31 @@ public class AuctionService {
 				payloadJson,
 				savedAt
 			)
-			: auctionDraftRepository.findById(request.draftId())
-				.map(existingDraft -> {
-					existingDraft.update(
+				: auctionDraftRepository.findById(request.draftId())
+					.map(existingDraft -> {
+						existingDraft.update(
+							normalizeBlank(request.name()),
+							normalizeBlank(request.description()),
+							request.saleType(),
+							request.categoryId(),
+							member.getMemberId(),
+							request.price(),
+							request.startPrice(),
+							null,
+							null,
+							request.auctionDurationDays(),
+							normalizeBlank(request.location()),
+							payloadJson,
+							savedAt
+						);
+						return existingDraft;
+					})
+					.orElseGet(() -> AuctionDraft.create(
 						normalizeBlank(request.name()),
 						normalizeBlank(request.description()),
 						request.saleType(),
 						request.categoryId(),
+						member.getMemberId(),
 						request.price(),
 						request.startPrice(),
 						null,
@@ -125,23 +149,7 @@ public class AuctionService {
 						normalizeBlank(request.location()),
 						payloadJson,
 						savedAt
-					);
-					return existingDraft;
-				})
-				.orElseGet(() -> AuctionDraft.create(
-					normalizeBlank(request.name()),
-					normalizeBlank(request.description()),
-					request.saleType(),
-					request.categoryId(),
-					request.price(),
-					request.startPrice(),
-					null,
-					null,
-					request.auctionDurationDays(),
-					normalizeBlank(request.location()),
-					payloadJson,
-					savedAt
-				));
+					));
 
 		AuctionDraft savedDraft = auctionDraftRepository.save(draft);
 		return new SaveAuctionDraftResponse(savedDraft.getDraftId(), savedDraft.getSavedAt());
@@ -283,6 +291,11 @@ public class AuctionService {
 		if (category.getDepth() == null || category.getDepth() != 3) {
 			throw new InvalidAuctionRequestException("최하위 카테고리만 선택할 수 있습니다.");
 		}
+	}
+
+	private Member loadActiveMember(Long memberId) {
+		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
+			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
 	}
 
 	private void validateRequestBySaleType(CreateAuctionRequest request) {
