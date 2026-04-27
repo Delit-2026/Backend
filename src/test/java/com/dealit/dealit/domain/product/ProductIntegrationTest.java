@@ -100,8 +100,11 @@ class ProductIntegrationTest {
 			imageBytes
 		);
 
-		mockMvc.perform(multipart("/api/v1/products/image").file(file))
-			.with(authentication(authenticatedMember()))
+		mockMvc.perform(
+				multipart("/api/v1/products/image")
+					.file(file)
+					.with(authentication(authenticatedMember()))
+			)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId").isNumber())
 			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/product/images/")))
@@ -210,8 +213,10 @@ class ProductIntegrationTest {
 	@Test
 	@DisplayName("일반 상품 이미지 삭제는 imageId 기준으로 처리한다")
 	void deleteProductImageSuccess() throws Exception {
-		mockMvc.perform(delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId()))
-			.with(authentication(authenticatedMember()))
+		mockMvc.perform(
+				delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId())
+					.with(authentication(authenticatedMember()))
+			)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId").value(uploadedImage.getImageId()))
 			.andExpect(jsonPath("$.deleted").value(true));
@@ -220,8 +225,10 @@ class ProductIntegrationTest {
 	@Test
 	@DisplayName("다른 사용자는 업로드하지 않은 일반 상품 이미지를 삭제할 수 없다")
 	void deleteProductImageFailsWhenNotOwner() throws Exception {
-		mockMvc.perform(delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId()))
-			.with(authentication(authenticatedMember(otherMember)))
+		mockMvc.perform(
+				delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId())
+					.with(authentication(authenticatedMember(otherMember)))
+			)
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("PRODUCT_ACCESS_DENIED"));
 	}

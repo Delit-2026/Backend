@@ -48,6 +48,9 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "category_id")
 	private Long categoryId;
 
+	@Column(name = "member_id")
+	private Long memberId;
+
 	@Column(name = "price", precision = 15, scale = 2)
 	private BigDecimal price;
 
@@ -59,6 +62,9 @@ public class AuctionDraft extends BaseEntity {
 
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
+
+	@Column(name = "auction_duration_days")
+	private Integer auctionDurationDays;
 
 	@Column(name = "location", length = 100)
 	private String location;
@@ -75,10 +81,12 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -87,10 +95,12 @@ public class AuctionDraft extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
+		this.auctionDurationDays = auctionDurationDays;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;
@@ -101,10 +111,12 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -114,10 +126,12 @@ public class AuctionDraft extends BaseEntity {
 			description,
 			saleType,
 			categoryId,
+			memberId,
 			price,
 			startPrice,
 			auctionStartAt,
 			auctionEndAt,
+			auctionDurationDays,
 			location,
 			payloadJson,
 			savedAt
@@ -129,10 +143,12 @@ public class AuctionDraft extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -141,10 +157,12 @@ public class AuctionDraft extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
+		this.auctionDurationDays = auctionDurationDays;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;

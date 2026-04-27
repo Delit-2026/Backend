@@ -18,12 +18,15 @@ import com.dealit.dealit.domain.auction.entity.AuctionDraft;
 import com.dealit.dealit.domain.auction.entity.AuctionProduct;
 import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
 import com.dealit.dealit.domain.auction.entity.Category;
+import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +54,7 @@ public class AuctionService {
 	private final AuctionProductImageRepository auctionProductImageRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
 	private final CategoryRepository categoryRepository;
+	private final MemberRepository memberRepository;
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
@@ -89,8 +93,9 @@ public class AuctionService {
 	}
 
 	@Transactional
-	public SaveAuctionDraftResponse saveDraft(SaveAuctionDraftRequest request) {
+	public SaveAuctionDraftResponse saveDraft(Long memberId, SaveAuctionDraftRequest request) {
 		validateDraftRequest(request);
+		Member member = loadActiveMember(memberId);
 
 		OffsetDateTime savedAt = OffsetDateTime.now(ZoneOffset.UTC);
 		String payloadJson = serializeDraft(request);
@@ -101,44 +106,50 @@ public class AuctionService {
 				normalizeBlank(request.description()),
 				request.saleType(),
 				request.categoryId(),
+				member.getMemberId(),
 				request.price(),
 				request.startPrice(),
-				request.auctionStartAt(),
-				request.auctionEndAt(),
+				null,
+				null,
+				request.auctionDurationDays(),
 				normalizeBlank(request.location()),
 				payloadJson,
 				savedAt
 			)
-			: auctionDraftRepository.findById(request.draftId())
-				.map(existingDraft -> {
-					existingDraft.update(
+				: auctionDraftRepository.findById(request.draftId())
+					.map(existingDraft -> {
+						existingDraft.update(
+							normalizeBlank(request.name()),
+							normalizeBlank(request.description()),
+							request.saleType(),
+							request.categoryId(),
+							member.getMemberId(),
+							request.price(),
+							request.startPrice(),
+							null,
+							null,
+							request.auctionDurationDays(),
+							normalizeBlank(request.location()),
+							payloadJson,
+							savedAt
+						);
+						return existingDraft;
+					})
+					.orElseGet(() -> AuctionDraft.create(
 						normalizeBlank(request.name()),
 						normalizeBlank(request.description()),
 						request.saleType(),
 						request.categoryId(),
+						member.getMemberId(),
 						request.price(),
 						request.startPrice(),
-						request.auctionStartAt(),
-						request.auctionEndAt(),
+						null,
+						null,
+						request.auctionDurationDays(),
 						normalizeBlank(request.location()),
 						payloadJson,
 						savedAt
-					);
-					return existingDraft;
-				})
-				.orElseGet(() -> AuctionDraft.create(
-					normalizeBlank(request.name()),
-					normalizeBlank(request.description()),
-					request.saleType(),
-					request.categoryId(),
-					request.price(),
-					request.startPrice(),
-					request.auctionStartAt(),
-					request.auctionEndAt(),
-					normalizeBlank(request.location()),
-					payloadJson,
-					savedAt
-				));
+					));
 
 		AuctionDraft savedDraft = auctionDraftRepository.save(draft);
 		return new SaveAuctionDraftResponse(savedDraft.getDraftId(), savedDraft.getSavedAt());
@@ -196,6 +207,8 @@ public class AuctionService {
 	public CreateAuctionResponse createAuction(CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
+		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 
 		AuctionProduct product = auctionProductRepository.save(
 			AuctionProduct.create(
@@ -205,15 +218,13 @@ public class AuctionService {
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
-				request.auctionStartAt(),
-				request.auctionEndAt(),
+				auctionPeriod.startAt(),
+				auctionPeriod.endAt(),
 				request.location().trim(),
 				request.draftId(),
 				determineStatus(
-					request.saleType(),
-					request.auctionStartAt(),
-					request.auctionEndAt(),
-					OffsetDateTime.now(ZoneOffset.UTC)
+					auctionPeriod.endAt(),
+					now
 				)
 			)
 		);
@@ -225,15 +236,11 @@ public class AuctionService {
 		}
 		auctionProductImageRepository.saveAll(imagesById.values());
 
-		CreateAuctionResponse.AuctionScheduleResponse auction = product.getSaleType() == ProductSaleType.AUCTION
-			? buildAuctionScheduleResponse(product)
-			: null;
-
 		return new CreateAuctionResponse(
 			product.getProductId(),
 			product.getSaleType(),
 			product.getStatus(),
-			auction
+			buildAuctionScheduleResponse(product)
 		);
 	}
 
@@ -286,46 +293,40 @@ public class AuctionService {
 		}
 	}
 
+	private Member loadActiveMember(Long memberId) {
+		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
+			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
+	}
+
 	private void validateRequestBySaleType(CreateAuctionRequest request) {
-		if (request.saleType() == ProductSaleType.AUCTION) {
-			if (request.startPrice() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
-			}
-			if (request.auctionStartAt() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 시작 시각이 필수입니다.");
-			}
-			if (request.auctionEndAt() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 종료 시각이 필수입니다.");
-			}
-			if (request.startPrice().signum() <= 0) {
-				throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
-			}
-			if (!request.auctionStartAt().isBefore(request.auctionEndAt())) {
-				throw new InvalidAuctionRequestException("경매 시작 시각은 종료 시각보다 빨라야 합니다.");
-			}
-			return;
+		if (request.saleType() != ProductSaleType.AUCTION) {
+			throw new InvalidAuctionRequestException("경매 등록에서는 AUCTION 판매 유형만 허용됩니다.");
 		}
 
-		if (request.price() == null) {
-			throw new InvalidAuctionRequestException("일반 판매에서는 판매가가 필수입니다.");
+		if (request.startPrice() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 		}
-		if (request.price().signum() <= 0) {
-			throw new InvalidAuctionRequestException("판매가는 0보다 커야 합니다.");
+		if (request.auctionDurationDays() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간이 필수입니다.");
+		}
+		if (request.startPrice().signum() <= 0) {
+			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
+		}
+		if (request.auctionDurationDays() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
 		}
 	}
 
+	private AuctionPeriod resolveAuctionPeriod(CreateAuctionRequest request, OffsetDateTime now) {
+		OffsetDateTime startAt = now;
+		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
+		return new AuctionPeriod(startAt, endAt);
+	}
+
 	private AuctionStatus determineStatus(
-		ProductSaleType saleType,
-		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		OffsetDateTime now
 	) {
-		if (saleType == ProductSaleType.REGULAR) {
-			return AuctionStatus.ON_SALE;
-		}
-		if (auctionStartAt != null && auctionStartAt.isAfter(now)) {
-			return AuctionStatus.AUCTION_SCHEDULED;
-		}
 		if (auctionEndAt != null && auctionEndAt.isBefore(now)) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
 		}
@@ -347,8 +348,7 @@ public class AuctionService {
 		boolean hasCategory = request.categoryId() != null;
 		boolean hasPrice = request.price() != null;
 		boolean hasStartPrice = request.startPrice() != null;
-		boolean hasAuctionStartAt = request.auctionStartAt() != null;
-		boolean hasAuctionEndAt = request.auctionEndAt() != null;
+		boolean hasAuctionDurationDays = request.auctionDurationDays() != null;
 		boolean hasImages = request.images() != null && !request.images().isEmpty();
 		boolean hasLocation = normalizeBlank(request.location()) != null;
 
@@ -359,8 +359,7 @@ public class AuctionService {
 			!hasCategory &&
 			!hasPrice &&
 			!hasStartPrice &&
-			!hasAuctionStartAt &&
-			!hasAuctionEndAt &&
+			!hasAuctionDurationDays &&
 			!hasImages &&
 			!hasLocation
 		) {
@@ -398,5 +397,11 @@ public class AuctionService {
 		private CategoryNode(Category category) {
 			this(category, new ArrayList<>());
 		}
+	}
+
+	private record AuctionPeriod(
+		OffsetDateTime startAt,
+		OffsetDateTime endAt
+	) {
 	}
 }

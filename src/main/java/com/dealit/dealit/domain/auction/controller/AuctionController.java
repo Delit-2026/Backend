@@ -12,6 +12,7 @@ import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
 import com.dealit.dealit.domain.auction.service.AuctionService;
+import com.dealit.dealit.global.security.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +22,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -62,8 +64,11 @@ public class AuctionController {
 	@ApiResponse(responseCode = "200", description = "임시저장 성공",
 		content = @Content(schema = @Schema(implementation = SaveAuctionDraftResponse.class)))
 	@PostMapping("/draft")
-	public SaveAuctionDraftResponse saveDraft(@RequestBody SaveAuctionDraftRequest request) {
-		return auctionService.saveDraft(request);
+	public SaveAuctionDraftResponse saveDraft(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestBody SaveAuctionDraftRequest request
+	) {
+		return auctionService.saveDraft(member.memberId(), request);
 	}
 
 	@Operation(summary = "카테고리 추천", description = "입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.")

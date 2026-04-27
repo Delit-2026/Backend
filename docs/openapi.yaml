@@ -1036,7 +1036,6 @@ components:
           type: string
           description: 판매 유형
           enum:
-          - REGULAR
           - AUCTION
           example: AUCTION
         categoryId:
@@ -1052,16 +1051,11 @@ components:
           type: number
           description: 경매 시작가
           example: 80000
-        auctionStartAt:
-          type: string
-          format: date-time
-          description: 경매 시작 시각
-          example: 2026-04-15T10:00:00Z
-        auctionEndAt:
-          type: string
-          format: date-time
-          description: 경매 종료 시각
-          example: 2026-04-15T12:00:00Z
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 3
         images:
           type: array
           items:
@@ -1095,11 +1089,9 @@ components:
           description: 경매 상태
           enum:
           - DRAFT
-          - ON_SALE
-          - AUCTION_SCHEDULED
           - AUCTION_LIVE
           - ENDED
-          example: AUCTION_SCHEDULED
+          example: AUCTION_LIVE
         startAt:
           type: string
           format: date-time
@@ -1123,7 +1115,6 @@ components:
           type: string
           description: 판매 유형
           enum:
-          - REGULAR
           - AUCTION
           example: AUCTION
         status:
@@ -1131,8 +1122,6 @@ components:
           description: 상품 상태
           enum:
           - DRAFT
-          - ON_SALE
-          - AUCTION_SCHEDULED
           - AUCTION_LIVE
           - ENDED
           example: AUCTION_LIVE
@@ -1188,16 +1177,11 @@ components:
           type: number
           description: 경매 시작가
           example: 80000
-        auctionStartAt:
-          type: string
-          format: date-time
-          description: 경매 시작 시각
-          example: 2026-04-15T10:00:00Z
-        auctionEndAt:
-          type: string
-          format: date-time
-          description: 경매 종료 시각
-          example: 2026-04-15T12:00:00Z
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 3
         images:
           type: array
           description: 상품 이미지 목록
