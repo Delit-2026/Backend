@@ -1,2 +1,0 @@
-ALTER TABLE member
-    ALTER COLUMN email DROP NOT NULL;
