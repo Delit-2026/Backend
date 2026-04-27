@@ -60,6 +60,9 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
+	@Column(name = "auction_duration_days")
+	private Integer auctionDurationDays;
+
 	@Column(name = "location", length = 100)
 	private String location;
 
@@ -79,6 +82,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -91,6 +95,7 @@ public class AuctionDraft extends BaseEntity {
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
+		this.auctionDurationDays = auctionDurationDays;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;
@@ -105,6 +110,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -118,6 +124,7 @@ public class AuctionDraft extends BaseEntity {
 			startPrice,
 			auctionStartAt,
 			auctionEndAt,
+			auctionDurationDays,
 			location,
 			payloadJson,
 			savedAt
@@ -133,6 +140,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
+		Integer auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -145,6 +153,7 @@ public class AuctionDraft extends BaseEntity {
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
+		this.auctionDurationDays = auctionDurationDays;
 		this.location = location;
 		this.payloadJson = payloadJson;
 		this.savedAt = savedAt;

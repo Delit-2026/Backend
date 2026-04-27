@@ -7,10 +7,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Schema(description = "경매 상품 등록 요청")
@@ -39,11 +39,9 @@ public record CreateAuctionRequest(
 	@Schema(description = "경매 시작가", example = "80000", nullable = true)
 	BigDecimal startPrice,
 
-	@Schema(description = "경매 시작 시각", example = "2026-04-15T10:00:00Z", nullable = true)
-	OffsetDateTime auctionStartAt,
-
-	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
-	OffsetDateTime auctionEndAt,
+	@Schema(description = "경매 진행 기간(일 단위)", example = "3", nullable = true)
+	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
+	Integer auctionDurationDays,
 
 	@ArraySchema(schema = @Schema(implementation = ProductImagePayload.class), minItems = 1)
 	@NotEmpty(message = "이미지는 최소 1장 이상 등록해야 합니다.")

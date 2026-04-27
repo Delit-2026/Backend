@@ -103,8 +103,9 @@ public class AuctionService {
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
-				request.auctionStartAt(),
-				request.auctionEndAt(),
+				null,
+				null,
+				request.auctionDurationDays(),
 				normalizeBlank(request.location()),
 				payloadJson,
 				savedAt
@@ -118,8 +119,9 @@ public class AuctionService {
 						request.categoryId(),
 						request.price(),
 						request.startPrice(),
-						request.auctionStartAt(),
-						request.auctionEndAt(),
+						null,
+						null,
+						request.auctionDurationDays(),
 						normalizeBlank(request.location()),
 						payloadJson,
 						savedAt
@@ -133,8 +135,9 @@ public class AuctionService {
 					request.categoryId(),
 					request.price(),
 					request.startPrice(),
-					request.auctionStartAt(),
-					request.auctionEndAt(),
+					null,
+					null,
+					request.auctionDurationDays(),
 					normalizeBlank(request.location()),
 					payloadJson,
 					savedAt
@@ -196,6 +199,8 @@ public class AuctionService {
 	public CreateAuctionResponse createAuction(CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
+		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 
 		AuctionProduct product = auctionProductRepository.save(
 			AuctionProduct.create(
@@ -205,15 +210,15 @@ public class AuctionService {
 				request.categoryId(),
 				request.price(),
 				request.startPrice(),
-				request.auctionStartAt(),
-				request.auctionEndAt(),
+				auctionPeriod.startAt(),
+				auctionPeriod.endAt(),
 				request.location().trim(),
 				request.draftId(),
 				determineStatus(
 					request.saleType(),
-					request.auctionStartAt(),
-					request.auctionEndAt(),
-					OffsetDateTime.now(ZoneOffset.UTC)
+					auctionPeriod.startAt(),
+					auctionPeriod.endAt(),
+					now
 				)
 			)
 		);
@@ -291,17 +296,14 @@ public class AuctionService {
 			if (request.startPrice() == null) {
 				throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 			}
-			if (request.auctionStartAt() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 시작 시각이 필수입니다.");
-			}
-			if (request.auctionEndAt() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 종료 시각이 필수입니다.");
+			if (request.auctionDurationDays() == null) {
+				throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간이 필수입니다.");
 			}
 			if (request.startPrice().signum() <= 0) {
 				throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
 			}
-			if (!request.auctionStartAt().isBefore(request.auctionEndAt())) {
-				throw new InvalidAuctionRequestException("경매 시작 시각은 종료 시각보다 빨라야 합니다.");
+			if (request.auctionDurationDays() <= 0) {
+				throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
 			}
 			return;
 		}
@@ -312,6 +314,16 @@ public class AuctionService {
 		if (request.price().signum() <= 0) {
 			throw new InvalidAuctionRequestException("판매가는 0보다 커야 합니다.");
 		}
+	}
+
+	private AuctionPeriod resolveAuctionPeriod(CreateAuctionRequest request, OffsetDateTime now) {
+		if (request.saleType() != ProductSaleType.AUCTION) {
+			return AuctionPeriod.empty();
+		}
+
+		OffsetDateTime startAt = now;
+		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
+		return new AuctionPeriod(startAt, endAt);
 	}
 
 	private AuctionStatus determineStatus(
@@ -347,8 +359,7 @@ public class AuctionService {
 		boolean hasCategory = request.categoryId() != null;
 		boolean hasPrice = request.price() != null;
 		boolean hasStartPrice = request.startPrice() != null;
-		boolean hasAuctionStartAt = request.auctionStartAt() != null;
-		boolean hasAuctionEndAt = request.auctionEndAt() != null;
+		boolean hasAuctionDurationDays = request.auctionDurationDays() != null;
 		boolean hasImages = request.images() != null && !request.images().isEmpty();
 		boolean hasLocation = normalizeBlank(request.location()) != null;
 
@@ -359,8 +370,7 @@ public class AuctionService {
 			!hasCategory &&
 			!hasPrice &&
 			!hasStartPrice &&
-			!hasAuctionStartAt &&
-			!hasAuctionEndAt &&
+			!hasAuctionDurationDays &&
 			!hasImages &&
 			!hasLocation
 		) {
@@ -397,6 +407,15 @@ public class AuctionService {
 	) {
 		private CategoryNode(Category category) {
 			this(category, new ArrayList<>());
+		}
+	}
+
+	private record AuctionPeriod(
+		OffsetDateTime startAt,
+		OffsetDateTime endAt
+	) {
+		private static AuctionPeriod empty() {
+			return new AuctionPeriod(null, null);
 		}
 	}
 }
