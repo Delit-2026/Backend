@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.member;
 
+import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -82,7 +84,7 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("JWT로 마이페이지 프로필을 조회하면 프론트가 기대하는 프로필 응답을 반환한다")
+	@DisplayName("JWT로 마이페이지 프로필을 조회하면 현재 프로필 응답을 반환한다")
 	void getMyPageProfileSuccess() throws Exception {
 		mockMvc.perform(get("/api/v1/users/me/mypage")
 				.header("Authorization", "Bearer " + accessToken))
@@ -109,7 +111,7 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("프로필 수정에 성공하면 변경된 프로필을 반환하고 저장한다")
+	@DisplayName("프로필 수정이 성공하면 변경된 프로필을 반환하고 저장한다")
 	void updateProfileSuccess() throws Exception {
 		mockMvc.perform(patch("/api/v1/users/me/profile")
 				.header("Authorization", "Bearer " + accessToken)
@@ -135,7 +137,7 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("프로필 수정 요청에서 소개글과 이미지가 누락되면 기존 값을 유지한다")
+	@DisplayName("프로필 수정 요청에서 소개글과 이미지가 빠지면 기존 값을 유지한다")
 	void updateProfilePreservesBioAndImageWhenFieldsMissing() throws Exception {
 		savedMember.updateProfile(
 			savedMember.getNickname(),
@@ -163,7 +165,7 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("다른 회원이 사용 중인 닉네임으로 프로필을 수정하면 409를 반환한다")
+	@DisplayName("다른 회원이 쓰는 닉네임으로 프로필을 수정하면 409를 반환한다")
 	void updateProfileFailsWhenNicknameDuplicated() throws Exception {
 		Member otherMember = memberRepository.save(Member.create(
 			"other-user",
@@ -190,7 +192,7 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("현재 본인의 닉네임으로 프로필을 다시 저장하는 것은 허용한다")
+	@DisplayName("현재 본인 닉네임으로 다시 저장하는 것은 허용한다")
 	void updateProfileAllowsCurrentNickname() throws Exception {
 		mockMvc.perform(patch("/api/v1/users/me/profile")
 				.header("Authorization", "Bearer " + accessToken)
@@ -208,25 +210,96 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("지역 수정에 성공하면 변경된 지역을 반환하고 저장한다")
+	@DisplayName("구조화된 지역 수정이 성공하면 대표 location과 상세 필드를 함께 저장한다")
 	void updateLocationSuccess() throws Exception {
 		mockMvc.perform(patch("/api/v1/users/me/location")
 				.header("Authorization", "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
-					  "location": "인천광역시 연수구"
+					  "postalCode": "21984",
+					  "roadAddress": "인천광역시 연수구 센트럴로 123",
+					  "jibunAddress": "인천광역시 연수구 송도동 24-1",
+					  "detailAddress": "101동 1203호",
+					  "latitude": 37.3891000,
+					  "longitude": 126.6430000,
+					  "locationSource": "POSTCODE"
 					}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.location").value("인천광역시 연수구"));
+			.andExpect(jsonPath("$.location").value("인천광역시 연수구 센트럴로 123 101동 1203호"))
+			.andExpect(jsonPath("$.postalCode").value("21984"))
+			.andExpect(jsonPath("$.roadAddress").value("인천광역시 연수구 센트럴로 123"))
+			.andExpect(jsonPath("$.jibunAddress").value("인천광역시 연수구 송도동 24-1"))
+			.andExpect(jsonPath("$.detailAddress").value("101동 1203호"))
+			.andExpect(jsonPath("$.latitude").value(37.3891))
+			.andExpect(jsonPath("$.longitude").value(126.643))
+			.andExpect(jsonPath("$.locationSource").value("POSTCODE"));
 
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
-		assertThat(updatedMember.getLocation()).isEqualTo("인천광역시 연수구");
+		assertThat(updatedMember.getLocation()).isEqualTo("인천광역시 연수구 센트럴로 123 101동 1203호");
+		assertThat(updatedMember.getPostalCode()).isEqualTo("21984");
+		assertThat(updatedMember.getRoadAddress()).isEqualTo("인천광역시 연수구 센트럴로 123");
+		assertThat(updatedMember.getJibunAddress()).isEqualTo("인천광역시 연수구 송도동 24-1");
+		assertThat(updatedMember.getDetailAddress()).isEqualTo("101동 1203호");
+		assertThat(updatedMember.getLatitude()).isEqualByComparingTo(new BigDecimal("37.3891000"));
+		assertThat(updatedMember.getLongitude()).isEqualByComparingTo(new BigDecimal("126.6430000"));
+		assertThat(updatedMember.getLocationSource()).isEqualTo(LocationSource.POSTCODE);
 	}
 
 	@Test
-	@DisplayName("프로필 이미지 업로드에 성공하면 접근 가능한 public URL을 반환하고 회원 프로필에 저장한다")
+	@DisplayName("기존 location 문자열만 보내도 지역 수정이 동작한다")
+	void updateLocationLegacyStringOnlySuccess() throws Exception {
+		mockMvc.perform(patch("/api/v1/users/me/location")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "location": "서울특별시 마포구"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.location").value("서울특별시 마포구"))
+			.andExpect(jsonPath("$.postalCode").doesNotExist())
+			.andExpect(jsonPath("$.roadAddress").doesNotExist())
+			.andExpect(jsonPath("$.locationSource").value("MANUAL"));
+
+		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
+		assertThat(updatedMember.getLocation()).isEqualTo("서울특별시 마포구");
+		assertThat(updatedMember.getRoadAddress()).isNull();
+		assertThat(updatedMember.getLocationSource()).isEqualTo(LocationSource.MANUAL);
+	}
+
+	@Test
+	@DisplayName("내 지역 조회는 구조화된 위치 정보를 함께 반환한다")
+	void getMyLocationSuccess() throws Exception {
+		savedMember.updateLocationDetails(
+			"경기도 성남시 분당구 판교역로 166 101동 1203호",
+			"13529",
+			"경기도 성남시 분당구 판교역로 166",
+			"경기도 성남시 분당구 백현동 532",
+			"101동 1203호",
+			new BigDecimal("37.3948000"),
+			new BigDecimal("127.1112000"),
+			LocationSource.POSTCODE
+		);
+		memberRepository.save(savedMember);
+
+		mockMvc.perform(get("/api/v1/users/me/location")
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.location").value("경기도 성남시 분당구 판교역로 166 101동 1203호"))
+			.andExpect(jsonPath("$.postalCode").value("13529"))
+			.andExpect(jsonPath("$.roadAddress").value("경기도 성남시 분당구 판교역로 166"))
+			.andExpect(jsonPath("$.jibunAddress").value("경기도 성남시 분당구 백현동 532"))
+			.andExpect(jsonPath("$.detailAddress").value("101동 1203호"))
+			.andExpect(jsonPath("$.latitude").value(37.3948))
+			.andExpect(jsonPath("$.longitude").value(127.1112))
+			.andExpect(jsonPath("$.locationSource").value("POSTCODE"));
+	}
+
+	@Test
+	@DisplayName("프로필 이미지 업로드에 성공하면 접근 가능한 URL을 반환하고 회원 프로필에 저장한다")
 	void uploadProfileImageSuccess() throws Exception {
 		byte[] imageBytes = "profile-image".getBytes();
 		MockMultipartFile file = new MockMultipartFile(

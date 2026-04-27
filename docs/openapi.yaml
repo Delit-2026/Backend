@@ -13,6 +13,12 @@ security:
 tags:
 - name: Health
   description: 애플리케이션 상태 확인 API
+- name: Product
+  description: 일반 상품 등록 API
+- name: Location
+  description: 위치 보조 API
+- name: Email Verification
+  description: 이메일 인증 API
 - name: Auction
   description: 경매 상품 등록 API
 - name: Member
@@ -47,6 +53,106 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UploadProfileImageResponse"
+  /api/v1/products:
+    post:
+      tags:
+      - Product
+      summary: 일반 상품 등록
+      operationId: createProduct
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+        required: true
+      responses:
+        "201":
+          description: 상품 등록 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateProductResponse"
+  /api/v1/products/price/recommend:
+    post:
+      tags:
+      - Product
+      summary: 가격 추천
+      operationId: recommendPrice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendPriceRequest"
+        required: true
+      responses:
+        "200":
+          description: 가격 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendPriceResponse"
+  /api/v1/products/image:
+    post:
+      tags:
+      - Product
+      summary: 상품 이미지 업로드
+      operationId: uploadImage
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: 이미지 업로드 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UploadProductImageResponse"
+  /api/v1/products/draft:
+    post:
+      tags:
+      - Product
+      summary: 일반 상품 임시저장
+      operationId: saveDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveProductDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: 임시저장 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SaveProductDraftResponse"
+  /api/v1/products/category/recommend:
+    post:
+      tags:
+      - Product
+      summary: 카테고리 추천
+      operationId: recommendCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendCategoryRequest"
+        required: true
+      responses:
+        "200":
+          description: 카테고리 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendCategoryResponse"
   /api/v1/members/signup:
     post:
       tags:
@@ -67,6 +173,66 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/SignUpResponse"
+  /api/v1/locations/resolve:
+    post:
+      tags:
+      - Location
+      summary: 좌표로 주소 변환
+      description: 위도와 경도를 기반으로 카카오 좌표-주소 변환 API를 호출해 주소 정보를 반환합니다.
+      operationId: resolve
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveLocationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResolvedLocationResponse"
+  /api/v1/email/verification/send:
+    post:
+      tags:
+      - Email Verification
+      summary: 이메일 인증 코드 발송
+      description: 회원가입 또는 프로필 수정에 사용할 이메일 인증 코드를 발송합니다.
+      operationId: send
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailVerificationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SendEmailVerificationResponse"
+  /api/v1/email/verification/confirm:
+    post:
+      tags:
+      - Email Verification
+      summary: 이메일 인증 코드 확인
+      description: 발송된 이메일 인증 코드를 검증합니다.
+      operationId: confirm
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEmailVerificationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConfirmEmailVerificationResponse"
   /api/v1/auth/login:
     post:
       tags:
@@ -113,7 +279,7 @@ paths:
       - Auction
       summary: 가격 추천
       description: 상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.
-      operationId: recommendPrice
+      operationId: recommendPrice_1
       requestBody:
         content:
           application/json:
@@ -133,7 +299,7 @@ paths:
       - Auction
       summary: 상품 이미지 업로드
       description: 경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.
-      operationId: uploadImage
+      operationId: uploadImage_1
       requestBody:
         content:
           multipart/form-data:
@@ -158,7 +324,7 @@ paths:
       - Auction
       summary: 경매 상품 임시저장
       description: 등록 직전 폼 데이터를 draft 상태로 저장한다.
-      operationId: saveDraft
+      operationId: saveDraft_1
       requestBody:
         content:
           application/json:
@@ -178,7 +344,7 @@ paths:
       - Auction
       summary: 카테고리 추천
       description: 입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.
-      operationId: recommendCategory
+      operationId: recommendCategory_1
       requestBody:
         content:
           application/json:
@@ -213,11 +379,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/MyPageProfileResponse"
   /api/v1/users/me/location:
+    get:
+      tags:
+      - Profile
+      summary: 내 지역 조회
+      description: 현재 로그인한 사용자의 지역 및 구조화된 위치 정보를 조회합니다.
+      operationId: getMyLocation
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyLocationResponse"
     patch:
       tags:
       - Profile
       summary: 지역 수정
-      description: 현재 로그인한 사용자의 지역 정보를 수정합니다.
+      description: 현재 로그인한 사용자의 대표 지역과 상세 위치 정보를 수정합니다.
       operationId: updateLocation
       requestBody:
         content:
@@ -246,6 +425,19 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyPageProfileResponse"
+  /api/v1/products/categories:
+    get:
+      tags:
+      - Product
+      summary: 카테고리 목록 조회
+      operationId: getCategories
+      responses:
+        "200":
+          description: 카테고리 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CategoryOptionResponse"
   /api/v1/members/nickname/check:
     get:
       tags:
@@ -282,7 +474,7 @@ paths:
         schema:
           type: string
           maxLength: 30
-          minLength: 1
+          minLength: 0
       responses:
         "200":
           description: OK
@@ -325,7 +517,7 @@ paths:
       - Auction
       summary: 카테고리 목록 조회
       description: 상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.
-      operationId: getCategories
+      operationId: getCategories_1
       responses:
         "200":
           description: 카테고리 조회 성공
@@ -333,13 +525,33 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CategoryOptionResponse"
+  /api/v1/products/image/{imageId}:
+    delete:
+      tags:
+      - Product
+      summary: 상품 이미지 삭제
+      operationId: deleteImage
+      parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 이미지 삭제 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeleteProductImageResponse"
   /api/v1/auction/image/{imageId}:
     delete:
       tags:
       - Auction
       summary: 상품 이미지 삭제
       description: 등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.
-      operationId: deleteImage
+      operationId: deleteImage_1
       parameters:
       - name: imageId
         in: path
@@ -361,6 +573,278 @@ components:
       properties:
         profileImageUrl:
           type: string
+    CreateProductRequest:
+      type: object
+      description: 일반 상품 등록 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 일반 판매 상품명
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 상품 설명
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+      required:
+      - allowOffer
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - price
+      - saleType
+    ProductImagePayload:
+      type: object
+      description: 일반 상품 이미지 메타데이터
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: http://localhost:8080/product/images/1-sample.jpg
+          minLength: 1
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+          minimum: 1
+      required:
+      - imageId
+      - imageUrl
+    AuctionResponse: {}
+    CreateProductResponse:
+      type: object
+      description: 일반 상품 등록 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 등록된 상품 ID
+          example: 123
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        auction:
+          $ref: "#/components/schemas/AuctionResponse"
+          description: 경매 메타 정보
+        generalSale:
+          $ref: "#/components/schemas/GeneralSaleResponse"
+          description: 일반 판매 정보
+    GeneralSaleResponse:
+      type: object
+      properties:
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+    RecommendPriceRequest:
+      type: object
+      description: 일반 상품 가격 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치 OLED
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 사용하지 않아서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+      required:
+      - description
+      - name
+      - saleType
+    RecommendPriceResponse:
+      type: object
+      description: 가격 추천 응답
+      properties:
+        recommendedPrice:
+          type: number
+          description: 추천 판매가
+          example: 250000
+        startPrice:
+          type: number
+          description: 추천 시작가
+          example: 180000
+    UploadProductImageResponse:
+      type: object
+      description: 일반 상품 이미지 업로드 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 301
+        imageUrl:
+          type: string
+          description: 업로드된 이미지 URL
+          example: http://localhost:8080/product/images/301-sample.jpg
+    SaveProductDraftRequest:
+      type: object
+      description: 일반 상품 임시저장 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 일반 판매 상품명
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 상품 설명
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+    SaveProductDraftResponse:
+      type: object
+      description: 일반 상품 임시저장 응답
+      properties:
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 10
+        savedAt:
+          type: string
+          format: date-time
+          description: 저장 시각
+          example: 2026-04-12T20:00:00Z
+    RecommendCategoryRequest:
+      type: object
+      description: 일반 상품 카테고리 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 사용하지 않아서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - description
+      - name
+    RecommendCategoryResponse:
+      type: object
+      description: 카테고리 추천 응답
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+          description: 추천 카테고리 ID
+          example: 200
+        categoryName:
+          type: string
+          description: 추천 카테고리명
+          example: 디지털/가전
     SignUpRequest:
       type: object
       description: 회원가입 요청
@@ -368,13 +852,13 @@ components:
         loginId:
           type: string
           description: 로그인 아이디
-          example: delit_user
+          example: dealit_user
           maxLength: 30
           minLength: 0
         password:
           type: string
           description: 비밀번호
-          example: 비밀번호123!
+          example: Password123!
           maxLength: 30
           minLength: 8
         email:
@@ -391,7 +875,6 @@ components:
           maxLength: 30
           minLength: 0
       required:
-      - email
       - loginId
       - password
     SignUpResponse:
@@ -419,6 +902,85 @@ components:
           type: string
           format: date-time
           description: 생성 시각
+    ResolveLocationRequest:
+      type: object
+      properties:
+        latitude:
+          type: number
+          maximum: 90.0
+          minimum: -90.0
+        longitude:
+          type: number
+          maximum: 180.0
+          minimum: -180.0
+      required:
+      - latitude
+      - longitude
+    ResolvedLocationResponse:
+      type: object
+      properties:
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+        region1DepthName:
+          type: string
+        region2DepthName:
+          type: string
+        region3DepthName:
+          type: string
+    SendEmailVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+      required:
+      - email
+    SendEmailVerificationResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        expiresInSeconds:
+          type: integer
+          format: int64
+    ConfirmEmailVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        code:
+          type: string
+          minLength: 1
+          pattern: "\\d{6}"
+      required:
+      - code
+      - email
+    ConfirmEmailVerificationResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        verified:
+          type: boolean
     LoginRequest:
       type: object
       description: 로그인 요청
@@ -518,29 +1080,6 @@ components:
       - location
       - name
       - saleType
-    ProductImagePayload:
-      type: object
-      description: 상품 이미지 메타데이터
-      properties:
-        imageId:
-          type: integer
-          format: int64
-          description: 업로드된 이미지 ID
-          example: 1
-        imageUrl:
-          type: string
-          description: 이미지 URL
-          example: http://localhost:8080/auction/images/1-sample.jpg
-          minLength: 1
-        sortOrder:
-          type: integer
-          format: int32
-          description: 정렬 순서
-          example: 1
-      required:
-      - imageId
-      - imageUrl
-      - sortOrder
     AuctionScheduleResponse:
       type: object
       description: 경매 일정 및 상태 정보
@@ -589,45 +1128,6 @@ components:
         auction:
           $ref: "#/components/schemas/AuctionScheduleResponse"
           description: 경매 메타 정보
-    RecommendPriceRequest:
-      type: object
-      description: 가격 추천 요청
-      properties:
-        name:
-          type: string
-          description: 상품명
-          example: 닌텐도 스위치 OLED
-          maxLength: 100
-          minLength: 0
-        description:
-          type: string
-          description: 상품 설명
-          example: 사용하지 않아서 깨끗합니다
-          maxLength: 2000
-          minLength: 0
-        saleType:
-          type: string
-          description: 판매 유형
-          enum:
-          - REGULAR
-          - AUCTION
-          example: REGULAR
-      required:
-      - description
-      - name
-      - saleType
-    RecommendPriceResponse:
-      type: object
-      description: 가격 추천 응답
-      properties:
-        recommendedPrice:
-          type: number
-          description: 추천 판매가
-          example: 250000
-        startPrice:
-          type: number
-          description: 추천 시작가
-          example: 180000
     UploadAuctionImageResponse:
       type: object
       description: 상품 이미지 업로드 응답
@@ -712,41 +1212,13 @@ components:
           format: date-time
           description: 저장 시각
           example: 2026-04-12T20:00:00Z
-    RecommendCategoryRequest:
-      type: object
-      description: 카테고리 추천 요청
-      properties:
-        name:
-          type: string
-          description: 상품명
-          example: 닌텐도 스위치
-          maxLength: 100
-          minLength: 0
-        description:
-          type: string
-          description: 상품 설명
-          example: 독과 조이콘이 포함된 중고 제품입니다.
-          maxLength: 2000
-          minLength: 0
-      required:
-      - description
-      - name
-    RecommendCategoryResponse:
-      type: object
-      description: 카테고리 추천 응답
-      properties:
-        categoryId:
-          type: integer
-          format: int64
-          description: 추천 카테고리 ID
-          example: 200
-        categoryName:
-          type: string
-          description: 추천 카테고리명
-          example: 디지털/가전
     UpdateMyProfileRequest:
       type: object
       properties:
+        name:
+          type: string
+          maxLength: 30
+          minLength: 0
         nickname:
           type: string
           maxLength: 30
@@ -767,6 +1239,8 @@ components:
         id:
           type: integer
           format: int64
+        name:
+          type: string
         nickname:
           type: string
         email:
@@ -777,6 +1251,8 @@ components:
           type: string
         location:
           type: string
+        verified:
+          type: boolean
         rating:
           type: number
           format: double
@@ -799,48 +1275,66 @@ components:
           type: string
           maxLength: 100
           minLength: 0
-      required:
-      - location
+        postalCode:
+          type: string
+          maxLength: 10
+          minLength: 0
+        roadAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        jibunAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        detailAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
     UpdateMyLocationResponse:
       type: object
       properties:
         location:
           type: string
-    NicknameCheckResponse:
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    MyLocationResponse:
       type: object
       properties:
-        nickname:
+        location:
           type: string
-        available:
-          type: boolean
-    LoginIdCheckResponse:
-      type: object
-      properties:
-        loginId:
+        postalCode:
           type: string
-        available:
-          type: boolean
-    CurrentMemberResponse:
-      type: object
-      description: 현재 인증된 회원 정보
-      properties:
-        memberId:
-          type: integer
-          format: int64
-          description: 회원 ID
-          example: 1
-        loginId:
+        roadAddress:
           type: string
-          description: 로그인 아이디
-          example: delit_user
-        email:
+        jibunAddress:
           type: string
-          description: 이메일
-          example: hong@example.com
-        nickname:
+        detailAddress:
           type: string
-          description: 닉네임
-          example: 당근한입
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
     CategoryOptionResponse:
       type: object
       description: 카테고리 선택 옵션
@@ -873,6 +1367,58 @@ components:
           description: 하위 카테고리 목록
           items:
             $ref: "#/components/schemas/CategoryOptionResponse"
+    NicknameCheckResponse:
+      type: object
+      properties:
+        nickname:
+          type: string
+        available:
+          type: boolean
+    LoginIdCheckResponse:
+      type: object
+      properties:
+        loginId:
+          type: string
+        available:
+          type: boolean
+    CurrentMemberResponse:
+      type: object
+      description: 현재 인증된 회원 정보
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+          example: 1
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: dealit_user
+        email:
+          type: string
+          description: 이메일
+          example: hong@example.com
+        nickname:
+          type: string
+          description: 닉네임
+          example: 딜잇유저
+        verified:
+          type: boolean
+          description: 이메일 인증 여부
+          example: false
+    DeleteProductImageResponse:
+      type: object
+      description: 일반 상품 이미지 삭제 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 삭제된 이미지 ID
+          example: 301
+        deleted:
+          type: boolean
+          description: 삭제 여부
+          example: true
     DeleteAuctionImageResponse:
       type: object
       description: 상품 이미지 삭제 응답
