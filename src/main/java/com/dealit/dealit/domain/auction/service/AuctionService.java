@@ -230,15 +230,11 @@ public class AuctionService {
 		}
 		auctionProductImageRepository.saveAll(imagesById.values());
 
-		CreateAuctionResponse.AuctionScheduleResponse auction = product.getSaleType() == ProductSaleType.AUCTION
-			? buildAuctionScheduleResponse(product)
-			: null;
-
 		return new CreateAuctionResponse(
 			product.getProductId(),
 			product.getSaleType(),
 			product.getStatus(),
-			auction
+			buildAuctionScheduleResponse(product)
 		);
 	}
 
@@ -292,35 +288,25 @@ public class AuctionService {
 	}
 
 	private void validateRequestBySaleType(CreateAuctionRequest request) {
-		if (request.saleType() == ProductSaleType.AUCTION) {
-			if (request.startPrice() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
-			}
-			if (request.auctionDurationDays() == null) {
-				throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간이 필수입니다.");
-			}
-			if (request.startPrice().signum() <= 0) {
-				throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
-			}
-			if (request.auctionDurationDays() <= 0) {
-				throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
-			}
-			return;
+		if (request.saleType() != ProductSaleType.AUCTION) {
+			throw new InvalidAuctionRequestException("경매 등록에서는 AUCTION 판매 유형만 허용됩니다.");
 		}
 
-		if (request.price() == null) {
-			throw new InvalidAuctionRequestException("일반 판매에서는 판매가가 필수입니다.");
+		if (request.startPrice() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 		}
-		if (request.price().signum() <= 0) {
-			throw new InvalidAuctionRequestException("판매가는 0보다 커야 합니다.");
+		if (request.auctionDurationDays() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간이 필수입니다.");
+		}
+		if (request.startPrice().signum() <= 0) {
+			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
+		}
+		if (request.auctionDurationDays() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
 		}
 	}
 
 	private AuctionPeriod resolveAuctionPeriod(CreateAuctionRequest request, OffsetDateTime now) {
-		if (request.saleType() != ProductSaleType.AUCTION) {
-			return AuctionPeriod.empty();
-		}
-
 		OffsetDateTime startAt = now;
 		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
 		return new AuctionPeriod(startAt, endAt);
@@ -332,9 +318,6 @@ public class AuctionService {
 		OffsetDateTime auctionEndAt,
 		OffsetDateTime now
 	) {
-		if (saleType == ProductSaleType.REGULAR) {
-			return AuctionStatus.ON_SALE;
-		}
 		if (auctionStartAt != null && auctionStartAt.isAfter(now)) {
 			return AuctionStatus.AUCTION_SCHEDULED;
 		}
@@ -414,8 +397,5 @@ public class AuctionService {
 		OffsetDateTime startAt,
 		OffsetDateTime endAt
 	) {
-		private static AuctionPeriod empty() {
-			return new AuctionPeriod(null, null);
-		}
 	}
 }
