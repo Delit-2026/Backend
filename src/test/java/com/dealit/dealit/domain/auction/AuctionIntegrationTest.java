@@ -12,7 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -21,8 +20,9 @@ import java.nio.file.Path;
 import java.util.Comparator;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,7 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuctionIntegrationTest {
@@ -127,8 +126,21 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("일반 판매 상품 등록에 성공하면 ON_SALE 상태를 반환한다")
-	void createRegularAuctionSuccess() throws Exception {
+	@DisplayName("카테고리 목록 조회는 계층형 트리 구조를 반환한다")
+	void getCategoriesReturnsHierarchy() throws Exception {
+		mockMvc.perform(get("/api/v1/auction/categories"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(3)))
+			.andExpect(jsonPath("$[0].nameKo").value("전자기기"))
+			.andExpect(jsonPath("$[0].children", hasSize(4)))
+			.andExpect(jsonPath("$[0].children[0].nameKo").value("스마트폰"))
+			.andExpect(jsonPath("$[0].children[0].children", hasSize(3)))
+			.andExpect(jsonPath("$[0].children[0].children[0].nameKo").value("아이폰"));
+	}
+
+	@Test
+	@DisplayName("경매 등록 API는 REGULAR 판매 유형을 허용하지 않는다")
+	void createAuctionFailsWhenSaleTypeIsRegular() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -136,10 +148,9 @@ class AuctionIntegrationTest {
 					  "name": "MacBook Air M2",
 					  "description": "Lightly used and includes charger.",
 					  "saleType": "REGULAR",
-					  "categoryId": 12,
+					  "categoryId": 19,
 					  "price": 1350000,
 					  "startPrice": null,
-					  "auctionEndAt": null,
 					  "images": [
 					    {
 					      "imageId": %d,
@@ -151,16 +162,44 @@ class AuctionIntegrationTest {
 					  "draftId": null
 					}
 					""".formatted(uploadedImage.getImageId())))
-			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.productId").isNumber())
-			.andExpect(jsonPath("$.saleType").value("REGULAR"))
-			.andExpect(jsonPath("$.status").value("ON_SALE"))
-			.andExpect(jsonPath("$.auction").value(nullValue()));
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.message").value("경매 등록에서는 AUCTION 판매 유형만 허용됩니다."));
 	}
 
 	@Test
-	@DisplayName("경매 시작 시각이 미래면 AUCTION_SCHEDULED 상태를 반환한다")
-	void createAuctionScheduledSuccess() throws Exception {
+	@DisplayName("상위 카테고리로 상품 등록을 시도하면 검증 오류를 반환한다")
+	void createAuctionFailsWhenCategoryIsNotLeaf() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "MacBook Air M2",
+					  "description": "Lightly used and includes charger.",
+					  "saleType": "AUCTION",
+					  "categoryId": 5,
+					  "price": null,
+					  "startPrice": 500000,
+					  "auctionDurationDays": 3,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "Seoul",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.message").value("최하위 카테고리만 선택할 수 있습니다."));
+	}
+
+	@Test
+	@DisplayName("경매 판매 상품 등록에 성공하면 즉시 AUCTION_LIVE 상태와 계산된 시간을 반환한다")
+	void createAuctionLiveSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -171,8 +210,7 @@ class AuctionIntegrationTest {
 					  "categoryId": 44,
 					  "price": null,
 					  "startPrice": 500000,
-					  "auctionStartAt": "2099-04-15T10:00:00Z",
-					  "auctionEndAt": "2099-04-15T12:00:00Z",
+					  "auctionDurationDays": 3,
 					  "images": [
 					    {
 					      "imageId": %d,
@@ -187,15 +225,15 @@ class AuctionIntegrationTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.productId").isNumber())
 			.andExpect(jsonPath("$.saleType").value("AUCTION"))
-			.andExpect(jsonPath("$.status").value("AUCTION_SCHEDULED"))
-			.andExpect(jsonPath("$.auction.status").value("AUCTION_SCHEDULED"))
-			.andExpect(jsonPath("$.auction.startAt").value("2099-04-15T10:00:00Z"))
-			.andExpect(jsonPath("$.auction.endAt").value("2099-04-15T12:00:00Z"));
+			.andExpect(jsonPath("$.status").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.auction.status").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
 	}
 
 	@Test
-	@DisplayName("경매 판매에서 시작 시각이 없으면 비즈니스 검증 오류를 반환한다")
-	void createAuctionFailsWhenStartTimeMissing() throws Exception {
+	@DisplayName("경매 판매에서 진행 기간이 없으면 비즈니스 검증 오류를 반환한다")
+	void createAuctionFailsWhenDurationMissing() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -206,8 +244,7 @@ class AuctionIntegrationTest {
 					  "categoryId": 44,
 					  "price": null,
 					  "startPrice": 500000,
-					  "auctionStartAt": null,
-					  "auctionEndAt": "2099-04-15T12:00:00Z",
+					  "auctionDurationDays": null,
 					  "images": [
 					    {
 					      "imageId": %d,
@@ -221,7 +258,7 @@ class AuctionIntegrationTest {
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("경매 판매에서는 시작 시각이 필수입니다."));
+			.andExpect(jsonPath("$.message").value("경매 판매에서는 진행 기간이 필수입니다."));
 	}
 
 	private void deleteStoredImages() throws IOException {

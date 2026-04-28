@@ -23,12 +23,42 @@ public class ImageUrlService {
 		return toPublicUrl(toAuctionImagePath(storedFileName));
 	}
 
+	public String toProfileImagePath(String storedFileName) {
+		return imageProperties.profileImagePath(storedFileName);
+	}
+
+	public String toProfileImageUrl(String storedFileName) {
+		return toPublicUrl(toProfileImagePath(storedFileName));
+	}
+
+	public String toProductImagePath(String storedFileName) {
+		return imageProperties.productImagePath(storedFileName);
+	}
+
+	public String toProductImageUrl(String storedFileName) {
+		return toPublicUrl(toProductImagePath(storedFileName));
+	}
+
 	public String toPublicUrl(String imagePathOrUrl) {
 		String normalizedPath = normalizePath(imagePathOrUrl);
 		if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
 			return normalizedPath;
 		}
 		return imageProperties.normalizedPublicBaseUrl() + UriUtils.encodePath(normalizedPath, StandardCharsets.UTF_8);
+	}
+
+	public String toStoragePath(String imagePathOrUrl) {
+		String normalizedPath = normalizePath(imagePathOrUrl);
+		String publicBaseUrl = imageProperties.normalizedPublicBaseUrl();
+
+		if (normalizedPath.startsWith(publicBaseUrl)) {
+			return normalizedPath.substring(publicBaseUrl.length());
+		}
+		if (normalizedPath.startsWith(LEGACY_CDN_BASE_URL)) {
+			return normalizedPath.substring(LEGACY_CDN_BASE_URL.length());
+		}
+
+		return normalizedPath;
 	}
 
 	private String normalizePath(String imagePathOrUrl) {

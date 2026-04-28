@@ -1,7 +1,18 @@
 package com.dealit.dealit.domain.member.entity;
 
+import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.global.entity.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,10 +29,9 @@ import lombok.NoArgsConstructor;
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SequenceGenerator(
-				name = "member_seq_generator",
-				sequenceName = "member_seq",
-				allocationSize = 1
-
+	name = "member_seq_generator",
+	sequenceName = "member_seq",
+	allocationSize = 1
 )
 public class Member extends BaseEntity {
 
@@ -36,11 +46,8 @@ public class Member extends BaseEntity {
 	@Column(name = "password", nullable = false, length = 255)
 	private String password;
 
-	@Column(name = "email", nullable = false, length = 100)
+	@Column(name = "email", length = 100)
 	private String email;
-
-	@Column(name = "phone_number", length = 15)
-	private String phoneNumber;
 
 	@Column(name = "name", length = 30)
 	private String name;
@@ -51,8 +58,33 @@ public class Member extends BaseEntity {
 	@Column(name = "intro", length = 500)
 	private String intro;
 
-	@Column(name = "profile_image", length = 255)
+	@Column(name = "profile_image", length = 500)
 	private String profileImage;
+
+	@Column(name = "location", length = 100)
+	private String location;
+
+	@Column(name = "postal_code", length = 10)
+	private String postalCode;
+
+	@Column(name = "road_address", length = 255)
+	private String roadAddress;
+
+	@Column(name = "jibun_address", length = 255)
+	private String jibunAddress;
+
+	@Column(name = "detail_address", length = 255)
+	private String detailAddress;
+
+	@Column(name = "latitude", precision = 10, scale = 7)
+	private BigDecimal latitude;
+
+	@Column(name = "longitude", precision = 10, scale = 7)
+	private BigDecimal longitude;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "location_source", length = 20)
+	private LocationSource locationSource;
 
 	@Column(name = "is_verified", nullable = false)
 	private boolean verified;
@@ -62,21 +94,35 @@ public class Member extends BaseEntity {
 		String loginId,
 		String password,
 		String email,
-		String phoneNumber,
 		String name,
 		String nickname,
 		String intro,
 		String profileImage,
+		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		BigDecimal latitude,
+		BigDecimal longitude,
+		LocationSource locationSource,
 		boolean verified
 	) {
 		this.loginId = loginId;
 		this.password = password;
 		this.email = email;
-		this.phoneNumber = phoneNumber;
 		this.name = name;
 		this.nickname = nickname;
 		this.intro = intro;
 		this.profileImage = profileImage;
+		this.location = location;
+		this.postalCode = postalCode;
+		this.roadAddress = roadAddress;
+		this.jibunAddress = jibunAddress;
+		this.detailAddress = detailAddress;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.locationSource = locationSource;
 		this.verified = verified;
 	}
 
@@ -87,15 +133,44 @@ public class Member extends BaseEntity {
 		String phoneNumber,
 		String name
 	) {
+		return create(loginId, encodedPassword, email, name, false);
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String name,
+		boolean verified
+	) {
 		return Member.builder()
 			.loginId(loginId)
 			.password(encodedPassword)
 			.email(email)
-			.phoneNumber(phoneNumber)
 			.name(name)
 			.nickname("PENDING")
-			.verified(false)
+			.verified(verified)
 			.build();
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String name
+	) {
+		return create(loginId, encodedPassword, email, name, false);
+	}
+
+	public static Member create(
+		String loginId,
+		String encodedPassword,
+		String email,
+		String phoneNumber,
+		String name,
+		boolean verified
+	) {
+		return create(loginId, encodedPassword, email, name, verified);
 	}
 
 	public void assignDefaultNickname() {
@@ -103,5 +178,71 @@ public class Member extends BaseEntity {
 			throw new IllegalStateException("memberId must be generated before assigning nickname");
 		}
 		this.nickname = "Dealit#" + memberId;
+	}
+
+	public void updateProfile(String name, String nickname, String intro, String profileImage) {
+		this.name = name;
+		this.nickname = nickname;
+		this.intro = intro;
+		this.profileImage = profileImage;
+	}
+
+	public void updateProfile(String nickname, String intro, String profileImage) {
+		updateProfile(this.name, nickname, intro, profileImage);
+	}
+
+	public void updateLocation(String location) {
+		this.location = location;
+		this.postalCode = null;
+		this.roadAddress = null;
+		this.jibunAddress = null;
+		this.detailAddress = null;
+		this.latitude = null;
+		this.longitude = null;
+		this.locationSource = LocationSource.MANUAL;
+	}
+
+	public void updateLocationDetails(
+		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		BigDecimal latitude,
+		BigDecimal longitude,
+		LocationSource locationSource
+	) {
+		this.location = location;
+		this.postalCode = postalCode;
+		this.roadAddress = roadAddress;
+		this.jibunAddress = jibunAddress;
+		this.detailAddress = detailAddress;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.locationSource = locationSource;
+	}
+
+	public void updateLocationDetails(
+		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		LocationSource locationSource
+	) {
+		updateLocationDetails(location, postalCode, roadAddress, jibunAddress, detailAddress, null, null, locationSource);
+	}
+
+	public void updateProfileImage(String profileImage) {
+		this.profileImage = profileImage;
+	}
+
+	public void verifyEmail() {
+		this.verified = true;
+	}
+
+	public void updateEmailAndVerify(String email) {
+		this.email = email;
+		this.verified = true;
 	}
 }

@@ -8,6 +8,13 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+    defer-datasource-initialization: true
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
   data:
     redis:
       repositories:

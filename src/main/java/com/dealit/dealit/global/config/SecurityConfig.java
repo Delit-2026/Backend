@@ -4,6 +4,7 @@ import com.dealit.dealit.global.security.jwt.JwtAuthenticationEntryPoint;
 import com.dealit.dealit.global.security.jwt.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -42,9 +43,21 @@ public class SecurityConfig {
 					"/",
 					"/error",
 					"/auction/images/**",
+					"/product/images/**",
+					"/profile/images/**",
 					"/api/v1/health",
 					"/api/v1/members/signup",
+					"/api/v1/members/login-id/check",
+						"/api/v1/members/nickname/check",
+						"/api/v1/auth/login",
+						"/swagger-ui.html",
+						"/swagger-ui/**",
+							"/api-docs",
+					"/api/v1/members/nickname/check",
+					"/api/v1/email/verification/send",
+					"/api/v1/email/verification/confirm",
 					"/api/v1/auth/login",
+					"/api/v1/locations/resolve",
 					"/api/v1/auction/**",
 					"/swagger-ui.html",
 					"/swagger-ui/**",
@@ -54,7 +67,19 @@ public class SecurityConfig {
 						"/ws/chat/**",
 					"/actuator/health",
 					"/actuator/info"
-				).permitAll()
+					).permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/auction/image").authenticated()
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/auction/image/*").authenticated()
+					.requestMatchers(HttpMethod.POST, "/api/v1/auction/draft").authenticated()
+					.requestMatchers(HttpMethod.POST, "/api/v1/auction").authenticated()
+					.requestMatchers(HttpMethod.GET, "/api/v1/auction/categories").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/auction/category/recommend").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/auction/price/recommend").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/products/image").authenticated()
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/products/image/*").authenticated()
+					.requestMatchers(HttpMethod.GET, "/api/v1/products/categories").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/products/category/recommend").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/products/price/recommend").permitAll()
 				.anyRequest().authenticated()
 			);
 

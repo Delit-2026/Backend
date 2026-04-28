@@ -3,10 +3,10 @@ package com.dealit.dealit.domain.auction.dto;
 import com.dealit.dealit.domain.auction.ProductSaleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Schema(description = "경매 상품 임시저장 요청")
@@ -31,11 +31,9 @@ public record SaveAuctionDraftRequest(
 	@Schema(description = "경매 시작가", example = "80000", nullable = true)
 	BigDecimal startPrice,
 
-	@Schema(description = "경매 시작 시각", example = "2026-04-15T10:00:00Z", nullable = true)
-	OffsetDateTime auctionStartAt,
-
-	@Schema(description = "경매 종료 시각", example = "2026-04-15T12:00:00Z", nullable = true)
-	OffsetDateTime auctionEndAt,
+	@Schema(description = "경매 진행 기간(일 단위)", example = "3", nullable = true)
+	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
+	Integer auctionDurationDays,
 
 	@Schema(description = "상품 이미지 목록", nullable = true)
 	List<@Valid ProductImagePayload> images,
@@ -55,8 +53,7 @@ public record SaveAuctionDraftRequest(
 			request.categoryId(),
 			request.price(),
 			request.startPrice(),
-			request.auctionStartAt(),
-			request.auctionEndAt(),
+			request.auctionDurationDays(),
 			request.images(),
 			request.location(),
 			request.draftId()

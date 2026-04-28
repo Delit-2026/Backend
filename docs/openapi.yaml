@@ -6,30 +6,180 @@ info:
     name: Dealit Team
   version: v1
 servers:
-  - url: http://localhost:8080
-    description: Local server
+- url: http://localhost:8080
+  description: Local server
 security:
-  - bearerAuth: []
+- bearerAuth: []
 tags:
-  - name: Member
-    description: 회원 API
-  - name: Chats
-    description: 채팅 API
-  - name: Profile
-    description: 마이페이지 프로필 API
-  - name: Auction
-    description: 경매 API
-  - name: Auth
-    description: 인증 API
-  - name: Health
-    description: Application health check
+- name: Health
+  description: 애플리케이션 상태 확인 API
+- name: Product
+  description: 일반 상품 등록 API
+- name: Location
+  description: 위치 보조 API
+- name: Email Verification
+  description: 이메일 인증 API
+- name: Auction
+  description: 경매 상품 등록 API
+- name: Member
+  description: 회원 API
+- name: Profile
+  description: 마이페이지 프로필 API
+- name: Auth
+  description: 인증 API
+- name: Chats
+  description: 채팅 API
 paths:
-  # --- Profile API ---
-  /api/v1/users/me/profile-image:
+  "/api/v1/chats/rooms":
+    get:
+      tags:
+      - Chats
+      summary: 채팅방 목록 조회
+      operationId: getChatRooms
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ChatRoomListResponse"
     post:
       tags:
-        - Profile
+      - Chats
+      summary: 채팅방 생성
+      operationId: createChatRoom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateChatRoomRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/CreateChatRoomResponse"
+  "/api/v1/chats/rooms/{roomId}/messages":
+    get:
+      tags:
+      - Chats
+      summary: 채팅 메시지 목록 조회
+      operationId: getChatMessages
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ChatMessageListResponse"
+    post:
+      tags:
+      - Chats
+      summary: 채팅 메시지 전송
+      operationId: sendMessage
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SendChatMessageRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/SendChatMessageResponse"
+  "/api/v1/chats/rooms/{roomId}/read":
+    patch:
+      tags:
+      - Chats
+      summary: 채팅방 읽음 처리
+      operationId: markAsRead
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/MarkChatRoomAsReadResponse"
+  "/api/v1/chats/unread-count":
+    get:
+      tags:
+      - Chats
+      summary: 전체 안읽음 개수 조회
+      operationId: getUnreadCount
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/UnreadCountResponse"
+  "/api/v1/chats/messages/{messageId}":
+    delete:
+      tags:
+      - Chats
+      summary: 채팅 메시지 삭제
+      operationId: deleteChatMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+  "/api/v1/chats/messages/{messageId}/reports":
+    post:
+      tags:
+      - Chats
+      summary: 채팅 메시지 신고
+      operationId: reportMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ReportChatMessageRequest"
+      responses:
+        '200':
+          description: OK
+  "/api/v1/users/me/profile-image":
+    post:
+      tags:
+      - Profile
       summary: 프로필 이미지 업로드
+      description: 현재 로그인한 사용자의 프로필 이미지를 업로드합니다.
       operationId: uploadProfileImage
       requestBody:
         content:
@@ -41,546 +191,1493 @@ paths:
                   type: string
                   format: binary
               required:
-                - file
+              - file
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/UploadProfileImageResponse"
-
-  /api/v1/users/me/profile:
-    patch:
-      tags:
-        - Profile
-      summary: 프로필 수정
-      operationId: updateProfile
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateMyProfileRequest"
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MyPageProfileResponse"
-
-  /api/v1/users/me/location:
-    patch:
-      tags:
-        - Profile
-      summary: 지역 수정
-      operationId: updateLocation
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateMyLocationRequest"
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UpdateMyLocationResponse"
-
-  /api/v1/users/me/mypage:
-    get:
-      tags:
-        - Profile
-      summary: 마이페이지 프로필 조회
-      operationId: getMyPageProfile
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MyPageProfileResponse"
-
-  # --- Member API ---
-  /api/v1/members/signup:
+                "$ref": "#/components/schemas/UploadProfileImageResponse"
+  "/api/v1/products":
     post:
       tags:
-        - Member
+      - Product
+      summary: 일반 상품 등록
+      operationId: createProduct
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateProductRequest"
+        required: true
+      responses:
+        '201':
+          description: 상품 등록 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/CreateProductResponse"
+  "/api/v1/products/price/recommend":
+    post:
+      tags:
+      - Product
+      summary: 가격 추천
+      operationId: recommendPrice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RecommendPriceRequest"
+        required: true
+      responses:
+        '200':
+          description: 가격 추천 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RecommendPriceResponse"
+  "/api/v1/products/image":
+    post:
+      tags:
+      - Product
+      summary: 상품 이미지 업로드
+      operationId: uploadImage
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '200':
+          description: 이미지 업로드 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/UploadProductImageResponse"
+  "/api/v1/products/draft":
+    post:
+      tags:
+      - Product
+      summary: 일반 상품 임시저장
+      operationId: saveDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SaveProductDraftRequest"
+        required: true
+      responses:
+        '200':
+          description: 임시저장 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/SaveProductDraftResponse"
+  "/api/v1/products/category/recommend":
+    post:
+      tags:
+      - Product
+      summary: 카테고리 추천
+      operationId: recommendCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RecommendCategoryRequest"
+        required: true
+      responses:
+        '200':
+          description: 카테고리 추천 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RecommendCategoryResponse"
+  "/api/v1/members/signup":
+    post:
+      tags:
+      - Member
       summary: 회원가입
+      description: 신규 회원을 생성합니다.
       operationId: signUp
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SignUpRequest"
+              "$ref": "#/components/schemas/SignUpRequest"
+        required: true
       responses:
-        "201":
+        '201':
           description: Created
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SignUpResponse"
-
-  /api/v1/members/nickname/check:
-    get:
-      tags:
-        - Member
-      summary: 닉네임 중복 확인
-      operationId: checkNickname
-      parameters:
-        - name: nickname
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/NicknameCheckResponse"
-
-  /api/v1/members/login-id/check:
-    get:
-      tags:
-        - Member
-      summary: 로그인 아이디 중복 확인
-      operationId: checkLoginId
-      parameters:
-        - name: loginId
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/LoginIdCheckResponse"
-
-  # --- Auth API ---
-  /api/v1/auth/login:
+                "$ref": "#/components/schemas/SignUpResponse"
+  "/api/v1/locations/resolve":
     post:
       tags:
-        - Auth
+      - Location
+      summary: 좌표로 주소 변환
+      description: 위도와 경도를 기반으로 카카오 좌표-주소 변환 API를 호출해 주소 정보를 반환합니다.
+      operationId: resolve
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ResolveLocationRequest"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ResolvedLocationResponse"
+  "/api/v1/email/verification/send":
+    post:
+      tags:
+      - Email Verification
+      summary: 이메일 인증 코드 발송
+      description: 회원가입 또는 프로필 수정에 사용할 이메일 인증 코드를 발송합니다.
+      operationId: send
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SendEmailVerificationRequest"
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/SendEmailVerificationResponse"
+  "/api/v1/email/verification/confirm":
+    post:
+      tags:
+      - Email Verification
+      summary: 이메일 인증 코드 확인
+      description: 발송된 이메일 인증 코드를 검증합니다.
+      operationId: confirm
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ConfirmEmailVerificationRequest"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ConfirmEmailVerificationResponse"
+  "/api/v1/auth/login":
+    post:
+      tags:
+      - Auth
       summary: 로그인
+      description: 로그인 성공 시 JWT Access Token을 발급합니다.
       operationId: login
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              "$ref": "#/components/schemas/LoginRequest"
+        required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/LoginResponse"
-
-  /api/v1/auth/me:
-    get:
-      tags:
-        - Auth
-      summary: 내 정보 조회
-      operationId: me
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/CurrentMemberResponse"
-
-  # --- Chats API ---
-  /api/v1/chats/rooms:
-    get:
-      tags:
-        - Chats
-      summary: 채팅방 목록 조회
-      operationId: getChatRooms
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChatRoomListResponse"
+                "$ref": "#/components/schemas/LoginResponse"
+  "/api/v1/auction":
     post:
       tags:
-        - Chats
-      summary: 채팅방 생성
-      operationId: createChatRoom
+      - Auction
+      summary: 경매 상품 등록
+      description: 프론트가 가공한 최종 payload로 상품을 등록한다.
+      operationId: createAuction
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateChatRoomRequest"
+              "$ref": "#/components/schemas/CreateAuctionRequest"
+        required: true
       responses:
-        "200":
-          description: OK
+        '201':
+          description: 상품 등록 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CreateChatRoomResponse"
-
-  /api/v1/chats/rooms/{roomId}/messages:
-    get:
-      tags:
-        - Chats
-      summary: 채팅 메시지 목록 조회
-      operationId: getChatMessages
-      parameters:
-        - name: roomId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChatMessageListResponse"
+                "$ref": "#/components/schemas/CreateAuctionResponse"
+  "/api/v1/auction/price/recommend":
     post:
       tags:
-        - Chats
-      summary: 채팅 메시지 전송
-      operationId: sendMessage
-      parameters:
-        - name: roomId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
+      - Auction
+      summary: 가격 추천
+      description: 상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.
+      operationId: recommendPrice_1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendChatMessageRequest"
+              "$ref": "#/components/schemas/RecommendPriceRequest"
+        required: true
       responses:
-        "200":
-          description: OK
+        '200':
+          description: 가격 추천 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SendChatMessageResponse"
-
-  /api/v1/chats/rooms/{roomId}/read:
+                "$ref": "#/components/schemas/RecommendPriceResponse"
+  "/api/v1/auction/image":
+    post:
+      tags:
+      - Auction
+      summary: 상품 이미지 업로드
+      description: 경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.
+      operationId: uploadImage_1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '200':
+          description: 이미지 업로드 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/UploadAuctionImageResponse"
+  "/api/v1/auction/draft":
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 임시저장
+      description: 등록 직전 폼 데이터를 draft 상태로 저장한다.
+      operationId: saveDraft_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SaveAuctionDraftRequest"
+        required: true
+      responses:
+        '200':
+          description: 임시저장 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/SaveAuctionDraftResponse"
+  "/api/v1/auction/category/recommend":
+    post:
+      tags:
+      - Auction
+      summary: 카테고리 추천
+      description: 입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.
+      operationId: recommendCategory_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RecommendCategoryRequest"
+        required: true
+      responses:
+        '200':
+          description: 카테고리 추천 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RecommendCategoryResponse"
+  "/api/v1/users/me/profile":
     patch:
       tags:
-        - Chats
-      summary: 채팅방 읽음 처리
-      operationId: markAsRead
-      parameters:
-        - name: roomId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MarkChatRoomAsReadResponse"
-
-  /api/v1/chats/unread-count:
-    get:
-      tags:
-        - Chats
-      summary: 전체 안읽음 개수 조회
-      operationId: getUnreadCount
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UnreadCountResponse"
-
-  /api/v1/chats/messages/{messageId}:
-    delete:
-      tags:
-        - Chats
-      summary: 채팅 메시지 삭제
-      operationId: deleteChatMessage
-      parameters:
-        - name: messageId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: OK
-
-  /api/v1/chats/messages/{messageId}/reports:
-    post:
-      tags:
-        - Chats
-      summary: 채팅 메시지 신고
-      operationId: reportMessage
-      parameters:
-        - name: messageId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
+      - Profile
+      summary: 프로필 수정
+      description: 현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.
+      operationId: updateProfile
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReportChatMessageRequest"
+              "$ref": "#/components/schemas/UpdateMyProfileRequest"
+        required: true
       responses:
-        "200":
+        '200':
           description: OK
-
-  # --- Auction API ---
-  /api/v1/auction/categories:
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/MyPageProfileResponse"
+  "/api/v1/users/me/location":
     get:
       tags:
-        - Auction
+      - Profile
+      summary: 내 지역 조회
+      description: 현재 로그인한 사용자의 지역 및 구조화된 위치 정보를 조회합니다.
+      operationId: getMyLocation
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/MyLocationResponse"
+    patch:
+      tags:
+      - Profile
+      summary: 지역 수정
+      description: 현재 로그인한 사용자의 대표 지역과 상세 위치 정보를 수정합니다.
+      operationId: updateLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateMyLocationRequest"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/UpdateMyLocationResponse"
+  "/api/v1/users/me/mypage":
+    get:
+      tags:
+      - Profile
+      summary: 마이페이지 프로필 조회
+      description: 현재 로그인한 사용자의 마이페이지 프로필 정보를 조회합니다.
+      operationId: getMyPageProfile
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/MyPageProfileResponse"
+  "/api/v1/products/categories":
+    get:
+      tags:
+      - Product
       summary: 카테고리 목록 조회
       operationId: getCategories
       responses:
-        "200":
-          description: OK
+        '200':
+          description: 카테고리 조회 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CategoryOptionResponse"
-
-  /api/v1/auction/image/{imageId}:
-    delete:
-      tags:
-        - Auction
-      summary: 상품 이미지 삭제
-      operationId: deleteAuctionImage
-      parameters:
-        - name: imageId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/DeleteAuctionImageResponse"
-
-  /api/v1/health:
+                "$ref": "#/components/schemas/CategoryOptionResponse"
+  "/api/v1/members/nickname/check":
     get:
       tags:
-        - Health
-      summary: Health check
+      - Member
+      summary: 닉네임 중복 확인
+      description: 프로필 설정 화면에서 닉네임 사용 가능 여부를 확인합니다.
+      operationId: checkNickname
+      parameters:
+      - name: nickname
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 30
+          minLength: 2
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/NicknameCheckResponse"
+  "/api/v1/members/login-id/check":
+    get:
+      tags:
+      - Member
+      summary: 로그인 아이디 중복 확인
+      description: 회원가입 화면에서 로그인 아이디 사용 가능 여부를 확인합니다.
+      operationId: checkLoginId
+      parameters:
+      - name: loginId
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 30
+          minLength: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/LoginIdCheckResponse"
+  "/api/v1/health":
+    get:
+      tags:
+      - Health
+      summary: 상태 확인
+      description: 애플리케이션의 기본 상태 정보를 반환합니다.
       operationId: health
       responses:
-        "200":
+        '200':
           description: OK
-
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties: {}
+  "/api/v1/auth/me":
+    get:
+      tags:
+      - Auth
+      summary: 내 정보 조회
+      description: 현재 인증된 회원의 기본 정보를 조회합니다.
+      operationId: me
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/CurrentMemberResponse"
+  "/api/v1/auction/categories":
+    get:
+      tags:
+      - Auction
+      summary: 카테고리 목록 조회
+      description: 상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.
+      operationId: getCategories_1
+      responses:
+        '200':
+          description: 카테고리 조회 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/CategoryOptionResponse"
+  "/api/v1/products/image/{imageId}":
+    delete:
+      tags:
+      - Product
+      summary: 상품 이미지 삭제
+      operationId: deleteImage
+      parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: 이미지 삭제 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/DeleteProductImageResponse"
+  "/api/v1/auction/image/{imageId}":
+    delete:
+      tags:
+      - Auction
+      summary: 상품 이미지 삭제
+      description: 등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.
+      operationId: deleteImage_1
+      parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: 이미지 삭제 성공
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/DeleteAuctionImageResponse"
 components:
   schemas:
-    # Error Schema
-    ErrorResponse:
-      type: object
-      properties:
-        timestamp: { type: string, format: date-time }
-        status: { type: integer }
-        code: { type: string }
-        message: { type: string }
-
-    # Auth & Member Schemas
-    LoginRequest:
-      type: object
-      required: [loginId, password]
-      properties:
-        loginId: { type: string, example: dealit-user }
-        password: { type: string, example: Password123! }
-    
-    LoginResponse:
-      type: object
-      properties:
-        accessToken: { type: string }
-        tokenType: { type: string, example: Bearer }
-        expiresIn: { type: integer, format: int64 }
-
-    SignUpRequest:
-      type: object
-      required: [loginId, password, email]
-      properties:
-        loginId: { type: string, maxLength: 30 }
-        password: { type: string, minLength: 8 }
-        email: { type: string, format: email }
-        name: { type: string }
-
-    SignUpResponse:
-      type: object
-      properties:
-        memberId: { type: integer, format: int64 }
-        loginId: { type: string }
-        nickname: { type: string }
-
-    CurrentMemberResponse:
-      type: object
-      properties:
-        memberId: { type: integer, format: int64 }
-        loginId: { type: string }
-        email: { type: string }
-        nickname: { type: string, example: 당근한입 }
-
-    # Profile Schemas
-    UploadProfileImageResponse:
-      type: object
-      properties:
-        profileImageUrl: { type: string }
-
-    UpdateMyProfileRequest:
-      type: object
-      required: [nickname]
-      properties:
-        nickname: { type: string, minLength: 2 }
-        bio: { type: string }
-        profileImageUrl: { type: string }
-
-    MyPageProfileResponse:
-      type: object
-      properties:
-        id: { type: integer, format: int64 }
-        nickname: { type: string }
-        email: { type: string }
-        bio: { type: string }
-        profileImageUrl: { type: string }
-        location: { type: string }
-        rating: { type: number, format: double }
-
-    # Chat Schemas
     CreateChatRoomRequest:
       type: object
-      required: [productId, receiverId]
+      required:
+      - productId
+      - receiverId
       properties:
-        productId: { type: integer, format: int64 }
-        receiverId: { type: integer, format: int64 }
-
+        productId:
+          type: integer
+          format: int64
+        receiverId:
+          type: integer
+          format: int64
     CreateChatRoomResponse:
       type: object
       properties:
-        roomId: { type: integer, format: int64 }
-        chatType: { type: string, enum: [GENERAL, AUCTION] }
-
+        roomId:
+          type: integer
+          format: int64
+        chatType:
+          type: string
+          enum:
+          - GENERAL
+          - AUCTION
     ChatRoomListResponse:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ChatRoomListItemResponse"
-
+            "$ref": "#/components/schemas/ChatRoomListItemResponse"
     ChatRoomListItemResponse:
       type: object
       properties:
-        roomId: { type: integer, format: int64 }
-        unreadCount: { type: integer }
-
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
     ChatMessageListResponse:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ChatMessageResponse"
-
+            "$ref": "#/components/schemas/ChatMessageResponse"
     ChatMessageResponse:
       type: object
       properties:
-        messageId: { type: integer, format: int64 }
-        content: { type: string }
-        senderNickname: { type: string }
-        sentAt: { type: string, format: date-time }
-
+        messageId:
+          type: integer
+          format: int64
+        content:
+          type: string
+        senderNickname:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
     SendChatMessageRequest:
       type: object
-      required: [content, messageType]
+      required:
+      - content
+      - messageType
       properties:
-        content: { type: string }
-        messageType: { type: string, enum: [TEXT, IMAGE, SYSTEM, TALK] }
-
+        content:
+          type: string
+        messageType:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - SYSTEM
+          - TALK
     SendChatMessageResponse:
-      $ref: "#/components/schemas/ChatMessageResponse"
-
+      "$ref": "#/components/schemas/ChatMessageResponse"
     MarkChatRoomAsReadResponse:
       type: object
       properties:
-        roomId: { type: integer, format: int64 }
-        unreadCount: { type: integer }
-
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
     UnreadCountResponse:
       type: object
       properties:
-        totalUnreadCount: { type: integer }
-
+        totalUnreadCount:
+          type: integer
     ReportChatMessageRequest:
       type: object
-      required: [reason]
+      required:
+      - reason
       properties:
-        reason: { type: string, maxLength: 255 }
-
-    # Auction Schemas
-    CategoryOptionResponse:
+        reason:
+          type: string
+          maxLength: 255
+    UploadProfileImageResponse:
       type: object
       properties:
-        id: { type: integer, format: int64 }
-        nameKo: { type: string }
-        children:
+        profileImageUrl:
+          type: string
+    CreateProductRequest:
+      type: object
+      description: 일반 상품 등록 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 일반 판매 상품명
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 상품 설명
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        images:
           type: array
           items:
-            $ref: "#/components/schemas/CategoryOptionResponse"
-
-    DeleteAuctionImageResponse:
+            "$ref": "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+      required:
+      - allowOffer
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - price
+      - saleType
+    ProductImagePayload:
+      type: object
+      description: 일반 상품 이미지 메타데이터
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: http://localhost:8080/product/images/1-sample.jpg
+          minLength: 1
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+          minimum: 1
+      required:
+      - imageId
+      - imageUrl
+    AuctionResponse: {}
+    CreateProductResponse:
+      type: object
+      description: 일반 상품 등록 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 등록된 상품 ID
+          example: 123
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        auction:
+          "$ref": "#/components/schemas/AuctionResponse"
+          description: 경매 메타 정보
+        generalSale:
+          "$ref": "#/components/schemas/GeneralSaleResponse"
+          description: 일반 판매 정보
+    GeneralSaleResponse:
       type: object
       properties:
-        imageId: { type: integer, format: int64 }
-        deleted: { type: boolean }
-
-    NicknameCheckResponse:
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+    RecommendPriceRequest:
+      type: object
+      description: 일반 상품 가격 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치 OLED
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 사용하지 않아서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+      required:
+      - description
+      - name
+      - saleType
+    RecommendPriceResponse:
+      type: object
+      description: 가격 추천 응답
+      properties:
+        recommendedPrice:
+          type: number
+          description: 추천 판매가
+          example: 250000
+        startPrice:
+          type: number
+          description: 추천 시작가
+          example: 180000
+    UploadProductImageResponse:
+      type: object
+      description: 일반 상품 이미지 업로드 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 301
+        imageUrl:
+          type: string
+          description: 업로드된 이미지 URL
+          example: http://localhost:8080/product/images/301-sample.jpg
+    SaveProductDraftRequest:
+      type: object
+      description: 일반 상품 임시저장 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 일반 판매 상품명
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 상품 설명
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        price:
+          type: number
+          description: 일반 판매가
+          example: 12000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            "$ref": "#/components/schemas/ProductImagePayload"
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+    SaveProductDraftResponse:
+      type: object
+      description: 일반 상품 임시저장 응답
+      properties:
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 10
+        savedAt:
+          type: string
+          format: date-time
+          description: 저장 시각
+          example: 2026-04-12 20:00:00.000000000 Z
+    RecommendCategoryRequest:
+      type: object
+      description: 일반 상품 카테고리 추천 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 닌텐도 스위치
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 사용하지 않아서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - description
+      - name
+    RecommendCategoryResponse:
+      type: object
+      description: 카테고리 추천 응답
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+          description: 추천 카테고리 ID
+          example: 200
+        categoryName:
+          type: string
+          description: 추천 카테고리명
+          example: 디지털/가전
+    SignUpRequest:
+      type: object
+      description: 회원가입 요청
+      properties:
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: dealit_user
+          maxLength: 30
+          minLength: 0
+        password:
+          type: string
+          description: 비밀번호
+          example: Password123!
+          maxLength: 30
+          minLength: 8
+        email:
+          type: string
+          format: email
+          description: 이메일
+          example: hong@example.com
+          maxLength: 100
+          minLength: 0
+        name:
+          type: string
+          description: 이름
+          example: 홍길동
+          maxLength: 30
+          minLength: 0
+      required:
+      - loginId
+      - password
+    SignUpResponse:
+      type: object
+      description: 회원가입 응답
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+          example: 1
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+        email:
+          type: string
+          description: 이메일
+          example: hong@example.com
+        nickname:
+          type: string
+          description: 자동 생성 닉네임
+          example: 당근한입
+        createdAt:
+          type: string
+          format: date-time
+          description: 생성 시각
+    ResolveLocationRequest:
       type: object
       properties:
-        nickname: { type: string }
-        available: { type: boolean }
-
-    LoginIdCheckResponse:
+        latitude:
+          type: number
+          maximum: 90.0
+          minimum: -90.0
+        longitude:
+          type: number
+          maximum: 180.0
+          minimum: -180.0
+      required:
+      - latitude
+      - longitude
+    ResolvedLocationResponse:
       type: object
       properties:
-        loginId: { type: string }
-        available: { type: boolean }
-
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+        region1DepthName:
+          type: string
+        region2DepthName:
+          type: string
+        region3DepthName:
+          type: string
+    SendEmailVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+      required:
+      - email
+    SendEmailVerificationResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        expiresInSeconds:
+          type: integer
+          format: int64
+    ConfirmEmailVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        code:
+          type: string
+          minLength: 1
+          pattern: "\\d{6}"
+      required:
+      - code
+      - email
+    ConfirmEmailVerificationResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        verified:
+          type: boolean
+    LoginRequest:
+      type: object
+      description: 로그인 요청
+      properties:
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: delit_user
+          maxLength: 30
+          minLength: 0
+        password:
+          type: string
+          description: 비밀번호
+          example: 비밀번호123!
+          maxLength: 30
+          minLength: 8
+      required:
+      - loginId
+      - password
+    LoginResponse:
+      type: object
+      description: 로그인 응답
+      properties:
+        accessToken:
+          type: string
+          description: 액세스 토큰
+        tokenType:
+          type: string
+          description: 토큰 타입
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          description: 만료 시간(ms)
+          example: 3600000
+    CreateAuctionRequest:
+      type: object
+      description: 경매 상품 등록 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 맥북 에어 M1
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 얼마 안 사용해서 깨끗합니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - AUCTION
+          example: AUCTION
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 3
+        images:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 5
+      required:
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - saleType
+    AuctionScheduleResponse:
+      type: object
+      description: 경매 일정 및 상태 정보
+      properties:
+        status:
+          type: string
+          description: 경매 상태
+          enum:
+          - DRAFT
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        startAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-15 10:00:00.000000000 Z
+        endAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-04-15 12:00:00.000000000 Z
+    CreateAuctionResponse:
+      type: object
+      description: 경매 상품 등록 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 등록된 상품 ID
+          example: 1001
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - AUCTION
+          example: AUCTION
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        auction:
+          "$ref": "#/components/schemas/AuctionScheduleResponse"
+          description: 경매 메타 정보
+    UploadAuctionImageResponse:
+      type: object
+      description: 상품 이미지 업로드 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 301
+        imageUrl:
+          type: string
+          description: 업로드된 이미지 URL
+          example: http://localhost:8080/auction/images/301-sample.jpg
+    SaveAuctionDraftRequest:
+      type: object
+      description: 경매 상품 임시저장 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 애플워치 시리즈 9
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 개봉 후 몇 번 사용하지 않았고 충전기도 함께 드립니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 3
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            "$ref": "#/components/schemas/ProductImagePayload"
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 5
+    SaveAuctionDraftResponse:
+      type: object
+      description: 경매 상품 임시저장 응답
+      properties:
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 10
+        savedAt:
+          type: string
+          format: date-time
+          description: 저장 시각
+          example: 2026-04-12 20:00:00.000000000 Z
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nickname:
+          type: string
+          maxLength: 30
+          minLength: 2
+        bio:
+          type: string
+          maxLength: 500
+          minLength: 0
+        profileImageUrl:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - nickname
+    MyPageProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+        location:
+          type: string
+        verified:
+          type: boolean
+        rating:
+          type: number
+          format: double
+        warningCount:
+          type: integer
+          format: int32
+        biddingCount:
+          type: integer
+          format: int32
+        sellingCount:
+          type: integer
+          format: int32
+        wishlistCount:
+          type: integer
+          format: int32
     UpdateMyLocationRequest:
       type: object
-      required: [location]
       properties:
-        location: { type: string }
-
+        location:
+          type: string
+          maxLength: 100
+          minLength: 0
+        postalCode:
+          type: string
+          maxLength: 10
+          minLength: 0
+        roadAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        jibunAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        detailAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
     UpdateMyLocationResponse:
       type: object
       properties:
-        location: { type: string }
-
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    MyLocationResponse:
+      type: object
+      properties:
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    CategoryOptionResponse:
+      type: object
+      description: 카테고리 선택 옵션
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 1
+        nameKo:
+          type: string
+          description: 카테고리 한글명
+          example: 전자기기
+        nameEn:
+          type: string
+          description: 카테고리 영문명
+          example: Electronics
+        depth:
+          type: integer
+          format: int32
+          description: 카테고리 깊이
+          example: 1
+        parentId:
+          type: integer
+          format: int64
+          description: 부모 카테고리 ID
+          example: 'null'
+        children:
+          type: array
+          description: 하위 카테고리 목록
+          items:
+            "$ref": "#/components/schemas/CategoryOptionResponse"
+    NicknameCheckResponse:
+      type: object
+      properties:
+        nickname:
+          type: string
+        available:
+          type: boolean
+    LoginIdCheckResponse:
+      type: object
+      properties:
+        loginId:
+          type: string
+        available:
+          type: boolean
+    CurrentMemberResponse:
+      type: object
+      description: 현재 인증된 회원 정보
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+          example: 1
+        loginId:
+          type: string
+          description: 로그인 아이디
+          example: dealit_user
+        email:
+          type: string
+          description: 이메일
+          example: hong@example.com
+        nickname:
+          type: string
+          description: 닉네임
+          example: 딜잇유저
+        verified:
+          type: boolean
+          description: 이메일 인증 여부
+          example: false
+    DeleteProductImageResponse:
+      type: object
+      description: 일반 상품 이미지 삭제 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 삭제된 이미지 ID
+          example: 301
+        deleted:
+          type: boolean
+          description: 삭제 여부
+          example: true
+    DeleteAuctionImageResponse:
+      type: object
+      description: 상품 이미지 삭제 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 삭제된 이미지 ID
+          example: 5
+        deleted:
+          type: boolean
+          description: 삭제 성공 여부
+          example: true
   securitySchemes:
     bearerAuth:
       type: http
+      name: Authorization
+      in: header
       scheme: bearer
       bearerFormat: JWT
