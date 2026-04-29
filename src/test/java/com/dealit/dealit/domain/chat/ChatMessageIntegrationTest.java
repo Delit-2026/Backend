@@ -8,6 +8,7 @@ import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
+import com.dealit.dealit.domain.chat.dto.RoomUnreadCountResponse;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
 import com.dealit.dealit.domain.chat.entity.ChatMessageType;
 import com.dealit.dealit.domain.chat.service.ChatService;
@@ -106,6 +107,42 @@ class ChatMessageIntegrationTest {
 
         assertThat(messageList.content()).hasSize(1);
         assertThat(messageList.content().get(0).senderNickname()).isEqualTo(buyerFallbackNickname);
+    }
+
+    @Test
+    @DisplayName("채팅방별 안읽음 개수를 조회한다")
+    void getRoomUnreadCount() {
+        Member seller = createMember("seller");
+        Member buyer = createMember("buyer");
+        Long productId = 300L;
+
+        stubProduct(productId, seller.getMemberId(), null);
+
+        CreateChatRoomResponse created = chatService.createChatRoom(
+                new CreateChatRoomRequest(productId, buyer.getMemberId()),
+                seller.getMemberId()
+        );
+
+        chatService.sendMessage(
+                created.roomId(),
+                new SendChatMessageRequest(ChatMessageType.TEXT, "first message"),
+                buyer.getMemberId()
+        );
+        chatService.sendMessage(
+                created.roomId(),
+                new SendChatMessageRequest(ChatMessageType.TEXT, "second message"),
+                buyer.getMemberId()
+        );
+
+        RoomUnreadCountResponse sellerUnread =
+                chatService.getRoomUnreadCount(created.roomId(), seller.getMemberId());
+        RoomUnreadCountResponse buyerUnread =
+                chatService.getRoomUnreadCount(created.roomId(), buyer.getMemberId());
+
+        assertThat(sellerUnread.roomId()).isEqualTo(created.roomId());
+        assertThat(sellerUnread.unreadCount()).isEqualTo(2);
+        assertThat(sellerUnread.updatedAt()).isNotNull();
+        assertThat(buyerUnread.unreadCount()).isZero();
     }
 
     private void setNicknameBlank(Long memberId) {

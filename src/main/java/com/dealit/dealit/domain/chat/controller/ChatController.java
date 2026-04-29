@@ -7,6 +7,7 @@ import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
 import com.dealit.dealit.domain.chat.dto.MarkChatRoomAsReadResponse;
 import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
 import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.RoomUnreadCountResponse;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
 import com.dealit.dealit.domain.chat.dto.UnreadCountResponse;
@@ -99,6 +100,15 @@ public class ChatController {
             @AuthenticationPrincipal(expression = "memberId") Long currentUserId
     ) {
         return ResponseEntity.ok(chatService.markAsRead(roomId, currentUserId));
+    }
+
+    @Operation(summary = "채팅방 안읽음 개수 조회")
+    @GetMapping("/rooms/{roomId}/unread-count")
+    public ResponseEntity<RoomUnreadCountResponse> getRoomUnreadCount(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal(expression = "memberId") Long currentUserId
+    ) {
+        return ResponseEntity.ok(chatService.getRoomUnreadCount(roomId, currentUserId));
     }
 
     @Operation(summary = "전체 안읽음 개수 조회")

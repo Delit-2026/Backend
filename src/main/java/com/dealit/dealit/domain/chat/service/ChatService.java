@@ -11,6 +11,7 @@ import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
 import com.dealit.dealit.domain.chat.dto.MarkChatRoomAsReadResponse;
 import com.dealit.dealit.domain.chat.dto.ReportChatMessageRequest;
 import com.dealit.dealit.domain.chat.dto.ReportChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.RoomUnreadCountResponse;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageRequest;
 import com.dealit.dealit.domain.chat.dto.SendChatMessageResponse;
 import com.dealit.dealit.domain.chat.dto.UnreadCountResponse;
@@ -269,6 +270,28 @@ public class ChatService {
 
         return new UnreadCountResponse(
                 totalUnread,
+                LocalDateTime.now()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public RoomUnreadCountResponse getRoomUnreadCount(Long roomId, Long currentUserId) {
+        if (roomId == null) {
+            throw new IllegalArgumentException("roomId는 필수입니다.");
+        }
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
+        }
+
+        chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+                .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
+
+        long count = chatMessageRepository.countUnreadByRoomId(roomId, currentUserId);
+        int unreadCount = count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+
+        return new RoomUnreadCountResponse(
+                roomId,
+                unreadCount,
                 LocalDateTime.now()
         );
     }
