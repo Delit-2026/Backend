@@ -1,11 +1,17 @@
 package com.dealit.dealit.domain.chat;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
+import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
+import com.dealit.dealit.domain.chat.entity.ChatRoom;
+import com.dealit.dealit.domain.chat.entity.ChatType;
 import com.dealit.dealit.domain.chat.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
@@ -22,7 +28,7 @@ import org.junit.jupiter.api.Test;
 class ChatServiceCreateRoomTest {
 
     @Test
-    @DisplayName("자기 자신과는 채팅방 생성 불가")
+    @DisplayName("본인 상품에는 채팅방 생성 불가")
     void createChatRoom_fail_whenSelfChat() {
         ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
         ChatMessageRepository chatMessageRepository = mock(ChatMessageRepository.class);
@@ -34,6 +40,7 @@ class ChatServiceCreateRoomTest {
 
         when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(anyLong(), anyLong(), anyLong()))
                 .thenReturn(Optional.empty());
+        when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(1L);
 
         ChatService chatService = new ChatService(
                 chatRoomRepository,
@@ -45,16 +52,16 @@ class ChatServiceCreateRoomTest {
                 eventStreamService
         );
 
-        CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 1L);
+        CreateChatRoomRequest request = new CreateChatRoomRequest(100L);
 
         assertThatThrownBy(() -> chatService.createChatRoom(request, 1L))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("자기 자신과는 채팅방을 생성할 수 없습니다.");
+                .hasMessageContaining("본인 상품에는 채팅방을 생성할 수 없습니다.");
     }
 
     @Test
-    @DisplayName("상품 소유자가 참여자가 아니면 채팅방 생성 불가")
-    void createChatRoom_fail_whenOwnerIsNotParticipant() {
+    @DisplayName("이미 같은 상품 채팅방이 있으면 기존 방을 반환한다")
+    void createChatRoom_returnsExistingRoom_whenDuplicated() {
         ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
         ChatMessageRepository chatMessageRepository = mock(ChatMessageRepository.class);
         ChatMessageReportRepository chatMessageReportRepository = mock(ChatMessageReportRepository.class);
@@ -63,7 +70,12 @@ class ChatServiceCreateRoomTest {
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
 
-        when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(999L);
+        ChatRoom existingRoom = ChatRoom.create(10L, 20L, 100L, ChatType.GENERAL);
+        when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(10L);
+        when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(10L, 20L, 100L))
+                .thenReturn(Optional.of(existingRoom));
+        when(productSummaryPort.getSummaryByProductId(100L))
+                .thenReturn(new ProductSummaryPort.ProductSummary(100L, "test-product", null));
 
         ChatService chatService = new ChatService(
                 chatRoomRepository,
@@ -75,11 +87,13 @@ class ChatServiceCreateRoomTest {
                 eventStreamService
         );
 
-        CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 2L);
+        CreateChatRoomRequest request = new CreateChatRoomRequest(100L);
 
-        assertThatThrownBy(() -> chatService.createChatRoom(request, 1L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");
+        CreateChatRoomResponse response = chatService.createChatRoom(request, 20L);
+
+        assertThat(response.chatType()).isEqualTo(ChatType.GENERAL);
+        assertThat(response.product().productId()).isEqualTo(100L);
+        verify(chatRoomRepository, never()).save(org.mockito.ArgumentMatchers.any(ChatRoom.class));
     }
 
     @Test
@@ -106,7 +120,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService
         );
 
-        CreateChatRoomRequest request = new CreateChatRoomRequest(404L, 2L);
+        CreateChatRoomRequest request = new CreateChatRoomRequest(404L);
 
         assertThatThrownBy(() -> chatService.createChatRoom(request, 1L))
                 .isInstanceOf(ProductNotFoundException.class)

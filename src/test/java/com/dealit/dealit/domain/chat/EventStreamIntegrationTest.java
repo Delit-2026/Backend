@@ -119,14 +119,13 @@ class EventStreamIntegrationTest {
                 .thenReturn(new ProductSummaryPort.ProductSummary(productId, "sse-product", null));
 
         String createRoomResponse = mockMvc.perform(post("/api/v1/chats/rooms")
-                        .header("Authorization", "Bearer " + sellerAccessToken)
+                        .header("Authorization", "Bearer " + buyerAccessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "productId": %d,
-                                  "receiverId": %d
+                                  "productId": %d
                                 }
-                                """.formatted(productId, buyerId)))
+                                """.formatted(productId)))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()

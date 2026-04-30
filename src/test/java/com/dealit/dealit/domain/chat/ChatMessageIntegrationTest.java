@@ -57,8 +57,8 @@ class ChatMessageIntegrationTest {
         stubProduct(productId, seller.getMemberId(), null);
 
         CreateChatRoomResponse created = chatService.createChatRoom(
-                new CreateChatRoomRequest(productId, buyer.getMemberId()),
-                seller.getMemberId()
+                new CreateChatRoomRequest(productId),
+                buyer.getMemberId()
         );
 
         assertThat(created.participants())
@@ -88,8 +88,8 @@ class ChatMessageIntegrationTest {
         stubProduct(productId, seller.getMemberId(), null);
 
         CreateChatRoomResponse created = chatService.createChatRoom(
-                new CreateChatRoomRequest(productId, buyer.getMemberId()),
-                seller.getMemberId()
+                new CreateChatRoomRequest(productId),
+                buyer.getMemberId()
         );
 
         chatService.sendMessage(
@@ -119,8 +119,8 @@ class ChatMessageIntegrationTest {
         stubProduct(productId, seller.getMemberId(), null);
 
         CreateChatRoomResponse created = chatService.createChatRoom(
-                new CreateChatRoomRequest(productId, buyer.getMemberId()),
-                seller.getMemberId()
+                new CreateChatRoomRequest(productId),
+                buyer.getMemberId()
         );
 
         chatService.sendMessage(

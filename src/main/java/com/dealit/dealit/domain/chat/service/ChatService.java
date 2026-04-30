@@ -23,7 +23,6 @@ import com.dealit.dealit.domain.chat.exception.ChatForbiddenException;
 import com.dealit.dealit.domain.chat.exception.ChatMessageNotFoundException;
 import com.dealit.dealit.domain.chat.exception.ChatRoomNotFoundException;
 import com.dealit.dealit.domain.chat.exception.DuplicateChatReportException;
-import com.dealit.dealit.domain.chat.exception.DuplicateChatRoomException;
 import com.dealit.dealit.domain.chat.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
@@ -33,6 +32,7 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,41 +57,50 @@ public class ChatService {
         if (currentUserId == null) {
             throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
         }
-        if (request.productId() == null || request.receiverId() == null) {
-            throw new IllegalArgumentException("productId, receiverId는 필수입니다.");
-        }
-        if (currentUserId.equals(request.receiverId())) {
-            throw new IllegalArgumentException("자기 자신과는 채팅방을 생성할 수 없습니다.");
+        if (request.productId() == null) {
+            throw new IllegalArgumentException("productId는 필수입니다.");
         }
 
-        Long sellerId = resolveSellerIdFromProduct(request.productId(), currentUserId, request.receiverId());
-        Long buyerId = sellerId.equals(currentUserId) ? request.receiverId() : currentUserId;
-
-        if (sellerId.equals(buyerId)) {
-            throw new IllegalArgumentException("seller/buyer가 동일할 수 없습니다.");
+        Long sellerId = resolveSellerIdFromProduct(request.productId());
+        if (sellerId.equals(currentUserId)) {
+            throw new IllegalArgumentException("본인 상품에는 채팅방을 생성할 수 없습니다.");
         }
+        Long buyerId = currentUserId;
 
-        boolean duplicated = chatRoomRepository
+        Optional<ChatRoom> existingRoom = chatRoomRepository
                 .findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
                         sellerId, buyerId, request.productId()
-                ).isPresent();
-
-        if (duplicated) {
-            throw new DuplicateChatRoomException("이미 동일 상품/참여자의 채팅방이 존재합니다.");
+                );
+        if (existingRoom.isPresent()) {
+            return buildCreateRoomResponse(existingRoom.get(), currentUserId, sellerId, buyerId, existingRoom.get().getCreatedAt());
         }
 
         ChatRoom saved = chatRoomRepository.save(
                 ChatRoom.create(sellerId, buyerId, request.productId(), ChatType.GENERAL)
         );
-
-        MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
-        MemberSnapshot receiver = resolveMemberSnapshot(request.receiverId());
-        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(request.productId());
         LocalDateTime now = LocalDateTime.now();
 
-        CreateChatRoomResponse response = new CreateChatRoomResponse(
-                saved.getRoomId(),
-                saved.getChatType(),
+        CreateChatRoomResponse response = buildCreateRoomResponse(saved, currentUserId, sellerId, buyerId, now);
+
+        publishRoomAndUnreadUpdates(saved, sellerId, buyerId, now);
+        return response;
+    }
+
+    private CreateChatRoomResponse buildCreateRoomResponse(
+            ChatRoom room,
+            Long currentUserId,
+            Long sellerId,
+            Long buyerId,
+            LocalDateTime createdAt
+    ) {
+        Long opponentId = sellerId.equals(currentUserId) ? buyerId : sellerId;
+        MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
+        MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+
+        return new CreateChatRoomResponse(
+                room.getRoomId(),
+                room.getChatType(),
                 new CreateChatRoomResponse.ProductInfo(
                         product.productId(),
                         product.name(),
@@ -106,9 +115,9 @@ public class ChatService {
                                 sellerId.equals(currentUserId) ? "SELLER" : "BUYER"
                         ),
                         new CreateChatRoomResponse.ParticipantInfo(
-                                request.receiverId(),
-                                receiver.nickname(),
-                                sellerId.equals(request.receiverId()) ? "SELLER" : "BUYER"
+                                opponentId,
+                                opponent.nickname(),
+                                sellerId.equals(opponentId) ? "SELLER" : "BUYER"
                         )
                 ),
                 false,
@@ -118,11 +127,8 @@ public class ChatService {
                         null,
                         null
                 ),
-                now
+                createdAt
         );
-
-        publishRoomAndUnreadUpdates(saved, sellerId, buyerId, now);
-        return response;
     }
 
     @Transactional(readOnly = true)
@@ -418,13 +424,8 @@ public class ChatService {
         );
     }
 
-    private Long resolveSellerIdFromProduct(Long productId, Long currentUserId, Long receiverId) {
-        Long ownerId = productOwnershipPort.getOwnerIdByProductId(productId);
-
-        if (!ownerId.equals(currentUserId) && !ownerId.equals(receiverId)) {
-            throw new IllegalArgumentException("상품 소유자는 채팅 참여자 중 한 명이어야 합니다.");
-        }
-        return ownerId;
+    private Long resolveSellerIdFromProduct(Long productId) {
+        return productOwnershipPort.getOwnerIdByProductId(productId);
     }
 
     private ProductSummaryPort.ProductSummary resolveProductSummaryOrFallback(Long productId) {

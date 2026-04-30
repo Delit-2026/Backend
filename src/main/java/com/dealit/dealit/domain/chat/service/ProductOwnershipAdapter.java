@@ -16,8 +16,8 @@ public class ProductOwnershipAdapter implements ProductOwnershipPort {
     @Override
     public Long getOwnerIdByProductId(Long productId) {
         String sql = """
-                SELECT seller_id
-                FROM products
+                SELECT member_id
+                FROM product
                 WHERE product_id = :productId
                   AND deleted_at IS NULL
                 """;
@@ -26,7 +26,7 @@ public class ProductOwnershipAdapter implements ProductOwnershipPort {
             Long ownerId = jdbcTemplate.query(
                     sql,
                     Map.of("productId", productId),
-                    rs -> rs.next() ? rs.getLong("seller_id") : null
+                    rs -> rs.next() ? rs.getLong("member_id") : null
             );
 
             if (ownerId == null) {

@@ -16,10 +16,20 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
     @Override
     public ProductSummary getSummaryByProductId(Long productId) {
         String sql = """
-                SELECT product_id, name, thumbnail_url
-                FROM products
-                WHERE product_id = :productId
-                  AND deleted_at IS NULL
+                SELECT
+                    p.product_id,
+                    p.name,
+                    (
+                        SELECT pi.image_url
+                        FROM product_image pi
+                        WHERE pi.product_id = p.product_id
+                          AND pi.deleted_at IS NULL
+                        ORDER BY pi.sort_order ASC, pi.image_id ASC
+                        LIMIT 1
+                    ) AS thumbnail_url
+                FROM product p
+                WHERE p.product_id = :productId
+                  AND p.deleted_at IS NULL
                 """;
 
         try {
