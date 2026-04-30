@@ -11,9 +11,12 @@ public record ImageProperties(
 	String storageRoot
 ) {
 
-	public static final String AUCTION_IMAGE_PATH_PREFIX = "/auction/images/";
-	public static final String PRODUCT_IMAGE_PATH_PREFIX = "/product/images/";
-	public static final String PROFILE_IMAGE_PATH_PREFIX = "/profile/images/";
+	public static final String AUCTION_IMAGE_PATH_PREFIX = "/uploads/auction/images/";
+	public static final String PRODUCT_IMAGE_PATH_PREFIX = "/uploads/product/images/";
+	public static final String PROFILE_IMAGE_PATH_PREFIX = "/uploads/profile/images/";
+	public static final String LEGACY_AUCTION_IMAGE_PATH_PREFIX = "/auction/images/";
+	public static final String LEGACY_PRODUCT_IMAGE_PATH_PREFIX = "/product/images/";
+	public static final String LEGACY_PROFILE_IMAGE_PATH_PREFIX = "/profile/images/";
 
 	public Path auctionImageDirectory() {
 		return Paths.get(storageRoot).resolve("auction").resolve("images");

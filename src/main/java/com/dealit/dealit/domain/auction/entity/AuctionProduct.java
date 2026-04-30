@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 @Getter
@@ -52,6 +53,9 @@ public class AuctionProduct extends BaseEntity {
 	@Column(name = "category_id", nullable = false)
 	private Long categoryId;
 
+	@Column(name = "member_id")
+	private Long memberId;
+
 	@Column(name = "price", precision = 15, scale = 2)
 	private BigDecimal price;
 
@@ -82,6 +86,7 @@ public class AuctionProduct extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -94,6 +99,7 @@ public class AuctionProduct extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
@@ -108,6 +114,7 @@ public class AuctionProduct extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -121,6 +128,7 @@ public class AuctionProduct extends BaseEntity {
 			description,
 			saleType,
 			categoryId,
+			memberId,
 			price,
 			startPrice,
 			auctionStartAt,
@@ -136,5 +144,38 @@ public class AuctionProduct extends BaseEntity {
 			images.add(image);
 		}
 		image.assignToProduct(this, sortOrder);
+	}
+
+	public void updateEditableDetails(
+		String name,
+		String description,
+		Long categoryId,
+		BigDecimal startPrice,
+		OffsetDateTime auctionEndAt,
+		String location
+	) {
+		this.name = name;
+		this.description = description;
+		this.categoryId = categoryId;
+		this.startPrice = startPrice;
+		this.auctionEndAt = auctionEndAt;
+		this.location = location;
+	}
+
+	public void replaceImages(Collection<AuctionProductImage> nextImages) {
+		List<AuctionProductImage> removedImages = images.stream()
+			.filter(image -> !nextImages.contains(image))
+			.toList();
+
+		for (AuctionProductImage removedImage : removedImages) {
+			removedImage.detachFromProduct();
+		}
+		images.removeAll(removedImages);
+
+		for (AuctionProductImage nextImage : nextImages) {
+			if (!images.contains(nextImage)) {
+				images.add(nextImage);
+			}
+		}
 	}
 }

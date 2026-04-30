@@ -100,7 +100,10 @@ public class AuctionController {
 		content = @Content(schema = @Schema(implementation = CreateAuctionResponse.class)))
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public CreateAuctionResponse createAuction(@Valid @RequestBody CreateAuctionRequest request) {
-		return auctionService.createAuction(request);
+	public CreateAuctionResponse createAuction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@Valid @RequestBody CreateAuctionRequest request
+	) {
+		return auctionService.createAuction(member.memberId(), request);
 	}
 }

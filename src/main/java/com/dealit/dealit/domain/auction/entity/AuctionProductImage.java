@@ -61,4 +61,9 @@ public class AuctionProductImage extends BaseEntity {
 		this.product = product;
 		this.sortOrder = sortOrder;
 	}
+
+	public void detachFromProduct() {
+		this.product = null;
+		this.sortOrder = null;
+	}
 }

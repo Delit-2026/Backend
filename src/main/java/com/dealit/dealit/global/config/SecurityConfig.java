@@ -42,6 +42,9 @@ public class SecurityConfig {
 				.requestMatchers(
 					"/",
 					"/error",
+					"/uploads/auction/images/**",
+					"/uploads/product/images/**",
+					"/uploads/profile/images/**",
 					"/auction/images/**",
 					"/product/images/**",
 					"/profile/images/**",
@@ -58,7 +61,6 @@ public class SecurityConfig {
 					"/api/v1/email/verification/confirm",
 					"/api/v1/auth/login",
 					"/api/v1/locations/resolve",
-					"/api/v1/auction/**",
 					"/swagger-ui.html",
 					"/swagger-ui/**",
 						"/api-docs",
@@ -67,6 +69,10 @@ public class SecurityConfig {
 					"/actuator/health",
 					"/actuator/info"
 					).permitAll()
+					.requestMatchers(HttpMethod.GET, "/api/v1/mypage/auctions/selling").authenticated()
+					.requestMatchers(HttpMethod.GET, "/api/v1/auctions/*/edit").authenticated()
+					.requestMatchers(HttpMethod.PATCH, "/api/v1/auctions/*").authenticated()
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/auctions/*").authenticated()
 					.requestMatchers(HttpMethod.POST, "/api/v1/auction/image").authenticated()
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/auction/image/*").authenticated()
 					.requestMatchers(HttpMethod.POST, "/api/v1/auction/draft").authenticated()
