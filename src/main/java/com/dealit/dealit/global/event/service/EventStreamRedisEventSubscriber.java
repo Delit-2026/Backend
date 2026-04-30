@@ -1,4 +1,4 @@
-package com.dealit.dealit.domain.chat.service;
+package com.dealit.dealit.global.event.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,25 +13,25 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnBean(ChatSseRedisEventPublisher.class)
-public class ChatSseRedisEventSubscriber implements MessageListener {
+@ConditionalOnBean(EventStreamRedisEventPublisher.class)
+public class EventStreamRedisEventSubscriber implements MessageListener {
 
     private final ObjectMapper objectMapper;
-    private final ChatSseRedisEventPublisher publisher;
-    private final ChatSseService chatSseService;
+    private final EventStreamRedisEventPublisher publisher;
+    private final EventStreamService eventStreamService;
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
         String body = new String(message.getBody(), StandardCharsets.UTF_8);
 
         try {
-            ChatSseRedisEvent event = objectMapper.readValue(body, ChatSseRedisEvent.class);
+            EventStreamRedisEvent event = objectMapper.readValue(body, EventStreamRedisEvent.class);
             if (publisher.getServerId().equals(event.originServerId())) {
                 return;
             }
-            chatSseService.publishRemote(event.userId(), event.eventName(), event.payload());
+            eventStreamService.publishRemote(event.userId(), event.eventName(), event.payload());
         } catch (JsonProcessingException exception) {
-            log.warn("Failed to consume chat SSE event from Redis.", exception);
+            log.warn("Failed to consume SSE event from Redis.", exception);
         }
     }
 }

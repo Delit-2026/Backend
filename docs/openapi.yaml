@@ -29,7 +29,22 @@ tags:
   description: 인증 API
 - name: Chats
   description: 채팅 API
+- name: Events
+  description: 앱 전역 실시간 이벤트 API
 paths:
+  "/api/v1/events/stream":
+    get:
+      tags:
+      - Events
+      summary: 앱 전역 SSE 구독
+      operationId: subscribeEventStream
+      responses:
+        '200':
+          description: SSE stream connected
+          content:
+            text/event-stream:
+              schema:
+                "$ref": "#/components/schemas/EventStreamConnectedEvent"
   "/api/v1/chats/rooms":
     get:
       tags:
@@ -746,6 +761,18 @@ components:
         receiverId:
           type: integer
           format: int64
+    EventStreamConnectedEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          example: event.stream.connected
+        userId:
+          type: integer
+          format: int64
+        connectedAt:
+          type: string
+          format: date-time
     CreateChatRoomResponse:
       type: object
       properties:

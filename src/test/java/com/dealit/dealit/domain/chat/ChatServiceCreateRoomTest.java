@@ -11,10 +11,10 @@ import com.dealit.dealit.domain.chat.repository.ChatMessageReportRepository;
 import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.chat.service.ChatService;
-import com.dealit.dealit.domain.chat.service.ChatSseService;
 import com.dealit.dealit.domain.chat.service.ProductOwnershipPort;
 import com.dealit.dealit.domain.chat.service.ProductSummaryPort;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.global.event.service.EventStreamService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
-        ChatSseService chatSseService = mock(ChatSseService.class);
+        EventStreamService eventStreamService = mock(EventStreamService.class);
 
         when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(anyLong(), anyLong(), anyLong()))
                 .thenReturn(Optional.empty());
@@ -42,7 +42,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
-                chatSseService
+                eventStreamService
         );
 
         CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 1L);
@@ -61,7 +61,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
-        ChatSseService chatSseService = mock(ChatSseService.class);
+        EventStreamService eventStreamService = mock(EventStreamService.class);
 
         when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(999L);
 
@@ -72,7 +72,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
-                chatSseService
+                eventStreamService
         );
 
         CreateChatRoomRequest request = new CreateChatRoomRequest(100L, 2L);
@@ -91,7 +91,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
-        ChatSseService chatSseService = mock(ChatSseService.class);
+        EventStreamService eventStreamService = mock(EventStreamService.class);
 
         when(productOwnershipPort.getOwnerIdByProductId(404L))
                 .thenThrow(new ProductNotFoundException("유효한 상품을 찾을 수 없습니다. productId=404"));
@@ -103,7 +103,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
-                chatSseService
+                eventStreamService
         );
 
         CreateChatRoomRequest request = new CreateChatRoomRequest(404L, 2L);

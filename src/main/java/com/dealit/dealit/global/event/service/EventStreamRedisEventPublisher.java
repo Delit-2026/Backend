@@ -1,4 +1,4 @@
-package com.dealit.dealit.domain.chat.service;
+package com.dealit.dealit.global.event.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.chat.sse.redis.enabled", havingValue = "true", matchIfMissing = true)
-public class ChatSseRedisEventPublisher {
+@ConditionalOnProperty(name = "app.events.sse.redis.enabled", havingValue = "true", matchIfMissing = true)
+public class EventStreamRedisEventPublisher {
 
     @Getter
     private final String serverId = UUID.randomUUID().toString();
@@ -24,11 +24,11 @@ public class ChatSseRedisEventPublisher {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.chat.sse.redis.channel}")
+    @Value("${app.events.sse.redis.channel}")
     private String channel;
 
     public void publish(Long userId, String eventName, Object payload) {
-        ChatSseRedisEvent event = new ChatSseRedisEvent(
+        EventStreamRedisEvent event = new EventStreamRedisEvent(
                 serverId,
                 userId,
                 eventName,
@@ -38,7 +38,7 @@ public class ChatSseRedisEventPublisher {
         try {
             stringRedisTemplate.convertAndSend(channel, objectMapper.writeValueAsString(event));
         } catch (JsonProcessingException | DataAccessException exception) {
-            log.warn("Failed to publish chat SSE event to Redis. eventName={}, userId={}", eventName, userId, exception);
+            log.warn("Failed to publish SSE event to Redis. eventName={}, userId={}", eventName, userId, exception);
         }
     }
 }

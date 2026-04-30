@@ -31,11 +31,11 @@ management:
       enabled: false
 
 app:
-  chat:
+  events:
     sse:
       redis:
         enabled: false
-        channel: dealit:chat:sse-events:test
+        channel: dealit:events:sse-events:test
   images:
     public-base-url: http://localhost:8080
     storage-root: ${java.io.tmpdir}/dealit-test-uploads

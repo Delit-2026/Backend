@@ -30,6 +30,7 @@ import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.global.event.service.EventStreamService;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,7 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final ProductOwnershipPort productOwnershipPort;
     private final ProductSummaryPort productSummaryPort;
-    private final ChatSseService chatSseService;
+    private final EventStreamService eventStreamService;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
         if (currentUserId == null) {
@@ -361,7 +362,7 @@ public class ChatService {
     }
 
     private void publishRoomUpdate(ChatRoom room, Long userId, LocalDateTime emittedAt) {
-        chatSseService.publishRoomUpdated(
+        eventStreamService.publishRoomUpdated(
                 userId,
                 ChatRoomUpdatedEvent.of(buildRoomListItem(room, userId), emittedAt)
         );
@@ -370,7 +371,7 @@ public class ChatService {
     private void publishUnreadCountUpdate(Long userId, LocalDateTime emittedAt) {
         long count = chatMessageRepository.countTotalUnreadForUser(userId);
         int totalUnread = count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
-        chatSseService.publishUnreadCountUpdated(
+        eventStreamService.publishUnreadCountUpdated(
                 userId,
                 ChatUnreadCountUpdatedEvent.of(totalUnread, emittedAt)
         );

@@ -6,10 +6,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.dealit.dealit.domain.chat.service.ChatSseRedisEvent;
-import com.dealit.dealit.domain.chat.service.ChatSseRedisEventPublisher;
-import com.dealit.dealit.domain.chat.service.ChatSseRedisEventSubscriber;
-import com.dealit.dealit.domain.chat.service.ChatSseService;
+import com.dealit.dealit.global.event.service.EventStreamRedisEvent;
+import com.dealit.dealit.global.event.service.EventStreamRedisEventPublisher;
+import com.dealit.dealit.global.event.service.EventStreamRedisEventSubscriber;
+import com.dealit.dealit.global.event.service.EventStreamService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -17,42 +17,42 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.Message;
 
-class ChatSseRedisEventSubscriberTest {
+class EventStreamRedisEventSubscriberTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ChatSseRedisEventPublisher publisher = mock(ChatSseRedisEventPublisher.class);
-    private final ChatSseService chatSseService = mock(ChatSseService.class);
-    private final ChatSseRedisEventSubscriber subscriber = new ChatSseRedisEventSubscriber(
+    private final EventStreamRedisEventPublisher publisher = mock(EventStreamRedisEventPublisher.class);
+    private final EventStreamService eventStreamService = mock(EventStreamService.class);
+    private final EventStreamRedisEventSubscriber subscriber = new EventStreamRedisEventSubscriber(
             objectMapper,
             publisher,
-            chatSseService
+            eventStreamService
     );
 
     @Test
     void redisEventFromOtherServerIsForwardedToLocalEmitter() throws Exception {
         when(publisher.getServerId()).thenReturn("server-1");
         JsonNode payload = objectMapper.valueToTree(Map.of("type", "chat.room.updated"));
-        ChatSseRedisEvent event = new ChatSseRedisEvent("server-2", 1L, "chat.room.updated", payload);
+        EventStreamRedisEvent event = new EventStreamRedisEvent("server-2", 1L, "chat.room.updated", payload);
 
         subscriber.onMessage(redisMessage(event), null);
 
-        verify(chatSseService).publishRemote(eq(1L), eq("chat.room.updated"), eq(payload));
+        verify(eventStreamService).publishRemote(eq(1L), eq("chat.room.updated"), eq(payload));
     }
 
     @Test
     void redisEventFromSameServerIsIgnored() throws Exception {
         when(publisher.getServerId()).thenReturn("server-1");
         JsonNode payload = objectMapper.valueToTree(Map.of("type", "chat.room.updated"));
-        ChatSseRedisEvent event = new ChatSseRedisEvent("server-1", 1L, "chat.room.updated", payload);
+        EventStreamRedisEvent event = new EventStreamRedisEvent("server-1", 1L, "chat.room.updated", payload);
 
         subscriber.onMessage(redisMessage(event), null);
 
-        verify(chatSseService, never()).publishRemote(eq(1L), eq("chat.room.updated"), eq(payload));
+        verify(eventStreamService, never()).publishRemote(eq(1L), eq("chat.room.updated"), eq(payload));
     }
 
-    private Message redisMessage(ChatSseRedisEvent event) throws Exception {
+    private Message redisMessage(EventStreamRedisEvent event) throws Exception {
         byte[] body = objectMapper.writeValueAsString(event).getBytes(StandardCharsets.UTF_8);
-        byte[] channel = "dealit:chat:sse-events".getBytes(StandardCharsets.UTF_8);
+        byte[] channel = "dealit:events:sse-events".getBytes(StandardCharsets.UTF_8);
 
         return new Message() {
             @Override

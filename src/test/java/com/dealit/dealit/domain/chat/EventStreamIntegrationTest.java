@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
-class ChatSseIntegrationTest {
+class EventStreamIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -84,23 +84,35 @@ class ChatSseIntegrationTest {
     }
 
     @Test
-    @DisplayName("채팅 SSE 구독 시 연결 이벤트를 즉시 수신한다")
+    @DisplayName("전역 SSE 구독 시 연결 이벤트를 즉시 수신한다")
     void subscribe_emitsConnectedEvent() throws Exception {
-        MvcResult streamResult = mockMvc.perform(get("/api/v1/chats/stream")
+        MvcResult streamResult = mockMvc.perform(get("/api/v1/events/stream")
                         .header("Authorization", "Bearer " + sellerAccessToken))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted())
                 .andReturn();
 
-        String body = waitForContent(streamResult, "chat.stream.connected");
-        assertThat(body).contains("event:chat.stream.connected");
-        assertThat(body).contains("\"type\":\"chat.stream.connected\"");
+        String body = waitForContent(streamResult, "event.stream.connected");
+        assertThat(body).contains("event:event.stream.connected");
+        assertThat(body).contains("\"type\":\"event.stream.connected\"");
         assertThat(body).contains("\"userId\":" + sellerId);
     }
 
     @Test
-    @DisplayName("메시지 전송 후 구독 중인 사용자는 채팅방 업데이트와 안읽음 개수 이벤트를 받는다")
+    @DisplayName("채팅 전용 SSE 경로는 제공하지 않는다")
+    void chatScopedStreamIsNotProvided() throws Exception {
+        mockMvc.perform(get("/api/v1/chats/stream")
+                        .header("Authorization", "Bearer " + sellerAccessToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("메시지 전송 후 전역 SSE 구독 중인 사용자는 채팅방 업데이트와 안읽음 개수 이벤트를 받는다")
     void sendMessage_emitsRoomAndUnreadEvents() throws Exception {
+        assertMessageSendEmitsRoomAndUnreadEvents();
+    }
+
+    private void assertMessageSendEmitsRoomAndUnreadEvents() throws Exception {
         Long productId = 1000L;
         when(productOwnershipPort.getOwnerIdByProductId(productId)).thenReturn(sellerId);
         when(productSummaryPort.getSummaryByProductId(productId))
@@ -122,13 +134,13 @@ class ChatSseIntegrationTest {
 
         Long roomId = extractLong(createRoomResponse, "\"roomId\":");
 
-        MvcResult streamResult = mockMvc.perform(get("/api/v1/chats/stream")
+        MvcResult streamResult = mockMvc.perform(get("/api/v1/events/stream")
                         .header("Authorization", "Bearer " + sellerAccessToken))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted())
                 .andReturn();
 
-        waitForContent(streamResult, "chat.stream.connected");
+        waitForContent(streamResult, ".stream.connected");
 
         mockMvc.perform(post("/api/v1/chats/rooms/{roomId}/messages", roomId)
                         .header("Authorization", "Bearer " + buyerAccessToken)
@@ -146,6 +158,7 @@ class ChatSseIntegrationTest {
         assertThat(body).contains("\"type\":\"chat.room.updated\"");
         assertThat(body).contains("\"roomId\":" + roomId);
         assertThat(body).contains("\"content\":\"hello from buyer\"");
+        assertThat(body).contains("\"unreadCount\":1");
         assertThat(body).contains("event:chat.unread-count.updated");
         assertThat(body).contains("\"type\":\"chat.unread-count.updated\"");
         assertThat(body).contains("\"totalUnreadCount\":1");

@@ -1,8 +1,8 @@
-package com.dealit.dealit.domain.chat.service;
+package com.dealit.dealit.global.event.service;
 
 import com.dealit.dealit.domain.chat.dto.ChatRoomUpdatedEvent;
-import com.dealit.dealit.domain.chat.dto.ChatSseConnectedEvent;
 import com.dealit.dealit.domain.chat.dto.ChatUnreadCountUpdatedEvent;
+import com.dealit.dealit.global.event.dto.EventStreamConnectedEvent;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -14,12 +14,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
 @RequiredArgsConstructor
-public class ChatSseService {
+public class EventStreamService {
 
     private static final long DEFAULT_TIMEOUT_MS = 30L * 60L * 1000L;
 
-    private final ChatSseEmitterRepository emitterRepository;
-    private final Optional<ChatSseRedisEventPublisher> redisEventPublisher;
+    private final EventStreamEmitterRepository emitterRepository;
+    private final Optional<EventStreamRedisEventPublisher> redisEventPublisher;
 
     public SseEmitter subscribe(Long userId) {
         String emitterId = UUID.randomUUID().toString();
@@ -30,7 +30,13 @@ public class ChatSseService {
         emitter.onTimeout(() -> emitterRepository.remove(userId, emitterId));
         emitter.onError(exception -> emitterRepository.remove(userId, emitterId));
 
-        send(userId, emitterId, emitter, "chat.stream.connected", ChatSseConnectedEvent.of(userId, LocalDateTime.now()));
+        send(
+                userId,
+                emitterId,
+                emitter,
+                "event.stream.connected",
+                EventStreamConnectedEvent.of(userId, LocalDateTime.now())
+        );
         return emitter;
     }
 

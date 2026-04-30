@@ -1,4 +1,4 @@
-package com.dealit.dealit.domain.chat.service;
+package com.dealit.dealit.global.event.service;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Component
-public class ChatSseEmitterRepository {
+public class EventStreamEmitterRepository {
 
     private final Map<Long, Map<String, SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
 

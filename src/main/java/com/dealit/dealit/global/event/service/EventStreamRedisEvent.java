@@ -1,8 +1,8 @@
-package com.dealit.dealit.domain.chat.service;
+package com.dealit.dealit.global.event.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
-public record ChatSseRedisEvent(
+public record EventStreamRedisEvent(
         String originServerId,
         Long userId,
         String eventName,
