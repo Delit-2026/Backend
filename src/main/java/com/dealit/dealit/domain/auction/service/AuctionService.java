@@ -19,9 +19,8 @@ import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
+import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.AuctionDraft;
-import com.dealit.dealit.domain.auction.entity.AuctionProduct;
-import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.exception.AuctionAccessDeniedException;
@@ -29,12 +28,16 @@ import com.dealit.dealit.domain.auction.exception.AuctionConflictException;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.AuctionProductNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
-import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
-import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.product.ProductStatus;
+import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.repository.ProductImageRepository;
+import com.dealit.dealit.domain.product.repository.ProductRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,11 +69,12 @@ public class AuctionService {
 
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
-	private final AuctionProductRepository auctionProductRepository;
-	private final AuctionProductImageRepository auctionProductImageRepository;
+	private final AuctionRepository auctionRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
 	private final CategoryRepository categoryRepository;
 	private final MemberRepository memberRepository;
+	private final ProductRepository productRepository;
+	private final ProductImageRepository productImageRepository;
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
@@ -79,36 +83,37 @@ public class AuctionService {
 		loadActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
-		Page<AuctionProduct> productPage = auctionProductRepository.findAllByMemberIdAndStatusAndDeletedAtIsNull(
+		Page<Auction> auctionPage = auctionRepository.findAllByProductMemberIdAndStatusAndDeletedAtIsNullAndProductDeletedAtIsNull(
 			memberId,
 			AuctionStatus.AUCTION_LIVE,
 			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
 		);
 
-		Map<Long, String> categoryNamesById = loadCategoryNames(productPage.getContent());
-		List<MySellingAuctionItemResponse> content = productPage.getContent()
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctionPage.getContent());
+		List<MySellingAuctionItemResponse> content = auctionPage.getContent()
 			.stream()
-			.map(product -> toMySellingAuctionItemResponse(product, categoryNamesById))
+			.map(auction -> toMySellingAuctionItemResponse(auction, categoryNamesById))
 			.toList();
 
 		return new MySellingAuctionListResponse(
 			content,
-			productPage.getNumber(),
-			productPage.getSize(),
-			productPage.getTotalElements(),
-			productPage.hasNext()
+			auctionPage.getNumber(),
+			auctionPage.getSize(),
+			auctionPage.getTotalElements(),
+			auctionPage.hasNext()
 		);
 	}
 
 	@Transactional
-	public UploadAuctionImageResponse uploadImage(MultipartFile file) {
+	public UploadAuctionImageResponse uploadImage(Long memberId, MultipartFile file) {
 		if (file == null || file.isEmpty()) {
 			throw new InvalidAuctionRequestException("이미지 파일은 필수입니다.");
 		}
+		Member member = loadActiveMember(memberId);
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
-		AuctionProductImage savedImage = auctionProductImageRepository.save(
-			AuctionProductImage.createTemporary("", originalFilename)
+		ProductImage savedImage = productImageRepository.save(
+			ProductImage.createTemporary("", originalFilename, member.getMemberId())
 		);
 
 		String storedFileName = auctionImageStorage.store(savedImage.getImageId(), file, originalFilename);
@@ -120,28 +125,29 @@ public class AuctionService {
 	}
 
 	private MySellingAuctionItemResponse toMySellingAuctionItemResponse(
-		AuctionProduct product,
+		Auction auction,
 		Map<Long, String> categoryNamesById
 	) {
-		int bidCount = getBidCount(product);
-		int bidderCount = getBidderCount(product);
+		Product product = auction.getProduct();
+		int bidCount = getBidCount(auction);
+		int bidderCount = getBidderCount(auction);
 		boolean canChange = bidCount == 0;
 
 		return new MySellingAuctionItemResponse(
 			product.getProductId(),
-			product.getProductId(),
+			auction.getAuctionId(),
 			product.getName(),
 			product.getDescription(),
 			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
 			resolveThumbnailUrl(product),
-			product.getStatus(),
-			product.getStartPrice(),
-			resolveCurrentPrice(product),
-			resolveMinimumNextBidPrice(product),
+			auction.getStatus(),
+			auction.getStartPrice(),
+			resolveCurrentPrice(auction),
+			resolveMinimumNextBidPrice(auction),
 			bidCount,
 			bidderCount,
-			toSeoulOffsetDateTime(product.getAuctionStartAt()),
-			toSeoulOffsetDateTime(product.getAuctionEndAt()),
+			toSeoulOffsetDateTime(auction.getAuctionStartAt()),
+			toSeoulOffsetDateTime(auction.getAuctionEndAt()),
 			canChange,
 			canChange,
 			toSeoulOffsetDateTime(product.getCreatedAt()),
@@ -151,8 +157,9 @@ public class AuctionService {
 
 	public AuctionEditDetailResponse getAuctionEditDetail(Long memberId, Long auctionId) {
 		loadActiveMember(memberId);
-		AuctionProduct product = loadOwnedAuctionProduct(memberId, auctionId);
-		int bidCount = getBidCount(product);
+		Auction auction = loadOwnedAuction(memberId, auctionId);
+		Product product = auction.getProduct();
+		int bidCount = getBidCount(auction);
 		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
 
 		List<AuctionEditImageResponse> images = product.getImages().stream()
@@ -167,18 +174,18 @@ public class AuctionService {
 
 		return new AuctionEditDetailResponse(
 			product.getProductId(),
-			product.getProductId(),
+			auction.getAuctionId(),
 			product.getName(),
 			product.getDescription(),
 			product.getCategoryId(),
 			category == null ? "" : category.getNameKo(),
 			product.getLocation(),
 			images,
-			product.getStartPrice(),
-			resolveAuctionDurationDays(product),
-			product.getStatus(),
+			auction.getStartPrice(),
+			resolveAuctionDurationDays(auction),
+			auction.getStatus(),
 			bidCount,
-			getBidderCount(product),
+			getBidderCount(auction),
 			bidCount == 0
 		);
 	}
@@ -186,27 +193,33 @@ public class AuctionService {
 	@Transactional
 	public void deleteAuction(Long memberId, Long auctionId) {
 		loadActiveMember(memberId);
-		AuctionProduct product = loadOwnedAuctionProduct(memberId, auctionId);
-		if (getBidCount(product) > 0) {
+		Auction auction = loadOwnedAuction(memberId, auctionId);
+		if (getBidCount(auction) > 0) {
 			throw new AuctionConflictException("입찰자가 있는 경매는 삭제할 수 없습니다.");
 		}
-		product.softDelete();
+		for (ProductImage image : auction.getProduct().getImages()) {
+			auctionImageStorage.delete(image.getImageUrl());
+			image.softDelete();
+		}
+		auction.softDelete();
+		auction.getProduct().softDelete();
 	}
 
 	@Transactional
 	public AuctionEditDetailResponse updateAuction(Long memberId, Long auctionId, UpdateAuctionRequest request) {
 		loadActiveMember(memberId);
-		AuctionProduct product = loadOwnedAuctionProduct(memberId, auctionId);
-		if (getBidCount(product) > 0) {
+		Auction auction = loadOwnedAuction(memberId, auctionId);
+		Product product = auction.getProduct();
+		if (getBidCount(auction) > 0) {
 			throw new AuctionConflictException("입찰자가 있는 경매는 수정할 수 없습니다.");
 		}
 
 		validateUpdateAuctionRequest(request);
 		validateCategorySelection(request.categoryId());
 
-		OffsetDateTime startAt = product.getAuctionStartAt() == null
+		OffsetDateTime startAt = auction.getAuctionStartAt() == null
 			? OffsetDateTime.now(ZoneOffset.UTC)
-			: product.getAuctionStartAt();
+			: auction.getAuctionStartAt();
 		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
 		if (!endAt.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
@@ -217,36 +230,45 @@ public class AuctionService {
 			request.description().trim(),
 			request.categoryId(),
 			request.startPrice(),
-			endAt,
 			request.location().trim()
 		);
+		auction.updateEditableDetails(request.startPrice(), endAt);
 
-		Map<Long, AuctionProductImage> imagesById = loadRequestedImagesForUpdate(product, request.images());
-		List<AuctionProductImage> orderedImages = request.images().stream()
+		Map<Long, ProductImage> imagesById = loadRequestedProductImagesForUpdate(product, request.images());
+		List<ProductImage> orderedImages = request.images().stream()
 			.map(imagePayload -> {
-				AuctionProductImage image = imagesById.get(imagePayload.imageId());
+				ProductImage image = imagesById.get(imagePayload.imageId());
 				image.assignToProduct(product, imagePayload.sortOrder());
 				return image;
 			})
 			.toList();
+
+		List<ProductImage> removedImages = product.getImages().stream()
+			.filter(image -> !orderedImages.contains(image))
+			.toList();
 		product.replaceImages(orderedImages);
-		auctionProductImageRepository.saveAll(imagesById.values());
+		for (ProductImage removedImage : removedImages) {
+			auctionImageStorage.delete(removedImage.getImageUrl());
+			removedImage.softDelete();
+		}
+		productImageRepository.saveAll(imagesById.values());
+		productImageRepository.saveAll(removedImages);
 
 		return getAuctionEditDetail(memberId, auctionId);
 	}
 
-	private AuctionProduct loadOwnedAuctionProduct(Long memberId, Long auctionId) {
-		AuctionProduct product = auctionProductRepository.findByProductIdAndMemberIdAndDeletedAtIsNull(auctionId, memberId)
+	private Auction loadOwnedAuction(Long memberId, Long auctionId) {
+		Auction auction = auctionRepository.findByAuctionIdAndProductMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId, memberId)
 			.orElseThrow(() -> new AuctionProductNotFoundException("존재하지 않는 경매 상품입니다."));
-		if (!product.getMemberId().equals(memberId)) {
+		if (!auction.getProduct().getMemberId().equals(memberId)) {
 			throw new AuctionAccessDeniedException("본인이 등록한 경매만 접근할 수 있습니다.");
 		}
-		return product;
+		return auction;
 	}
 
-	private Map<Long, String> loadCategoryNames(List<AuctionProduct> products) {
-		List<Long> categoryIds = products.stream()
-			.map(AuctionProduct::getCategoryId)
+	private Map<Long, String> loadCategoryNamesFromAuctions(List<Auction> auctions) {
+		List<Long> categoryIds = auctions.stream()
+			.map(auction -> auction.getProduct().getCategoryId())
 			.distinct()
 			.toList();
 
@@ -256,7 +278,7 @@ public class AuctionService {
 		return categoryNamesById;
 	}
 
-	private String resolveThumbnailUrl(AuctionProduct product) {
+	private String resolveThumbnailUrl(Product product) {
 		return product.getImages().stream()
 			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
 			.sorted(this::compareImagesBySortOrder)
@@ -265,33 +287,33 @@ public class AuctionService {
 			.orElse(null);
 	}
 
-	private int compareImagesBySortOrder(AuctionProductImage left, AuctionProductImage right) {
+	private int compareImagesBySortOrder(ProductImage left, ProductImage right) {
 		int leftOrder = left.getSortOrder() == null ? Integer.MAX_VALUE : left.getSortOrder();
 		int rightOrder = right.getSortOrder() == null ? Integer.MAX_VALUE : right.getSortOrder();
 		return Integer.compare(leftOrder, rightOrder);
 	}
 
-	private BigDecimal resolveCurrentPrice(AuctionProduct product) {
-		return product.getStartPrice();
+	private BigDecimal resolveCurrentPrice(Auction auction) {
+		return auction.getCurrentPrice();
 	}
 
-	private BigDecimal resolveMinimumNextBidPrice(AuctionProduct product) {
-		return resolveCurrentPrice(product);
+	private BigDecimal resolveMinimumNextBidPrice(Auction auction) {
+		return resolveCurrentPrice(auction);
 	}
 
-	private int getBidCount(AuctionProduct product) {
+	private int getBidCount(Auction auction) {
 		return 0;
 	}
 
-	private int getBidderCount(AuctionProduct product) {
+	private int getBidderCount(Auction auction) {
 		return 0;
 	}
 
-	private long resolveAuctionDurationDays(AuctionProduct product) {
-		if (product.getAuctionStartAt() == null || product.getAuctionEndAt() == null) {
+	private long resolveAuctionDurationDays(Auction auction) {
+		if (auction.getAuctionStartAt() == null || auction.getAuctionEndAt() == null) {
 			return 0;
 		}
-		return Duration.between(product.getAuctionStartAt(), product.getAuctionEndAt()).toDays();
+		return Duration.between(auction.getAuctionStartAt(), auction.getAuctionEndAt()).toDays();
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
@@ -309,10 +331,14 @@ public class AuctionService {
 	}
 
 	@Transactional
-	public DeleteAuctionImageResponse deleteImage(Long imageId) {
-		AuctionProductImage image = auctionProductImageRepository.findByImageIdAndDeletedAtIsNull(imageId)
+	public DeleteAuctionImageResponse deleteImage(Long memberId, Long imageId) {
+		loadActiveMember(memberId);
+		ProductImage image = productImageRepository.findByImageIdAndDeletedAtIsNull(imageId)
 			.orElseThrow(() -> new AuctionImageNotFoundException("존재하지 않는 이미지입니다."));
 
+		if (!image.getMemberId().equals(memberId)) {
+			throw new AuctionAccessDeniedException("본인이 업로드한 이미지만 삭제할 수 있습니다.");
+		}
 		if (image.getProduct() != null) {
 			throw new InvalidAuctionRequestException("이미 상품에 연결된 이미지는 삭제할 수 없습니다.");
 		}
@@ -441,19 +467,27 @@ public class AuctionService {
 		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 
-		AuctionProduct product = auctionProductRepository.save(
-			AuctionProduct.create(
+		Product product = productRepository.save(
+			Product.create(
 				request.name().trim(),
 				request.description().trim(),
-				request.saleType(),
+				com.dealit.dealit.domain.product.ProductSaleType.AUCTION,
 				request.categoryId(),
 				member.getMemberId(),
-				request.price(),
+				request.startPrice(),
+				false,
+				request.location().trim(),
+				request.draftId(),
+				ProductStatus.ON_SALE
+			)
+		);
+
+		Auction auction = auctionRepository.save(
+			Auction.create(
+				product,
 				request.startPrice(),
 				auctionPeriod.startAt(),
 				auctionPeriod.endAt(),
-				request.location().trim(),
-				request.draftId(),
 				determineStatus(
 					auctionPeriod.endAt(),
 					now
@@ -461,33 +495,36 @@ public class AuctionService {
 			)
 		);
 
-		Map<Long, AuctionProductImage> imagesById = loadRequestedImages(request.images());
+		Map<Long, ProductImage> imagesById = loadRequestedProductImages(member.getMemberId(), request.images());
 		for (ProductImagePayload imagePayload : request.images()) {
-			AuctionProductImage image = imagesById.get(imagePayload.imageId());
+			ProductImage image = imagesById.get(imagePayload.imageId());
 			product.attachImage(image, imagePayload.sortOrder());
 		}
-		auctionProductImageRepository.saveAll(imagesById.values());
+		productImageRepository.saveAll(imagesById.values());
 
 		return new CreateAuctionResponse(
 			product.getProductId(),
-			product.getSaleType(),
-			product.getStatus(),
-			buildAuctionScheduleResponse(product)
+			request.saleType(),
+			auction.getStatus(),
+			buildAuctionScheduleResponse(auction)
 		);
 	}
 
-	private Map<Long, AuctionProductImage> loadRequestedImages(List<ProductImagePayload> imagePayloads) {
+	private Map<Long, ProductImage> loadRequestedProductImages(Long memberId, List<ProductImagePayload> imagePayloads) {
 		List<Long> imageIds = imagePayloads.stream()
 			.map(ProductImagePayload::imageId)
 			.toList();
 
-		List<AuctionProductImage> images = auctionProductImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
+		List<ProductImage> images = productImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
 		if (images.size() != imageIds.size()) {
 			throw new AuctionImageNotFoundException("존재하지 않는 이미지가 포함되어 있습니다.");
 		}
 
-		Map<Long, AuctionProductImage> imagesById = new LinkedHashMap<>();
-		for (AuctionProductImage image : images) {
+		Map<Long, ProductImage> imagesById = new LinkedHashMap<>();
+		for (ProductImage image : images) {
+			if (!image.getMemberId().equals(memberId)) {
+				throw new AuctionAccessDeniedException("본인이 업로드한 이미지만 사용할 수 있습니다.");
+			}
 			if (image.getProduct() != null) {
 				throw new InvalidAuctionRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
 			}
@@ -498,21 +535,24 @@ public class AuctionService {
 		return imagesById;
 	}
 
-	private Map<Long, AuctionProductImage> loadRequestedImagesForUpdate(
-		AuctionProduct product,
+	private Map<Long, ProductImage> loadRequestedProductImagesForUpdate(
+		Product product,
 		List<ProductImagePayload> imagePayloads
 	) {
 		List<Long> imageIds = imagePayloads.stream()
 			.map(ProductImagePayload::imageId)
 			.toList();
 
-		List<AuctionProductImage> images = auctionProductImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
+		List<ProductImage> images = productImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
 		if (images.size() != imageIds.size()) {
 			throw new AuctionImageNotFoundException("존재하지 않는 이미지가 포함되어 있습니다.");
 		}
 
-		Map<Long, AuctionProductImage> imagesById = new LinkedHashMap<>();
-		for (AuctionProductImage image : images) {
+		Map<Long, ProductImage> imagesById = new LinkedHashMap<>();
+		for (ProductImage image : images) {
+			if (!image.getMemberId().equals(product.getMemberId())) {
+				throw new AuctionAccessDeniedException("본인이 업로드한 이미지만 사용할 수 있습니다.");
+			}
 			if (image.getProduct() != null && !image.getProduct().getProductId().equals(product.getProductId())) {
 				throw new InvalidAuctionRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
 			}
@@ -523,15 +563,15 @@ public class AuctionService {
 		return imagesById;
 	}
 
-	private CreateAuctionResponse.AuctionScheduleResponse buildAuctionScheduleResponse(AuctionProduct product) {
-		if (product.getAuctionStartAt() == null || product.getAuctionEndAt() == null) {
+	private CreateAuctionResponse.AuctionScheduleResponse buildAuctionScheduleResponse(Auction auction) {
+		if (auction.getAuctionStartAt() == null || auction.getAuctionEndAt() == null) {
 			throw new InvalidAuctionRequestException("경매 응답에는 시작 시각과 종료 시각이 반드시 포함되어야 합니다.");
 		}
 
 		return new CreateAuctionResponse.AuctionScheduleResponse(
-			product.getStatus(),
-			product.getAuctionStartAt(),
-			product.getAuctionEndAt()
+			auction.getStatus(),
+			auction.getAuctionStartAt(),
+			auction.getAuctionEndAt()
 		);
 	}
 

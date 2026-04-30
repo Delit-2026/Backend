@@ -51,7 +51,7 @@ public class ProductImageStorage {
 	}
 
 	public void delete(String imagePath) {
-		Path relativePath = Path.of(imagePath.replaceFirst("^/+", ""));
+		Path relativePath = Path.of(imagePath.replaceFirst("^/+", "").replaceFirst("^uploads/", ""));
 		Path targetFile = imageProperties.productImageDirectory().getParent().getParent().resolve(relativePath);
 
 		try {

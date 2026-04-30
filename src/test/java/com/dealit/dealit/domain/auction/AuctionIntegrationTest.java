@@ -1,10 +1,11 @@
 package com.dealit.dealit.domain.auction;
 
-import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
-import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
-import com.dealit.dealit.domain.auction.repository.AuctionProductRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.repository.ProductImageRepository;
+import com.dealit.dealit.domain.product.repository.ProductRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,10 +45,13 @@ class AuctionIntegrationTest {
 	private MockMvc mockMvc;
 
 	@Autowired
-	private AuctionProductImageRepository auctionProductImageRepository;
+	private AuctionRepository auctionRepository;
 
 	@Autowired
-	private AuctionProductRepository auctionProductRepository;
+	private ProductImageRepository productImageRepository;
+
+	@Autowired
+	private ProductRepository productRepository;
 
 	@Autowired
 	private MemberRepository memberRepository;
@@ -61,13 +65,14 @@ class AuctionIntegrationTest {
 	@Value("${app.images.storage-root}")
 	private String imageStorageRoot;
 
-	private AuctionProductImage uploadedImage;
+	private ProductImage uploadedImage;
 	private String accessToken;
 
 	@BeforeEach
 	void setUp() throws IOException {
-		auctionProductImageRepository.deleteAll();
-		auctionProductRepository.deleteAll();
+		auctionRepository.deleteAll();
+		productImageRepository.deleteAll();
+		productRepository.deleteAll();
 		memberRepository.deleteAll();
 		deleteStoredImages();
 
@@ -83,10 +88,11 @@ class AuctionIntegrationTest {
 		savedMember = memberRepository.save(savedMember);
 		accessToken = jwtService.generateAccessToken(savedMember);
 
-		uploadedImage = auctionProductImageRepository.save(
-			AuctionProductImage.createTemporary(
+		uploadedImage = productImageRepository.save(
+			ProductImage.createTemporary(
 				"/uploads/auction/images/test-image.jpg",
-				"test-image.jpg"
+				"test-image.jpg",
+				savedMember.getMemberId()
 			)
 		);
 	}
@@ -172,7 +178,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")))
 			.andReturn();
 
-		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+		ProductImage savedImage = productImageRepository.findAll().stream()
 			.filter(image -> image.getOriginalFileName().equals("스크린샷 2026-04-14 오전 11.28.49.png"))
 			.findFirst()
 			.orElseThrow();
@@ -198,7 +204,7 @@ class AuctionIntegrationTest {
 				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk());
 
-		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+		ProductImage savedImage = productImageRepository.findAll().stream()
 			.filter(image -> image.getOriginalFileName().equals("delete-target.png"))
 			.findFirst()
 			.orElseThrow();

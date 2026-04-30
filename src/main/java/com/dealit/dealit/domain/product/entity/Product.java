@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 @Getter
@@ -117,5 +118,36 @@ public class Product extends BaseEntity {
 			images.add(image);
 		}
 		image.assignToProduct(this, sortOrder);
+	}
+
+	public void updateEditableDetails(
+		String name,
+		String description,
+		Long categoryId,
+		BigDecimal price,
+		String location
+	) {
+		this.name = name;
+		this.description = description;
+		this.categoryId = categoryId;
+		this.price = price;
+		this.location = location;
+	}
+
+	public void replaceImages(Collection<ProductImage> nextImages) {
+		List<ProductImage> removedImages = images.stream()
+			.filter(image -> !nextImages.contains(image))
+			.toList();
+
+		for (ProductImage removedImage : removedImages) {
+			removedImage.detachFromProduct();
+		}
+		images.removeAll(removedImages);
+
+		for (ProductImage nextImage : nextImages) {
+			if (!images.contains(nextImage)) {
+				images.add(nextImage);
+			}
+		}
 	}
 }

@@ -48,16 +48,22 @@ public class AuctionController {
 	@ApiResponse(responseCode = "200", description = "이미지 업로드 성공",
 		content = @Content(schema = @Schema(implementation = UploadAuctionImageResponse.class)))
 	@PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public UploadAuctionImageResponse uploadImage(@RequestPart("file") MultipartFile file) {
-		return auctionService.uploadImage(file);
+	public UploadAuctionImageResponse uploadImage(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestPart("file") MultipartFile file
+	) {
+		return auctionService.uploadImage(member.memberId(), file);
 	}
 
 	@Operation(summary = "상품 이미지 삭제", description = "등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.")
 	@ApiResponse(responseCode = "200", description = "이미지 삭제 성공",
 		content = @Content(schema = @Schema(implementation = DeleteAuctionImageResponse.class)))
 	@DeleteMapping("/image/{imageId}")
-	public DeleteAuctionImageResponse deleteImage(@PathVariable Long imageId) {
-		return auctionService.deleteImage(imageId);
+	public DeleteAuctionImageResponse deleteImage(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long imageId
+	) {
+		return auctionService.deleteImage(member.memberId(), imageId);
 	}
 
 	@Operation(summary = "경매 상품 임시저장", description = "등록 직전 폼 데이터를 draft 상태로 저장한다.")
