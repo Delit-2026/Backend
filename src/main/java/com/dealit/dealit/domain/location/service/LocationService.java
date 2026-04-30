@@ -24,6 +24,8 @@ public class LocationService {
 			result.roadAddress(),
 			result.jibunAddress(),
 			null,
+			request.latitude(),
+			request.longitude(),
 			LocationSource.GPS,
 			result.region1DepthName(),
 			result.region2DepthName(),

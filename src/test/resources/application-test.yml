@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:dealit;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    defer-datasource-initialization: true
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+jwt:
+  secret: test-secret-key-test-secret-key-test-secret-key
+  access-token-expiration-ms: 3600000
+  issuer: dealit-test
+
+management:
+  health:
+    redis:
+      enabled: false
+
+app:
+  events:
+    sse:
+      redis:
+        enabled: false
+        channel: dealit:events:sse-events:test
+  images:
+    public-base-url: http://localhost:8080
+    storage-root: ${java.io.tmpdir}/dealit-test-uploads

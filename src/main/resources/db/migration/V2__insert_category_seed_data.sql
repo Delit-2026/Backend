@@ -167,7 +167,4 @@ VALUES (50, '잡지', 'Magazine', 3, (SELECT id FROM category WHERE name_ko = '�
 INSERT INTO category (id, name_ko, name_en, depth, parent_id)
 VALUES (51, '문제집', 'Workbook', 3, (SELECT id FROM category WHERE name_ko = '기타' AND depth = 2));
 
-SELECT setval(
-    pg_get_serial_sequence('category', 'id'),
-    (SELECT MAX(id) FROM category)
-);
+ALTER TABLE category ALTER COLUMN id RESTART WITH 52;

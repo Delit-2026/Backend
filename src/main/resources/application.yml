@@ -13,6 +13,11 @@ server:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:80}
+  events:
+    sse:
+      redis:
+        enabled: ${APP_EVENTS_SSE_REDIS_ENABLED:true}
+        channel: ${APP_EVENTS_SSE_REDIS_CHANNEL:dealit:events:sse-events}
   images:
     public-base-url: ${APP_IMAGES_PUBLIC_BASE_URL:http://localhost:${SERVER_PORT:8080}}
     storage-root: ${APP_IMAGES_STORAGE_ROOT:${user.dir}/uploads}

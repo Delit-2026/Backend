@@ -41,6 +41,8 @@ public class ProfileService {
 			locationDetails.roadAddress(),
 			locationDetails.jibunAddress(),
 			locationDetails.detailAddress(),
+			locationDetails.latitude(),
+			locationDetails.longitude(),
 			locationDetails.locationSource()
 		);
 	}
@@ -76,6 +78,8 @@ public class ProfileService {
 			roadAddress,
 			jibunAddress,
 			detailAddress,
+			request.latitude(),
+			request.longitude(),
 			locationSource
 		);
 
@@ -85,6 +89,8 @@ public class ProfileService {
 			roadAddress,
 			jibunAddress,
 			detailAddress,
+			request.latitude(),
+			request.longitude(),
 			locationSource
 		);
 	}
@@ -135,6 +141,8 @@ public class ProfileService {
 			member.getRoadAddress(),
 			member.getJibunAddress(),
 			member.getDetailAddress(),
+			member.getLatitude(),
+			member.getLongitude(),
 			member.getLocationSource()
 		);
 	}
