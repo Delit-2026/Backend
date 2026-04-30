@@ -27,8 +27,189 @@ tags:
   description: 마이페이지 프로필 API
 - name: Auth
   description: 인증 API
+- name: Chats
+  description: 채팅 API
+- name: Events
+  description: 앱 전역 실시간 이벤트 API
 paths:
-  /api/v1/users/me/profile-image:
+  "/api/v1/events/stream":
+    get:
+      tags:
+      - Events
+      summary: 앱 전역 SSE 구독
+      operationId: subscribeEventStream
+      responses:
+        '200':
+          description: SSE stream connected
+          content:
+            text/event-stream:
+              schema:
+                "$ref": "#/components/schemas/EventStreamConnectedEvent"
+  "/api/v1/chats/rooms":
+    get:
+      tags:
+      - Chats
+      summary: 채팅방 목록 조회
+      operationId: getChatRooms
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ChatRoomListResponse"
+    post:
+      tags:
+      - Chats
+      summary: 채팅방 생성
+      operationId: createChatRoom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateChatRoomRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/CreateChatRoomResponse"
+  "/api/v1/chats/rooms/{roomId}/messages":
+    get:
+      tags:
+      - Chats
+      summary: 채팅 메시지 목록 조회
+      operationId: getChatMessages
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/ChatMessageListResponse"
+    post:
+      tags:
+      - Chats
+      summary: 채팅 메시지 전송
+      operationId: sendMessage
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SendChatMessageRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/SendChatMessageResponse"
+  "/api/v1/chats/rooms/{roomId}/read":
+    patch:
+      tags:
+      - Chats
+      summary: 채팅방 읽음 처리
+      operationId: markAsRead
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/MarkChatRoomAsReadResponse"
+  "/api/v1/chats/rooms/{roomId}/unread-count":
+    get:
+      tags:
+      - Chats
+      summary: 채팅방 안읽음 개수 조회
+      operationId: getRoomUnreadCount
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RoomUnreadCountResponse"
+  "/api/v1/chats/unread-count":
+    get:
+      tags:
+      - Chats
+      summary: 전체 안읽음 개수 조회
+      operationId: getUnreadCount
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/UnreadCountResponse"
+  "/api/v1/chats/messages/{messageId}":
+    delete:
+      tags:
+      - Chats
+      summary: 채팅 메시지 삭제
+      operationId: deleteChatMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: OK
+  "/api/v1/chats/messages/{messageId}/reports":
+    post:
+      tags:
+      - Chats
+      summary: 채팅 메시지 신고
+      operationId: reportMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ReportChatMessageRequest"
+      responses:
+        '200':
+          description: OK
+  "/api/v1/users/me/profile-image":
     post:
       tags:
       - Profile
@@ -47,13 +228,13 @@ paths:
               required:
               - file
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/UploadProfileImageResponse"
-  /api/v1/products:
+                "$ref": "#/components/schemas/UploadProfileImageResponse"
+  "/api/v1/products":
     post:
       tags:
       - Product
@@ -63,16 +244,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateProductRequest"
+              "$ref": "#/components/schemas/CreateProductRequest"
         required: true
       responses:
-        "201":
+        '201':
           description: 상품 등록 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CreateProductResponse"
-  /api/v1/products/price/recommend:
+                "$ref": "#/components/schemas/CreateProductResponse"
+  "/api/v1/products/price/recommend":
     post:
       tags:
       - Product
@@ -82,16 +263,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RecommendPriceRequest"
+              "$ref": "#/components/schemas/RecommendPriceRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 가격 추천 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/RecommendPriceResponse"
-  /api/v1/products/image:
+                "$ref": "#/components/schemas/RecommendPriceResponse"
+  "/api/v1/products/image":
     post:
       tags:
       - Product
@@ -109,13 +290,13 @@ paths:
               required:
               - file
       responses:
-        "200":
+        '200':
           description: 이미지 업로드 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/UploadProductImageResponse"
-  /api/v1/products/draft:
+                "$ref": "#/components/schemas/UploadProductImageResponse"
+  "/api/v1/products/draft":
     post:
       tags:
       - Product
@@ -125,16 +306,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SaveProductDraftRequest"
+              "$ref": "#/components/schemas/SaveProductDraftRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 임시저장 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SaveProductDraftResponse"
-  /api/v1/products/category/recommend:
+                "$ref": "#/components/schemas/SaveProductDraftResponse"
+  "/api/v1/products/category/recommend":
     post:
       tags:
       - Product
@@ -144,16 +325,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RecommendCategoryRequest"
+              "$ref": "#/components/schemas/RecommendCategoryRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 카테고리 추천 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/RecommendCategoryResponse"
-  /api/v1/members/signup:
+                "$ref": "#/components/schemas/RecommendCategoryResponse"
+  "/api/v1/members/signup":
     post:
       tags:
       - Member
@@ -164,16 +345,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SignUpRequest"
+              "$ref": "#/components/schemas/SignUpRequest"
         required: true
       responses:
-        "201":
+        '201':
           description: Created
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SignUpResponse"
-  /api/v1/locations/resolve:
+                "$ref": "#/components/schemas/SignUpResponse"
+  "/api/v1/locations/resolve":
     post:
       tags:
       - Location
@@ -184,16 +365,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ResolveLocationRequest"
+              "$ref": "#/components/schemas/ResolveLocationRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/ResolvedLocationResponse"
-  /api/v1/email/verification/send:
+                "$ref": "#/components/schemas/ResolvedLocationResponse"
+  "/api/v1/email/verification/send":
     post:
       tags:
       - Email Verification
@@ -204,16 +385,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendEmailVerificationRequest"
+              "$ref": "#/components/schemas/SendEmailVerificationRequest"
         required: true
       responses:
-        "201":
+        '201':
           description: Created
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SendEmailVerificationResponse"
-  /api/v1/email/verification/confirm:
+                "$ref": "#/components/schemas/SendEmailVerificationResponse"
+  "/api/v1/email/verification/confirm":
     post:
       tags:
       - Email Verification
@@ -224,16 +405,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ConfirmEmailVerificationRequest"
+              "$ref": "#/components/schemas/ConfirmEmailVerificationRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/ConfirmEmailVerificationResponse"
-  /api/v1/auth/login:
+                "$ref": "#/components/schemas/ConfirmEmailVerificationResponse"
+  "/api/v1/auth/login":
     post:
       tags:
       - Auth
@@ -244,16 +425,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              "$ref": "#/components/schemas/LoginRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/LoginResponse"
-  /api/v1/auction:
+                "$ref": "#/components/schemas/LoginResponse"
+  "/api/v1/auction":
     post:
       tags:
       - Auction
@@ -264,16 +445,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateAuctionRequest"
+              "$ref": "#/components/schemas/CreateAuctionRequest"
         required: true
       responses:
-        "201":
+        '201':
           description: 상품 등록 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CreateAuctionResponse"
-  /api/v1/auction/price/recommend:
+                "$ref": "#/components/schemas/CreateAuctionResponse"
+  "/api/v1/auction/price/recommend":
     post:
       tags:
       - Auction
@@ -284,16 +465,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RecommendPriceRequest"
+              "$ref": "#/components/schemas/RecommendPriceRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 가격 추천 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/RecommendPriceResponse"
-  /api/v1/auction/image:
+                "$ref": "#/components/schemas/RecommendPriceResponse"
+  "/api/v1/auction/image":
     post:
       tags:
       - Auction
@@ -312,13 +493,13 @@ paths:
               required:
               - file
       responses:
-        "200":
+        '200':
           description: 이미지 업로드 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/UploadAuctionImageResponse"
-  /api/v1/auction/draft:
+                "$ref": "#/components/schemas/UploadAuctionImageResponse"
+  "/api/v1/auction/draft":
     post:
       tags:
       - Auction
@@ -329,16 +510,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SaveAuctionDraftRequest"
+              "$ref": "#/components/schemas/SaveAuctionDraftRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 임시저장 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/SaveAuctionDraftResponse"
-  /api/v1/auction/category/recommend:
+                "$ref": "#/components/schemas/SaveAuctionDraftResponse"
+  "/api/v1/auction/category/recommend":
     post:
       tags:
       - Auction
@@ -349,36 +530,36 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RecommendCategoryRequest"
+              "$ref": "#/components/schemas/RecommendCategoryRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: 카테고리 추천 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/RecommendCategoryResponse"
-  /api/v1/users/me/profile:
+                "$ref": "#/components/schemas/RecommendCategoryResponse"
+  "/api/v1/users/me/profile":
     patch:
       tags:
       - Profile
       summary: 프로필 수정
-      description: "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다."
+      description: 현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.
       operationId: updateProfile
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMyProfileRequest"
+              "$ref": "#/components/schemas/UpdateMyProfileRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/MyPageProfileResponse"
-  /api/v1/users/me/location:
+                "$ref": "#/components/schemas/MyPageProfileResponse"
+  "/api/v1/users/me/location":
     get:
       tags:
       - Profile
@@ -386,12 +567,12 @@ paths:
       description: 현재 로그인한 사용자의 지역 및 구조화된 위치 정보를 조회합니다.
       operationId: getMyLocation
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/MyLocationResponse"
+                "$ref": "#/components/schemas/MyLocationResponse"
     patch:
       tags:
       - Profile
@@ -402,16 +583,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateMyLocationRequest"
+              "$ref": "#/components/schemas/UpdateMyLocationRequest"
         required: true
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/UpdateMyLocationResponse"
-  /api/v1/users/me/mypage:
+                "$ref": "#/components/schemas/UpdateMyLocationResponse"
+  "/api/v1/users/me/mypage":
     get:
       tags:
       - Profile
@@ -419,26 +600,26 @@ paths:
       description: 현재 로그인한 사용자의 마이페이지 프로필 정보를 조회합니다.
       operationId: getMyPageProfile
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/MyPageProfileResponse"
-  /api/v1/products/categories:
+                "$ref": "#/components/schemas/MyPageProfileResponse"
+  "/api/v1/products/categories":
     get:
       tags:
       - Product
       summary: 카테고리 목록 조회
       operationId: getCategories
       responses:
-        "200":
+        '200':
           description: 카테고리 조회 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CategoryOptionResponse"
-  /api/v1/members/nickname/check:
+                "$ref": "#/components/schemas/CategoryOptionResponse"
+  "/api/v1/members/nickname/check":
     get:
       tags:
       - Member
@@ -454,13 +635,13 @@ paths:
           maxLength: 30
           minLength: 2
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/NicknameCheckResponse"
-  /api/v1/members/login-id/check:
+                "$ref": "#/components/schemas/NicknameCheckResponse"
+  "/api/v1/members/login-id/check":
     get:
       tags:
       - Member
@@ -476,13 +657,13 @@ paths:
           maxLength: 30
           minLength: 0
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/LoginIdCheckResponse"
-  /api/v1/health:
+                "$ref": "#/components/schemas/LoginIdCheckResponse"
+  "/api/v1/health":
     get:
       tags:
       - Health
@@ -490,14 +671,14 @@ paths:
       description: 애플리케이션의 기본 상태 정보를 반환합니다.
       operationId: health
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
                 type: object
                 additionalProperties: {}
-  /api/v1/auth/me:
+  "/api/v1/auth/me":
     get:
       tags:
       - Auth
@@ -505,13 +686,13 @@ paths:
       description: 현재 인증된 회원의 기본 정보를 조회합니다.
       operationId: me
       responses:
-        "200":
+        '200':
           description: OK
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CurrentMemberResponse"
-  /api/v1/auction/categories:
+                "$ref": "#/components/schemas/CurrentMemberResponse"
+  "/api/v1/auction/categories":
     get:
       tags:
       - Auction
@@ -519,13 +700,13 @@ paths:
       description: 상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.
       operationId: getCategories_1
       responses:
-        "200":
+        '200':
           description: 카테고리 조회 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/CategoryOptionResponse"
-  /api/v1/products/image/{imageId}:
+                "$ref": "#/components/schemas/CategoryOptionResponse"
+  "/api/v1/products/image/{imageId}":
     delete:
       tags:
       - Product
@@ -539,13 +720,13 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
+        '200':
           description: 이미지 삭제 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/DeleteProductImageResponse"
-  /api/v1/auction/image/{imageId}:
+                "$ref": "#/components/schemas/DeleteProductImageResponse"
+  "/api/v1/auction/image/{imageId}":
     delete:
       tags:
       - Auction
@@ -560,14 +741,133 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
+        '200':
           description: 이미지 삭제 성공
           content:
-            '*/*':
+            "*/*":
               schema:
-                $ref: "#/components/schemas/DeleteAuctionImageResponse"
+                "$ref": "#/components/schemas/DeleteAuctionImageResponse"
 components:
   schemas:
+    CreateChatRoomRequest:
+      type: object
+      required:
+      - productId
+      - receiverId
+      properties:
+        productId:
+          type: integer
+          format: int64
+        receiverId:
+          type: integer
+          format: int64
+    EventStreamConnectedEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          example: event.stream.connected
+        userId:
+          type: integer
+          format: int64
+        connectedAt:
+          type: string
+          format: date-time
+    CreateChatRoomResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        chatType:
+          type: string
+          enum:
+          - GENERAL
+          - AUCTION
+    ChatRoomListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ChatRoomListItemResponse"
+    ChatRoomListItemResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
+    ChatMessageListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ChatMessageResponse"
+    ChatMessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: integer
+          format: int64
+        content:
+          type: string
+        senderNickname:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+    SendChatMessageRequest:
+      type: object
+      required:
+      - content
+      - messageType
+      properties:
+        content:
+          type: string
+        messageType:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - SYSTEM
+          - TALK
+    SendChatMessageResponse:
+      "$ref": "#/components/schemas/ChatMessageResponse"
+    MarkChatRoomAsReadResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
+    RoomUnreadCountResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+    UnreadCountResponse:
+      type: object
+      properties:
+        totalUnreadCount:
+          type: integer
+    ReportChatMessageRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          maxLength: 255
     UploadProfileImageResponse:
       type: object
       properties:
@@ -612,7 +912,7 @@ components:
         images:
           type: array
           items:
-            $ref: "#/components/schemas/ProductImagePayload"
+            "$ref": "#/components/schemas/ProductImagePayload"
             minItems: 1
           minItems: 1
         location:
@@ -684,10 +984,10 @@ components:
           - ENDED
           example: ON_SALE
         auction:
-          $ref: "#/components/schemas/AuctionResponse"
+          "$ref": "#/components/schemas/AuctionResponse"
           description: 경매 메타 정보
         generalSale:
-          $ref: "#/components/schemas/GeneralSaleResponse"
+          "$ref": "#/components/schemas/GeneralSaleResponse"
           description: 일반 판매 정보
     GeneralSaleResponse:
       type: object
@@ -788,7 +1088,7 @@ components:
           type: array
           description: 상품 이미지 목록
           items:
-            $ref: "#/components/schemas/ProductImagePayload"
+            "$ref": "#/components/schemas/ProductImagePayload"
         location:
           type: string
           description: 거래 위치
@@ -812,7 +1112,7 @@ components:
           type: string
           format: date-time
           description: 저장 시각
-          example: 2026-04-12T20:00:00Z
+          example: 2026-04-12 20:00:00.000000000 Z
     RecommendCategoryRequest:
       type: object
       description: 일반 상품 카테고리 추천 요청
@@ -1059,7 +1359,7 @@ components:
         images:
           type: array
           items:
-            $ref: "#/components/schemas/ProductImagePayload"
+            "$ref": "#/components/schemas/ProductImagePayload"
             minItems: 1
           minItems: 1
         location:
@@ -1096,12 +1396,12 @@ components:
           type: string
           format: date-time
           description: 경매 시작 시각
-          example: 2026-04-15T10:00:00Z
+          example: 2026-04-15 10:00:00.000000000 Z
         endAt:
           type: string
           format: date-time
           description: 경매 종료 시각
-          example: 2026-04-15T12:00:00Z
+          example: 2026-04-15 12:00:00.000000000 Z
     CreateAuctionResponse:
       type: object
       description: 경매 상품 등록 응답
@@ -1126,7 +1426,7 @@ components:
           - ENDED
           example: AUCTION_LIVE
         auction:
-          $ref: "#/components/schemas/AuctionScheduleResponse"
+          "$ref": "#/components/schemas/AuctionScheduleResponse"
           description: 경매 메타 정보
     UploadAuctionImageResponse:
       type: object
@@ -1186,7 +1486,7 @@ components:
           type: array
           description: 상품 이미지 목록
           items:
-            $ref: "#/components/schemas/ProductImagePayload"
+            "$ref": "#/components/schemas/ProductImagePayload"
         location:
           type: string
           description: 거래 위치
@@ -1211,7 +1511,7 @@ components:
           type: string
           format: date-time
           description: 저장 시각
-          example: 2026-04-12T20:00:00Z
+          example: 2026-04-12 20:00:00.000000000 Z
     UpdateMyProfileRequest:
       type: object
       properties:
@@ -1361,12 +1661,12 @@ components:
           type: integer
           format: int64
           description: 부모 카테고리 ID
-          example: "null"
+          example: 'null'
         children:
           type: array
           description: 하위 카테고리 목록
           items:
-            $ref: "#/components/schemas/CategoryOptionResponse"
+            "$ref": "#/components/schemas/CategoryOptionResponse"
     NicknameCheckResponse:
       type: object
       properties:
