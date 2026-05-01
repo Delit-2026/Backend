@@ -29,11 +29,14 @@ import com.dealit.dealit.domain.chat.repository.ChatMessageRepository;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.service.FcmNotificationService;
 import com.dealit.dealit.global.event.service.EventStreamService;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class ChatService {
@@ -52,6 +56,7 @@ public class ChatService {
     private final ProductOwnershipPort productOwnershipPort;
     private final ProductSummaryPort productSummaryPort;
     private final EventStreamService eventStreamService;
+    private final FcmNotificationService fcmNotificationService;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
         if (currentUserId == null) {
@@ -234,6 +239,7 @@ public class ChatService {
         );
 
         publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), saved.getSentAt());
+        sendChatPushNotification(room, currentUserId, sender, saved);
         return response;
     }
 
@@ -381,6 +387,39 @@ public class ChatService {
                 userId,
                 ChatUnreadCountUpdatedEvent.of(totalUnread, emittedAt)
         );
+    }
+
+    private void sendChatPushNotification(
+            ChatRoom room,
+            Long senderId,
+            MemberSnapshot sender,
+            ChatMessage message
+    ) {
+        Long recipientId = room.getOpponentId(senderId);
+        String body = switch (message.getMessageType()) {
+            case IMAGE -> "사진을 보냈습니다.";
+            case SYSTEM -> "채팅방에 새 알림이 있습니다.";
+            case TEXT, TALK -> message.getContent();
+        };
+
+        try {
+            int sentCount = fcmNotificationService.sendToMember(
+                    recipientId,
+                    sender.nickname(),
+                    body,
+                    Map.of(
+                            "type", "CHAT_MESSAGE",
+                            "roomId", String.valueOf(room.getRoomId()),
+                            "messageId", String.valueOf(message.getMessageId()),
+                            "senderId", String.valueOf(senderId)
+                    )
+            );
+            log.debug("Sent chat push notification. roomId={}, recipientId={}, sentCount={}",
+                    room.getRoomId(), recipientId, sentCount);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to send chat push notification. roomId={}, recipientId={}",
+                    room.getRoomId(), recipientId, exception);
+        }
     }
 
     private ChatRoomListItemResponse buildRoomListItem(ChatRoom room, Long currentUserId) {
