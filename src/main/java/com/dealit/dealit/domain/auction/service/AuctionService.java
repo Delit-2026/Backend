@@ -340,7 +340,13 @@ public class AuctionService {
 			throw new AuctionAccessDeniedException("본인이 업로드한 이미지만 삭제할 수 있습니다.");
 		}
 		if (image.getProduct() != null) {
-			throw new InvalidAuctionRequestException("이미 상품에 연결된 이미지는 삭제할 수 없습니다.");
+			Auction auction = auctionRepository
+				.findByProductProductIdAndDeletedAtIsNullAndProductDeletedAtIsNull(image.getProduct().getProductId())
+				.orElseThrow(() -> new InvalidAuctionRequestException("경매 상품 이미지가 아닙니다."));
+			if (getBidCount(auction) > 0) {
+				throw new AuctionConflictException("입찰자가 있는 경매는 수정할 수 없습니다.");
+			}
+			auction.getProduct().removeImage(image);
 		}
 
 		auctionImageStorage.delete(image.getImageUrl());

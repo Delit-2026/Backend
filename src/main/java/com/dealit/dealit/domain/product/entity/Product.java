@@ -150,4 +150,10 @@ public class Product extends BaseEntity {
 			}
 		}
 	}
+
+	public void removeImage(ProductImage image) {
+		if (images.remove(image)) {
+			image.detachFromProduct();
+		}
+	}
 }

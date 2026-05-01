@@ -226,6 +226,52 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("경매 수정 중 기존 상품 이미지를 imageId 기준으로 삭제할 수 있다")
+	void deleteLinkedAuctionImageSuccess() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Nintendo Switch OLED",
+					  "description": "Includes dock and controller.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
+
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", uploadedImage.getImageId())
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.imageId", is(uploadedImage.getImageId().intValue())))
+			.andExpect(jsonPath("$.deleted").value(true));
+
+		mockMvc.perform(get("/api/v1/auctions/{auctionId}/edit", auctionId)
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.images", hasSize(0)));
+
+		ProductImage deletedImage = productImageRepository.findById(uploadedImage.getImageId()).orElseThrow();
+		org.assertj.core.api.Assertions.assertThat(deletedImage.getDeletedAt()).isNotNull();
+		org.assertj.core.api.Assertions.assertThat(deletedImage.getProduct()).isNull();
+	}
+
+	@Test
 	@DisplayName("카테고리 목록 조회는 계층형 트리 구조를 반환한다")
 	void getCategoriesReturnsHierarchy() throws Exception {
 		mockMvc.perform(get("/api/v1/auction/categories"))
