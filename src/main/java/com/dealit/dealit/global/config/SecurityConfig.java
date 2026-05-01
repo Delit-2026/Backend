@@ -66,6 +66,7 @@ public class SecurityConfig {
 						"/api-docs",
 						"/api-docs.yaml",
 						"/api-docs/**",
+						"/ws/chat/**",
 					"/actuator/health",
 					"/actuator/info"
 					).permitAll()

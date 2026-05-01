@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.location.dto;
 
 import com.dealit.dealit.domain.member.LocationSource;
+import java.math.BigDecimal;
 
 public record ResolvedLocationResponse(
 	String location,
@@ -8,6 +9,8 @@ public record ResolvedLocationResponse(
 	String roadAddress,
 	String jibunAddress,
 	String detailAddress,
+	BigDecimal latitude,
+	BigDecimal longitude,
 	LocationSource locationSource,
 	String region1DepthName,
 	String region2DepthName,
