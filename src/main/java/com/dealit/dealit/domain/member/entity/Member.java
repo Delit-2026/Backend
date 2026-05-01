@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -75,6 +76,12 @@ public class Member extends BaseEntity {
 	@Column(name = "detail_address", length = 255)
 	private String detailAddress;
 
+	@Column(name = "latitude", precision = 10, scale = 7)
+	private BigDecimal latitude;
+
+	@Column(name = "longitude", precision = 10, scale = 7)
+	private BigDecimal longitude;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "location_source", length = 20)
 	private LocationSource locationSource;
@@ -96,6 +103,8 @@ public class Member extends BaseEntity {
 		String roadAddress,
 		String jibunAddress,
 		String detailAddress,
+		BigDecimal latitude,
+		BigDecimal longitude,
 		LocationSource locationSource,
 		boolean verified
 	) {
@@ -111,6 +120,8 @@ public class Member extends BaseEntity {
 		this.roadAddress = roadAddress;
 		this.jibunAddress = jibunAddress;
 		this.detailAddress = detailAddress;
+		this.latitude = latitude;
+		this.longitude = longitude;
 		this.locationSource = locationSource;
 		this.verified = verified;
 	}
@@ -176,13 +187,39 @@ public class Member extends BaseEntity {
 		this.profileImage = profileImage;
 	}
 
+	public void updateProfile(String nickname, String intro, String profileImage) {
+		updateProfile(this.name, nickname, intro, profileImage);
+	}
+
 	public void updateLocation(String location) {
 		this.location = location;
 		this.postalCode = null;
 		this.roadAddress = null;
 		this.jibunAddress = null;
 		this.detailAddress = null;
+		this.latitude = null;
+		this.longitude = null;
 		this.locationSource = LocationSource.MANUAL;
+	}
+
+	public void updateLocationDetails(
+		String location,
+		String postalCode,
+		String roadAddress,
+		String jibunAddress,
+		String detailAddress,
+		BigDecimal latitude,
+		BigDecimal longitude,
+		LocationSource locationSource
+	) {
+		this.location = location;
+		this.postalCode = postalCode;
+		this.roadAddress = roadAddress;
+		this.jibunAddress = jibunAddress;
+		this.detailAddress = detailAddress;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.locationSource = locationSource;
 	}
 
 	public void updateLocationDetails(
@@ -193,12 +230,7 @@ public class Member extends BaseEntity {
 		String detailAddress,
 		LocationSource locationSource
 	) {
-		this.location = location;
-		this.postalCode = postalCode;
-		this.roadAddress = roadAddress;
-		this.jibunAddress = jibunAddress;
-		this.detailAddress = detailAddress;
-		this.locationSource = locationSource;
+		updateLocationDetails(location, postalCode, roadAddress, jibunAddress, detailAddress, null, null, locationSource);
 	}
 
 	public void updateProfileImage(String profileImage) {

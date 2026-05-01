@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Duration;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
 @Service
 @RequiredArgsConstructor
@@ -78,9 +79,19 @@ public class EmailVerificationService {
 	}
 
 	@Transactional
+	public ConfirmEmailVerificationResponse confirm(ConfirmEmailVerificationRequest request) {
+		return confirm(request, null);
+	}
+
+	@Transactional
 	public boolean consumeVerifiedStatus(String email) {
 		String normalizedEmail = normalizeEmail(email);
-		Boolean verified = stringRedisTemplate.hasKey(verifiedKey(normalizedEmail));
+		Boolean verified;
+		try {
+			verified = stringRedisTemplate.hasKey(verifiedKey(normalizedEmail));
+		} catch (RedisConnectionFailureException exception) {
+			return false;
+		}
 		if (Boolean.TRUE.equals(verified)) {
 			stringRedisTemplate.delete(verifiedKey(normalizedEmail));
 			return true;

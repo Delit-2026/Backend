@@ -4,15 +4,15 @@ import com.dealit.dealit.domain.member.config.EmailVerificationProperties;
 import com.dealit.dealit.domain.member.exception.EmailVerificationSendFailedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class SmtpVerificationEmailSender implements VerificationEmailSender {
 
-	private final JavaMailSender javaMailSender;
+	private final MailSender mailSender;
 	private final EmailVerificationProperties properties;
 
 	@Override
@@ -32,7 +32,7 @@ public class SmtpVerificationEmailSender implements VerificationEmailSender {
 			""".formatted(code, properties.codeTtlSeconds()));
 
 		try {
-			javaMailSender.send(message);
+			mailSender.send(message);
 		} catch (MailException exception) {
 			throw new EmailVerificationSendFailedException("이메일 인증 코드 발송에 실패했습니다.");
 		}
