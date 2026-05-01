@@ -234,27 +234,43 @@ public class AuctionService {
 		);
 		auction.updateEditableDetails(request.startPrice(), endAt);
 
-		Map<Long, ProductImage> imagesById = loadRequestedProductImagesForUpdate(product, request.images());
-		List<ProductImage> orderedImages = request.images().stream()
+		replaceAuctionImages(product, request.images());
+
+		return getAuctionEditDetail(memberId, auctionId);
+	}
+
+	private void replaceAuctionImages(Product product, List<ProductImagePayload> imagePayloads) {
+		Map<Long, ProductImage> imagesById = loadRequestedProductImagesForUpdate(product, imagePayloads);
+		List<ProductImage> orderedImages = toOrderedProductImages(product, imagePayloads, imagesById);
+		List<ProductImage> removedImages = product.getImages().stream()
+			.filter(image -> !orderedImages.contains(image))
+			.toList();
+
+		product.replaceImages(orderedImages);
+		deleteRemovedAuctionImages(removedImages);
+		productImageRepository.saveAll(imagesById.values());
+		productImageRepository.saveAll(removedImages);
+	}
+
+	private List<ProductImage> toOrderedProductImages(
+		Product product,
+		List<ProductImagePayload> imagePayloads,
+		Map<Long, ProductImage> imagesById
+	) {
+		return imagePayloads.stream()
 			.map(imagePayload -> {
 				ProductImage image = imagesById.get(imagePayload.imageId());
 				image.assignToProduct(product, imagePayload.sortOrder());
 				return image;
 			})
 			.toList();
+	}
 
-		List<ProductImage> removedImages = product.getImages().stream()
-			.filter(image -> !orderedImages.contains(image))
-			.toList();
-		product.replaceImages(orderedImages);
+	private void deleteRemovedAuctionImages(List<ProductImage> removedImages) {
 		for (ProductImage removedImage : removedImages) {
 			auctionImageStorage.delete(removedImage.getImageUrl());
 			removedImage.softDelete();
 		}
-		productImageRepository.saveAll(imagesById.values());
-		productImageRepository.saveAll(removedImages);
-
-		return getAuctionEditDetail(memberId, auctionId);
 	}
 
 	private Auction loadOwnedAuction(Long memberId, Long auctionId) {
