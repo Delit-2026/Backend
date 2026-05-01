@@ -29,6 +29,12 @@ app:
     protocol: ${APP_MAIL_PROTOCOL:smtp}
     auth: ${APP_MAIL_AUTH:true}
     starttls-enable: ${APP_MAIL_STARTTLS_ENABLE:true}
+  firebase:
+    enabled: ${FIREBASE_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:dealit-f6b55}
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+    service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
 
 jwt:
   secret: ${JWT_SECRET:dealit-local-secret-key-dealit-local-secret-key}

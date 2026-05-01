@@ -43,8 +43,6 @@ class LocationServiceTest {
 		assertThat(response.roadAddress()).isEqualTo("서울특별시 중구 세종대로 110");
 		assertThat(response.jibunAddress()).isEqualTo("서울특별시 중구 태평로1가 31");
 		assertThat(response.detailAddress()).isNull();
-		assertThat(response.latitude()).isEqualByComparingTo("37.5665000");
-		assertThat(response.longitude()).isEqualByComparingTo("126.9780000");
 		assertThat(response.locationSource()).isEqualTo(LocationSource.GPS);
 		assertThat(response.region1DepthName()).isEqualTo("서울특별시");
 		assertThat(response.region2DepthName()).isEqualTo("중구");

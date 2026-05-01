@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.member;
 
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,10 +30,14 @@ class MemberSignUpIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private FcmTokenRepository fcmTokenRepository;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@BeforeEach
 	void setUp() {
+		fcmTokenRepository.deleteAll();
 		memberRepository.deleteAll();
 	}
 
@@ -162,7 +167,7 @@ class MemberSignUpIntegrationTest {
 			null,
 			null
 		));
-		member.updateProfile("비드마스터", null, null);
+		member.updateProfile(member.getName(), "비드마스터", null, null);
 		memberRepository.save(member);
 
 		mockMvc.perform(get("/api/v1/members/nickname/check")
