@@ -1,7 +1,12 @@
 package com.dealit.dealit.domain.auction;
 
-import com.dealit.dealit.domain.auction.entity.AuctionProductImage;
-import com.dealit.dealit.domain.auction.repository.AuctionProductImageRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.repository.ProductImageRepository;
+import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.global.security.jwt.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -19,7 +25,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -40,21 +45,54 @@ class AuctionIntegrationTest {
 	private MockMvc mockMvc;
 
 	@Autowired
-	private AuctionProductImageRepository auctionProductImageRepository;
+	private AuctionRepository auctionRepository;
+
+	@Autowired
+	private ProductImageRepository productImageRepository;
+
+	@Autowired
+	private ProductRepository productRepository;
+
+	@Autowired
+	private MemberRepository memberRepository;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtService jwtService;
 
 	@Value("${app.images.storage-root}")
 	private String imageStorageRoot;
 
-	private AuctionProductImage uploadedImage;
+	private ProductImage uploadedImage;
+	private String accessToken;
 
 	@BeforeEach
 	void setUp() throws IOException {
-		auctionProductImageRepository.deleteAll();
+		auctionRepository.deleteAll();
+		productImageRepository.deleteAll();
+		productRepository.deleteAll();
+		memberRepository.deleteAll();
 		deleteStoredImages();
-		uploadedImage = auctionProductImageRepository.save(
-			AuctionProductImage.createTemporary(
-				"/auction/images/test-image.jpg",
-				"test-image.jpg"
+
+		Member member = Member.create(
+			"auction-user",
+			passwordEncoder.encode("Password123!"),
+			"auction-user@dealit.com",
+			null,
+			"경매판매자"
+		);
+		Member savedMember = memberRepository.save(member);
+		savedMember.assignDefaultNickname();
+		savedMember = memberRepository.save(savedMember);
+		accessToken = jwtService.generateAccessToken(savedMember);
+
+		uploadedImage = productImageRepository.save(
+			ProductImage.createTemporary(
+				"/uploads/auction/images/test-image.jpg",
+				"test-image.jpg",
+				savedMember.getMemberId()
 			)
 		);
 	}
@@ -62,6 +100,62 @@ class AuctionIntegrationTest {
 	@AfterEach
 	void tearDown() throws IOException {
 		deleteStoredImages();
+	}
+
+	@Test
+	@DisplayName("내 판매중 경매 목록 조회는 현재 사용자가 등록한 진행중 경매를 페이징 응답으로 반환한다")
+	void getMySellingAuctionProductsReturnsCurrentMemberLiveAuctions() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Nintendo Switch OLED",
+					  "description": "Includes dock and controller.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(get("/api/v1/mypage/auctions/selling")
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].productId").isNumber())
+			.andExpect(jsonPath("$.content[0].auctionId").isNumber())
+			.andExpect(jsonPath("$.content[0].name").value("Nintendo Switch OLED"))
+			.andExpect(jsonPath("$.content[0].description").value("Includes dock and controller."))
+			.andExpect(jsonPath("$.content[0].categoryName").value("사무용노트북"))
+			.andExpect(jsonPath("$.content[0].thumbnailUrl").value("http://localhost:8080/uploads/auction/images/test-image.jpg"))
+			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.content[0].startPrice").value(180000))
+			.andExpect(jsonPath("$.content[0].currentPrice").value(180000))
+			.andExpect(jsonPath("$.content[0].minimumNextBidPrice").value(180000))
+			.andExpect(jsonPath("$.content[0].bidCount").value(0))
+			.andExpect(jsonPath("$.content[0].bidderCount").value(0))
+			.andExpect(jsonPath("$.content[0].startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].endAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].canEdit").value(true))
+			.andExpect(jsonPath("$.content[0].canDelete").value(true))
+			.andExpect(jsonPath("$.content[0].createdAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].updatedAt").value(notNullValue()))
+			.andExpect(jsonPath("$.page").value(0))
+			.andExpect(jsonPath("$.size").value(20))
+			.andExpect(jsonPath("$.totalElements").value(1))
+			.andExpect(jsonPath("$.hasNext").value(false));
 	}
 
 	@Test
@@ -75,14 +169,16 @@ class AuctionIntegrationTest {
 			imageBytes
 		);
 
-		mockMvc.perform(multipart("/api/v1/auction/image").file(file))
+		mockMvc.perform(multipart("/api/v1/auction/image")
+				.file(file)
+				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId").isNumber())
-			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/auction/images/")))
-			.andExpect(jsonPath("$.imageUrl").value(containsString("%EC%8A%A4%ED%81%AC")))
+			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/uploads/auction/images/")))
+			.andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")))
 			.andReturn();
 
-		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+		ProductImage savedImage = productImageRepository.findAll().stream()
 			.filter(image -> image.getOriginalFileName().equals("스크린샷 2026-04-14 오전 11.28.49.png"))
 			.findFirst()
 			.orElseThrow();
@@ -103,26 +199,76 @@ class AuctionIntegrationTest {
 			imageBytes
 		);
 
-		mockMvc.perform(multipart("/api/v1/auction/image").file(file))
+		mockMvc.perform(multipart("/api/v1/auction/image")
+				.file(file)
+				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk());
 
-		AuctionProductImage savedImage = auctionProductImageRepository.findAll().stream()
+		ProductImage savedImage = productImageRepository.findAll().stream()
 			.filter(image -> image.getOriginalFileName().equals("delete-target.png"))
 			.findFirst()
 			.orElseThrow();
 
-		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId()))
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId())
+				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId", is(savedImage.getImageId().intValue())))
 			.andExpect(jsonPath("$.deleted").value(true));
 
-		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId()))
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId())
+				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("AUCTION_IMAGE_NOT_FOUND"));
 
 		Path deletedFilePath = Path.of(imageStorageRoot)
-			.resolve(savedImage.getImageUrl().replaceFirst("^/auction/images/", "auction/images/"));
+			.resolve(savedImage.getImageUrl().replaceFirst("^/uploads/", ""));
 		org.assertj.core.api.Assertions.assertThat(Files.exists(deletedFilePath)).isFalse();
+	}
+
+	@Test
+	@DisplayName("경매 수정 중 기존 상품 이미지를 imageId 기준으로 삭제할 수 있다")
+	void deleteLinkedAuctionImageSuccess() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Nintendo Switch OLED",
+					  "description": "Includes dock and controller.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
+
+		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", uploadedImage.getImageId())
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.imageId", is(uploadedImage.getImageId().intValue())))
+			.andExpect(jsonPath("$.deleted").value(true));
+
+		mockMvc.perform(get("/api/v1/auctions/{auctionId}/edit", auctionId)
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.images", hasSize(0)));
+
+		ProductImage deletedImage = productImageRepository.findById(uploadedImage.getImageId()).orElseThrow();
+		org.assertj.core.api.Assertions.assertThat(deletedImage.getDeletedAt()).isNotNull();
+		org.assertj.core.api.Assertions.assertThat(deletedImage.getProduct()).isNull();
 	}
 
 	@Test
@@ -142,6 +288,7 @@ class AuctionIntegrationTest {
 	@DisplayName("경매 등록 API는 REGULAR 판매 유형을 허용하지 않는다")
 	void createAuctionFailsWhenSaleTypeIsRegular() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -154,7 +301,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -171,6 +318,7 @@ class AuctionIntegrationTest {
 	@DisplayName("상위 카테고리로 상품 등록을 시도하면 검증 오류를 반환한다")
 	void createAuctionFailsWhenCategoryIsNotLeaf() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -184,7 +332,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -201,6 +349,7 @@ class AuctionIntegrationTest {
 	@DisplayName("경매 판매 상품 등록에 성공하면 즉시 AUCTION_LIVE 상태와 계산된 시간을 반환한다")
 	void createAuctionLiveSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -214,7 +363,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -235,6 +384,7 @@ class AuctionIntegrationTest {
 	@DisplayName("경매 판매에서 진행 기간이 없으면 비즈니스 검증 오류를 반환한다")
 	void createAuctionFailsWhenDurationMissing() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -248,7 +398,7 @@ class AuctionIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/auction/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],

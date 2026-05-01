@@ -74,7 +74,7 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     volumes:
-      - auction-image-data:/app/uploads
+      - ./uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/actuator/health || exit 1"]
       interval: 15s
@@ -94,6 +94,5 @@ services:
       - ./nginx/logs:/var/log/nginx
 
 volumes:
-  auction-image-data:
   postgres-data:
   redis-data:
