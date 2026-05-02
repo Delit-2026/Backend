@@ -4,12 +4,10 @@ import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
-import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
-import com.dealit.dealit.domain.product.dto.SalesManagementListResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
@@ -38,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "Product", description = "일반 상품 등록 및 판매 관리 API")
+@Tag(name = "Product", description = "일반 상품 등록 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")
@@ -46,9 +44,12 @@ public class ProductController {
 
 	private final ProductService productService;
 
-	@Operation(summary = "상품 이미지 업로드")
-	@ApiResponse(responseCode = "200", description = "이미지 업로드 성공",
-		content = @Content(schema = @Schema(implementation = UploadProductImageResponse.class)))
+	@Operation(summary = "일반 상품 이미지 업로드")
+	@ApiResponse(
+		responseCode = "200",
+		description = "이미지 업로드 성공",
+		content = @Content(schema = @Schema(implementation = UploadProductImageResponse.class))
+	)
 	@PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public UploadProductImageResponse uploadImage(
 		@AuthenticationPrincipal AuthenticatedMember member,
@@ -57,9 +58,12 @@ public class ProductController {
 		return productService.uploadImage(member.memberId(), file);
 	}
 
-	@Operation(summary = "상품 이미지 삭제")
-	@ApiResponse(responseCode = "200", description = "이미지 삭제 성공",
-		content = @Content(schema = @Schema(implementation = DeleteProductImageResponse.class)))
+	@Operation(summary = "일반 상품 이미지 삭제")
+	@ApiResponse(
+		responseCode = "200",
+		description = "이미지 삭제 성공",
+		content = @Content(schema = @Schema(implementation = DeleteProductImageResponse.class))
+	)
 	@DeleteMapping("/image/{imageId}")
 	public DeleteProductImageResponse deleteImage(
 		@AuthenticationPrincipal AuthenticatedMember member,
@@ -68,30 +72,12 @@ public class ProductController {
 		return productService.deleteImage(member.memberId(), imageId);
 	}
 
-	@Operation(summary = "내 판매 중 상품 목록 조회")
-	@ApiResponse(responseCode = "200", description = "판매 중 관리 목록 조회 성공",
-		content = @Content(schema = @Schema(implementation = SalesManagementListResponse.class)))
-	@GetMapping("/me/sales-management")
-	public SalesManagementListResponse getSalesManagementProducts(
-		@AuthenticationPrincipal AuthenticatedMember member
-	) {
-		return productService.getSalesManagementProducts(member.memberId());
-	}
-
-	@Operation(summary = "내 판매 중 상품 삭제")
-	@ApiResponse(responseCode = "200", description = "판매 중 상품 삭제 성공",
-		content = @Content(schema = @Schema(implementation = DeleteProductResponse.class)))
-	@DeleteMapping("/{productId}")
-	public DeleteProductResponse deleteProduct(
-		@AuthenticationPrincipal AuthenticatedMember member,
-		@PathVariable Long productId
-	) {
-		return productService.deleteProduct(member.memberId(), productId);
-	}
-
 	@Operation(summary = "일반 상품 임시저장")
-	@ApiResponse(responseCode = "200", description = "임시저장 성공",
-		content = @Content(schema = @Schema(implementation = SaveProductDraftResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "임시저장 성공",
+		content = @Content(schema = @Schema(implementation = SaveProductDraftResponse.class))
+	)
 	@PostMapping("/draft")
 	public SaveProductDraftResponse saveDraft(
 		@AuthenticationPrincipal AuthenticatedMember member,
@@ -101,32 +87,44 @@ public class ProductController {
 	}
 
 	@Operation(summary = "카테고리 추천")
-	@ApiResponse(responseCode = "200", description = "카테고리 추천 성공",
-		content = @Content(schema = @Schema(implementation = RecommendCategoryResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "카테고리 추천 성공",
+		content = @Content(schema = @Schema(implementation = RecommendCategoryResponse.class))
+	)
 	@PostMapping("/category/recommend")
 	public RecommendCategoryResponse recommendCategory(@Valid @RequestBody RecommendCategoryRequest request) {
 		return productService.recommendCategory(request);
 	}
 
 	@Operation(summary = "카테고리 목록 조회")
-	@ApiResponse(responseCode = "200", description = "카테고리 조회 성공",
-		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "카테고리 조회 성공",
+		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class))
+	)
 	@GetMapping("/categories")
 	public List<CategoryOptionResponse> getCategories() {
 		return productService.getCategories();
 	}
 
 	@Operation(summary = "가격 추천")
-	@ApiResponse(responseCode = "200", description = "가격 추천 성공",
-		content = @Content(schema = @Schema(implementation = RecommendPriceResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "가격 추천 성공",
+		content = @Content(schema = @Schema(implementation = RecommendPriceResponse.class))
+	)
 	@PostMapping("/price/recommend")
 	public RecommendPriceResponse recommendPrice(@Valid @RequestBody RecommendPriceRequest request) {
 		return productService.recommendPrice(request);
 	}
 
 	@Operation(summary = "일반 상품 등록")
-	@ApiResponse(responseCode = "201", description = "상품 등록 성공",
-		content = @Content(schema = @Schema(implementation = CreateProductResponse.class)))
+	@ApiResponse(
+		responseCode = "201",
+		description = "일반 상품 등록 성공",
+		content = @Content(schema = @Schema(implementation = CreateProductResponse.class))
+	)
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public CreateProductResponse createProduct(
