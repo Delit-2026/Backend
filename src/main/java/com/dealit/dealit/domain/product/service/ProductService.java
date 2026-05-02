@@ -304,7 +304,7 @@ public class ProductService {
 	public CreateProductResponse createProduct(Long memberId, CreateProductRequest request) {
 		validateCreateRequest(request);
 		validateCategorySelection(request.categoryId());
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		String location = resolveLocation(member, request.location());
 
 		Product product = productRepository.save(

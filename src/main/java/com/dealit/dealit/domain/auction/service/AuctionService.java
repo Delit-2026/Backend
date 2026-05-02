@@ -486,7 +486,7 @@ public class AuctionService {
 	public CreateAuctionResponse createAuction(Long memberId, CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 
