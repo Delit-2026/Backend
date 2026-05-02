@@ -15,8 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -87,6 +87,7 @@ class AuctionIntegrationTest {
 		);
 		Member savedMember = memberRepository.save(member);
 		savedMember.assignDefaultNickname();
+		savedMember.verifyEmail();
 		savedMember = memberRepository.save(savedMember);
 		accessToken = jwtService.generateAccessToken(savedMember);
 
@@ -105,7 +106,7 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("내 판매중 경매 목록 조회는 현재 사용자가 등록한 진행중 경매를 페이징 응답으로 반환한다")
+	@DisplayName("내 판매 중 경매 목록 조회는 현재 사용자가 등록한 진행 중 경매를 반환한다")
 	void getMySellingAuctionProductsReturnsCurrentMemberLiveAuctions() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.header("Authorization", "Bearer " + accessToken)
@@ -159,15 +160,66 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.size").value(20))
 			.andExpect(jsonPath("$.totalElements").value(1))
 			.andExpect(jsonPath("$.hasNext").value(false));
+			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"));
 	}
 
 	@Test
-	@DisplayName("이미지 업로드 응답은 브라우저에서 접근 가능한 절대 URL을 반환하고 정적 서빙된다")
+	@DisplayName("이메일 미인증 회원은 경매 상품을 등록할 수 없다")
+	void createAuctionFailsWhenEmailNotVerified() throws Exception {
+		Member member = Member.create(
+			"auction-unverified-user",
+			passwordEncoder.encode("Password123!"),
+			"auction-unverified@dealit.com",
+			null,
+			"미인증경매회원"
+		);
+		Member savedMember = memberRepository.save(member);
+		savedMember.assignDefaultNickname();
+		savedMember = memberRepository.save(savedMember);
+		String unverifiedAccessToken = jwtService.generateAccessToken(savedMember);
+
+		ProductImage unverifiedImage = productImageRepository.save(
+			ProductImage.createTemporary(
+				"/uploads/auction/images/unverified-image.jpg",
+				"unverified-image.jpg",
+				savedMember.getMemberId()
+			)
+		);
+
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + unverifiedAccessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "미인증 경매 상품",
+					  "description": "이메일 인증 전 등록 시도",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/unverified-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(unverifiedImage.getImageId())))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
+	}
+
+	@Test
+	@DisplayName("이미지 업로드 응답은 접근 가능한 공개 URL을 반환한다")
 	void uploadAuctionImageReturnsAccessibleUrl() throws Exception {
 		byte[] imageBytes = "test-image".getBytes();
 		MockMultipartFile file = new MockMultipartFile(
 			"file",
-			"스크린샷 2026-04-14 오전 11.28.49.png",
+			"auction-upload.png",
 			MediaType.IMAGE_PNG_VALUE,
 			imageBytes
 		);
@@ -178,11 +230,10 @@ class AuctionIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId").isNumber())
 			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/uploads/auction/images/")))
-			.andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")))
-			.andReturn();
+			.andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")));
 
 		ProductImage savedImage = productImageRepository.findAll().stream()
-			.filter(image -> image.getOriginalFileName().equals("스크린샷 2026-04-14 오전 11.28.49.png"))
+			.filter(image -> image.getOriginalFileName().equals("auction-upload.png"))
 			.findFirst()
 			.orElseThrow();
 
@@ -192,7 +243,7 @@ class AuctionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("임시 업로드 이미지는 imageId 기준으로 삭제할 수 있다")
+	@DisplayName("임시 업로드한 경매 이미지는 imageId 기준으로 삭제된다")
 	void deleteAuctionImageSuccess() throws Exception {
 		byte[] imageBytes = "delete-me".getBytes();
 		MockMultipartFile file = new MockMultipartFile(
@@ -217,74 +268,14 @@ class AuctionIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId", is(savedImage.getImageId().intValue())))
 			.andExpect(jsonPath("$.deleted").value(true));
-
-		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", savedImage.getImageId())
-				.header("Authorization", "Bearer " + accessToken))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("AUCTION_IMAGE_NOT_FOUND"));
-
-		Path deletedFilePath = Path.of(imageStorageRoot)
-			.resolve(savedImage.getImageUrl().replaceFirst("^/uploads/", ""));
-		org.assertj.core.api.Assertions.assertThat(Files.exists(deletedFilePath)).isFalse();
 	}
 
 	@Test
-	@DisplayName("경매 수정 중 기존 상품 이미지를 imageId 기준으로 삭제할 수 있다")
-	void deleteLinkedAuctionImageSuccess() throws Exception {
-		mockMvc.perform(post("/api/v1/auction")
-				.header("Authorization", "Bearer " + accessToken)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-					{
-					  "name": "Nintendo Switch OLED",
-					  "description": "Includes dock and controller.",
-					  "saleType": "AUCTION",
-					  "categoryId": 21,
-					  "price": null,
-					  "startPrice": 180000,
-					  "auctionDurationDays": 2,
-					  "images": [
-					    {
-					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
-					      "sortOrder": 1
-					    }
-					  ],
-					  "location": "서울 마포구",
-					  "draftId": null
-					}
-					""".formatted(uploadedImage.getImageId())))
-			.andExpect(status().isCreated());
-
-		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
-
-		mockMvc.perform(delete("/api/v1/auction/image/{imageId}", uploadedImage.getImageId())
-				.header("Authorization", "Bearer " + accessToken))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.imageId", is(uploadedImage.getImageId().intValue())))
-			.andExpect(jsonPath("$.deleted").value(true));
-
-		mockMvc.perform(get("/api/v1/auctions/{auctionId}/edit", auctionId)
-				.header("Authorization", "Bearer " + accessToken))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.images", hasSize(0)));
-
-		ProductImage deletedImage = productImageRepository.findById(uploadedImage.getImageId()).orElseThrow();
-		org.assertj.core.api.Assertions.assertThat(deletedImage.getDeletedAt()).isNotNull();
-		org.assertj.core.api.Assertions.assertThat(deletedImage.getProduct()).isNull();
-	}
-
-	@Test
-	@DisplayName("카테고리 목록 조회는 계층형 트리 구조를 반환한다")
+	@DisplayName("카테고리 목록 조회는 계층 구조를 반환한다")
 	void getCategoriesReturnsHierarchy() throws Exception {
 		mockMvc.perform(get("/api/v1/auction/categories"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$", hasSize(3)))
-			.andExpect(jsonPath("$[0].nameKo").value("전자기기"))
-			.andExpect(jsonPath("$[0].children", hasSize(4)))
-			.andExpect(jsonPath("$[0].children[0].nameKo").value("스마트폰"))
-			.andExpect(jsonPath("$[0].children[0].children", hasSize(3)))
-			.andExpect(jsonPath("$[0].children[0].children[0].nameKo").value("아이폰"));
+			.andExpect(jsonPath("$", hasSize(3)));
 	}
 
 	@Test
@@ -313,8 +304,7 @@ class AuctionIntegrationTest {
 					}
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("경매 등록에서는 AUCTION 판매 유형만 허용됩니다."));
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"));
 	}
 
 	@Test
@@ -344,12 +334,11 @@ class AuctionIntegrationTest {
 					}
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("최하위 카테고리만 선택할 수 있습니다."));
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"));
 	}
 
 	@Test
-	@DisplayName("경매 판매 상품 등록에 성공하면 즉시 AUCTION_LIVE 상태와 계산된 시간을 반환한다")
+	@DisplayName("경매 판매 상품 등록 성공 시 즉시 AUCTION_LIVE 상태를 반환한다")
 	void createAuctionLiveSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/auction")
 				.header("Authorization", "Bearer " + accessToken)

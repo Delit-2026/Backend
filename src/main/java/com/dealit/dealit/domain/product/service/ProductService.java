@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -11,6 +12,11 @@ import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
+import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
+import com.dealit.dealit.domain.product.dto.MySellingProductItemResponse;
+import com.dealit.dealit.domain.product.dto.MySellingProductListResponse;
+import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse;
+import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse.ProductEditImageResponse;
 import com.dealit.dealit.domain.product.dto.ProductImagePayload;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
@@ -18,12 +24,13 @@ import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
+import com.dealit.dealit.domain.product.dto.UpdateProductRequest;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductDraft;
 import com.dealit.dealit.domain.product.entity.ProductImage;
-import com.dealit.dealit.domain.product.exception.ProductAccessDeniedException;
 import com.dealit.dealit.domain.product.exception.InvalidProductRequestException;
+import com.dealit.dealit.domain.product.exception.ProductAccessDeniedException;
 import com.dealit.dealit.domain.product.exception.ProductImageNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
@@ -32,23 +39,33 @@ import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ProductService {
+
+	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
 	private final ProductRepository productRepository;
 	private final ProductImageRepository productImageRepository;
@@ -92,10 +109,100 @@ public class ProductService {
 		return new DeleteProductImageResponse(image.getImageId(), true);
 	}
 
+	public MySellingProductListResponse getMySellingProducts(Long memberId, int page, int size) {
+		loadActiveMember(memberId);
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		Page<Product> productPage = productRepository.findAllByMemberIdAndStatusAndDeletedAtIsNull(
+			memberId,
+			ProductStatus.ON_SALE,
+			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(productPage.getContent());
+		List<MySellingProductItemResponse> content = productPage.getContent().stream()
+			.map(product -> toMySellingProductItemResponse(product, categoryNamesById))
+			.toList();
+
+		return new MySellingProductListResponse(
+			content,
+			productPage.getNumber(),
+			productPage.getSize(),
+			productPage.getTotalElements(),
+			productPage.hasNext()
+		);
+	}
+
+	public ProductEditDetailResponse getProductEditDetail(Long memberId, Long productId) {
+		loadActiveMember(memberId);
+		Product product = loadOwnedProduct(memberId, productId);
+		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
+
+		List<ProductEditImageResponse> images = product.getImages().stream()
+			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
+			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+				.thenComparing(ProductImage::getCreatedAt))
+			.map(image -> new ProductEditImageResponse(
+				image.getImageId(),
+				imageUrlService.toPublicUrl(image.getImageUrl()),
+				image.getSortOrder()
+			))
+			.toList();
+
+		return new ProductEditDetailResponse(
+			product.getProductId(),
+			product.getName(),
+			product.getDescription(),
+			product.getCategoryId(),
+			category == null ? "" : category.getNameKo(),
+			product.getLocation(),
+			images,
+			product.getPrice(),
+			product.isAllowOffer(),
+			product.getStatus(),
+			product.getStatus() == ProductStatus.ON_SALE
+		);
+	}
+
+	@Transactional
+	public ProductEditDetailResponse updateProduct(Long memberId, Long productId, UpdateProductRequest request) {
+		loadActiveMember(memberId);
+		Product product = loadOwnedProduct(memberId, productId);
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			throw new InvalidProductRequestException("판매 중인 상품만 수정할 수 있습니다.");
+		}
+
+		validateCategorySelection(request.categoryId());
+		product.updateEditableDetails(
+			request.name().trim(),
+			request.description().trim(),
+			request.categoryId(),
+			request.price(),
+			request.location().trim()
+		);
+		product.updateAllowOffer(request.allowOffer());
+		replaceProductImages(product, request.images());
+
+		return getProductEditDetail(memberId, productId);
+	}
+
+	@Transactional
+	public void deleteProduct(Long memberId, Long productId) {
+		Product product = loadOwnedProduct(memberId, productId);
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			throw new InvalidProductRequestException("판매 중인 상품만 삭제할 수 있습니다.");
+		}
+
+		for (ProductImage image : product.getImages()) {
+			productImageStorage.delete(image.getImageUrl());
+		}
+		product.softDeleteWithImages();
+	}
+
 	@Transactional
 	public SaveProductDraftResponse saveDraft(Long memberId, SaveProductDraftRequest request) {
 		validateDraftRequest(request);
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		String location = resolveLocation(member, request.location());
 
 		OffsetDateTime savedAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -185,7 +292,7 @@ public class ProductService {
 
 	public RecommendPriceResponse recommendPrice(RecommendPriceRequest request) {
 		if (request.saleType() != ProductSaleType.REGULAR) {
-			throw new InvalidProductRequestException("일반 상품 가격 추천에서는 판매 유형이 REGULAR여야 합니다.");
+			throw new InvalidProductRequestException("일반 상품 가격 추천에서는 saleType이 REGULAR여야 합니다.");
 		}
 
 		int textWeight = request.name().trim().length() * 10 + request.description().trim().length() * 2;
@@ -197,7 +304,7 @@ public class ProductService {
 	public CreateProductResponse createProduct(Long memberId, CreateProductRequest request) {
 		validateCreateRequest(request);
 		validateCategorySelection(request.categoryId());
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		String location = resolveLocation(member, request.location());
 
 		Product product = productRepository.save(
@@ -251,9 +358,22 @@ public class ProductService {
 		return imagesById;
 	}
 
+	private Map<Long, ProductImage> loadRequestedImagesForUpdate(Product product, List<ProductImagePayload> imagePayloads) {
+		Map<Long, ProductImage> imagesById = loadRequestedImages(imagePayloads);
+		for (ProductImage image : imagesById.values()) {
+			if (!image.getMemberId().equals(product.getMemberId())) {
+				throw new ProductAccessDeniedException("본인이 업로드한 이미지로만 수정할 수 있습니다.");
+			}
+			if (image.getProduct() != null && !image.getProduct().getProductId().equals(product.getProductId())) {
+				throw new InvalidProductRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
+			}
+		}
+		return imagesById;
+	}
+
 	private void validateDuplicateImageIds(List<Long> imageIds, Collection<Long> storedImageIds) {
 		if (storedImageIds.size() != imageIds.size()) {
-			throw new InvalidProductRequestException("중복된 이미지 ID는 허용되지 않습니다.");
+			throw new InvalidProductRequestException("중복된 이미지 ID는 사용할 수 없습니다.");
 		}
 	}
 
@@ -268,10 +388,10 @@ public class ProductService {
 
 	private void validateCreateRequest(CreateProductRequest request) {
 		if (request.saleType() != ProductSaleType.REGULAR) {
-			throw new InvalidProductRequestException("일반 상품 등록에서는 판매 유형이 REGULAR여야 합니다.");
+			throw new InvalidProductRequestException("일반 상품 등록에서는 saleType이 REGULAR여야 합니다.");
 		}
 		if (request.price().signum() <= 0) {
-			throw new InvalidProductRequestException("판매가는 0보다 커야 합니다.");
+			throw new InvalidProductRequestException("판매 가격은 0보다 커야 합니다.");
 		}
 	}
 
@@ -289,16 +409,33 @@ public class ProductService {
 			throw new InvalidProductRequestException("임시저장할 내용이 없습니다.");
 		}
 		if (request.saleType() != null && request.saleType() != ProductSaleType.REGULAR) {
-			throw new InvalidProductRequestException("일반 상품 임시저장에서는 판매 유형이 REGULAR여야 합니다.");
+			throw new InvalidProductRequestException("일반 상품 임시저장에서는 saleType이 REGULAR여야 합니다.");
 		}
 		if (request.price() != null && request.price().signum() <= 0) {
-			throw new InvalidProductRequestException("판매가는 0보다 커야 합니다.");
+			throw new InvalidProductRequestException("판매 가격은 0보다 커야 합니다.");
 		}
 	}
 
 	private Member loadActiveMember(Long memberId) {
 		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
 			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
+	}
+
+	private Product loadOwnedProduct(Long memberId, Long productId) {
+		Product product = productRepository.findByProductIdAndMemberIdAndDeletedAtIsNull(productId, memberId)
+			.orElseThrow(() -> new InvalidProductRequestException("존재하지 않는 상품입니다."));
+		if (!product.getMemberId().equals(memberId)) {
+			throw new ProductAccessDeniedException("본인 상품만 조회하거나 수정할 수 있습니다.");
+		}
+		return product;
+	}
+
+	private Member loadVerifiedMember(Long memberId) {
+		Member member = loadActiveMember(memberId);
+		if (!member.isVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+		return member;
 	}
 
 	private String resolveLocation(Member member, String requestLocation) {
@@ -342,6 +479,77 @@ public class ProductService {
 			category.getParentId(),
 			node.children().stream().map(this::toCategoryResponse).toList()
 		);
+	}
+
+	private Map<Long, String> loadCategoryNames(List<Product> products) {
+		Set<Long> categoryIds = products.stream()
+			.map(Product::getCategoryId)
+			.collect(java.util.stream.Collectors.toSet());
+
+		Map<Long, String> categoryNamesById = new HashMap<>();
+		categoryRepository.findAllById(categoryIds)
+			.forEach(category -> categoryNamesById.put(category.getId(), category.getNameKo()));
+		return categoryNamesById;
+	}
+
+	private String resolveThumbnailUrl(Product product) {
+		return product.getImages().stream()
+			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
+			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+				.thenComparing(ProductImage::getCreatedAt))
+			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
+			.findFirst()
+			.orElse(null);
+	}
+
+	private MySellingProductItemResponse toMySellingProductItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById
+	) {
+		return new MySellingProductItemResponse(
+			product.getProductId(),
+			product.getName(),
+			product.getDescription(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			resolveThumbnailUrl(product),
+			product.getStatus(),
+			product.getPrice(),
+			product.getLocation(),
+			product.getStatus() == ProductStatus.ON_SALE,
+			product.getStatus() == ProductStatus.ON_SALE,
+			toSeoulOffsetDateTime(product.getCreatedAt()),
+			toSeoulOffsetDateTime(product.getUpdatedAt() == null ? product.getCreatedAt() : product.getUpdatedAt())
+		);
+	}
+
+	private void replaceProductImages(Product product, List<ProductImagePayload> imagePayloads) {
+		Map<Long, ProductImage> imagesById = loadRequestedImagesForUpdate(product, imagePayloads);
+		List<ProductImage> orderedImages = imagePayloads.stream()
+			.map(imagePayload -> {
+				ProductImage image = imagesById.get(imagePayload.imageId());
+				image.assignToProduct(product, imagePayload.sortOrder());
+				return image;
+			})
+			.toList();
+
+		List<ProductImage> removedImages = product.getImages().stream()
+			.filter(image -> !orderedImages.contains(image))
+			.toList();
+
+		product.replaceImages(orderedImages);
+		for (ProductImage removedImage : removedImages) {
+			productImageStorage.delete(removedImage.getImageUrl());
+			removedImage.softDelete();
+		}
+		productImageRepository.saveAll(imagesById.values());
+		productImageRepository.saveAll(removedImages);
+	}
+
+	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
+		if (dateTime == null) {
+			return null;
+		}
+		return dateTime.atZone(SEOUL_ZONE).toOffsetDateTime();
 	}
 
 	private record CategoryNode(

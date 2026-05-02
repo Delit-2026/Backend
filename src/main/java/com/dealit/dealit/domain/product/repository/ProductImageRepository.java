@@ -10,5 +10,7 @@ import java.util.Optional;
 public interface ProductImageRepository extends JpaRepository<ProductImage, Long> {
 	List<ProductImage> findAllByImageIdInAndDeletedAtIsNull(Collection<Long> imageIds);
 
+	List<ProductImage> findAllByProduct_ProductIdInAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(Collection<Long> productIds);
+
 	Optional<ProductImage> findByImageIdAndDeletedAtIsNull(Long imageId);
 }

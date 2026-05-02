@@ -24,8 +24,8 @@ public class ProductDetailController {
     private final ProductDetailService productDetailService;
 
     @Operation(
-            summary = "상품 상세 조회",
-            description = "productId로 일반 상품 또는 경매 상품의 상세 정보를 조회합니다. 로그인 사용자는 이메일 인증 여부와 관계없이 조회할 수 있습니다."
+            summary = "일반 상품 상세 조회",
+            description = "productId로 일반 상품 상세 정보를 조회합니다. 로그인 사용자는 이메일 인증 여부와 관계없이 조회할 수 있습니다."
     )
     @ApiResponse(
             responseCode = "200",
