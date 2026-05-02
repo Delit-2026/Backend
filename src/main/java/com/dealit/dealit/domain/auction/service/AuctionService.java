@@ -5,12 +5,15 @@ import com.dealit.dealit.domain.auction.ProductSaleType;
 import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
+import com.dealit.dealit.domain.auction.dto.DeleteAuctionProductResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
 import com.dealit.dealit.domain.auction.dto.ProductImagePayload;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceResponse;
+import com.dealit.dealit.domain.auction.dto.SalesManagementAuctionListResponse;
+import com.dealit.dealit.domain.auction.dto.SalesManagementAuctionProductResponse;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
@@ -39,11 +42,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -90,6 +96,45 @@ public class AuctionService {
 		auctionImageStorage.delete(image.getImageUrl());
 		image.softDelete();
 		return new DeleteAuctionImageResponse(image.getImageId(), true);
+	}
+
+	public SalesManagementAuctionListResponse getSalesManagementProducts(Long memberId) {
+		loadActiveMember(memberId);
+
+		List<AuctionProduct> products =
+			auctionProductRepository.findAllByMemberIdAndDeletedAtIsNullAndStatusOrderByCreatedAtDesc(
+				memberId,
+				AuctionStatus.AUCTION_LIVE
+			);
+
+		if (products.isEmpty()) {
+			return new SalesManagementAuctionListResponse(List.of());
+		}
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		Map<Long, String> thumbnailUrlsByProductId = loadThumbnailUrls(products);
+
+		List<SalesManagementAuctionProductResponse> items = products.stream()
+			.map(product -> toSalesManagementAuctionProductResponse(product, categoryNamesById, thumbnailUrlsByProductId))
+			.toList();
+
+		return new SalesManagementAuctionListResponse(items);
+	}
+
+	@Transactional
+	public DeleteAuctionProductResponse deleteProduct(Long memberId, Long productId) {
+		AuctionProduct product = auctionProductRepository.findByProductIdAndDeletedAtIsNull(productId)
+			.orElseThrow(() -> new InvalidAuctionRequestException("존재하지 않는 경매 상품입니다."));
+
+		if (!product.getMemberId().equals(memberId)) {
+			throw new InvalidAuctionRequestException("본인 경매 상품만 삭제할 수 있습니다.");
+		}
+		if (product.getStatus() != AuctionStatus.AUCTION_LIVE) {
+			throw new InvalidAuctionRequestException("진행 중인 경매 상품만 삭제할 수 있습니다.");
+		}
+
+		product.softDeleteWithImages();
+		return new DeleteAuctionProductResponse(product.getProductId(), true);
 	}
 
 	@Transactional
@@ -204,9 +249,10 @@ public class AuctionService {
 	}
 
 	@Transactional
-	public CreateAuctionResponse createAuction(CreateAuctionRequest request) {
+	public CreateAuctionResponse createAuction(Long memberId, CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
+		loadActiveMember(memberId);
 		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 
@@ -216,6 +262,7 @@ public class AuctionService {
 				request.description().trim(),
 				request.saleType(),
 				request.categoryId(),
+				memberId,
 				request.price(),
 				request.startPrice(),
 				auctionPeriod.startAt(),
@@ -387,6 +434,59 @@ public class AuctionService {
 			node.children().stream()
 				.map(this::toCategoryResponse)
 				.toList()
+		);
+	}
+
+	private Map<Long, String> loadCategoryNames(List<AuctionProduct> products) {
+		Set<Long> categoryIds = products.stream()
+			.map(AuctionProduct::getCategoryId)
+			.collect(java.util.stream.Collectors.toSet());
+
+		Map<Long, String> categoryNamesById = new HashMap<>();
+		categoryRepository.findAllById(categoryIds)
+			.forEach(category -> categoryNamesById.put(category.getId(), category.getNameKo()));
+		return categoryNamesById;
+	}
+
+	private Map<Long, String> loadThumbnailUrls(List<AuctionProduct> products) {
+		List<Long> productIds = products.stream()
+			.map(AuctionProduct::getProductId)
+			.toList();
+
+		Map<Long, String> thumbnailUrlsByProductId = new HashMap<>();
+		auctionProductImageRepository.findAllByProduct_ProductIdInAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(productIds).stream()
+			.sorted(Comparator.comparing(AuctionProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+				.thenComparing(AuctionProductImage::getCreatedAt))
+			.forEach(image -> thumbnailUrlsByProductId.putIfAbsent(
+				image.getProduct().getProductId(),
+				imageUrlService.toPublicUrl(image.getImageUrl())
+			));
+
+		return thumbnailUrlsByProductId;
+	}
+
+	private SalesManagementAuctionProductResponse toSalesManagementAuctionProductResponse(
+		AuctionProduct product,
+		Map<Long, String> categoryNamesById,
+		Map<Long, String> thumbnailUrlsByProductId
+	) {
+		return new SalesManagementAuctionProductResponse(
+			product.getProductId(),
+			product.getName(),
+			product.getDescription(),
+			product.getSaleType(),
+			product.getStatus(),
+			product.getPrice(),
+			product.getStartPrice(),
+			product.getLocation(),
+			product.getCategoryId(),
+			categoryNamesById.get(product.getCategoryId()),
+			thumbnailUrlsByProductId.get(product.getProductId()),
+			0,
+			true,
+			true,
+			product.getAuctionEndAt(),
+			product.getCreatedAt()
 		);
 	}
 

@@ -11,5 +11,7 @@ public interface AuctionProductImageRepository extends JpaRepository<AuctionProd
 
 	List<AuctionProductImage> findAllByImageIdInAndDeletedAtIsNull(Collection<Long> imageIds);
 
+	List<AuctionProductImage> findAllByProduct_ProductIdInAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(Collection<Long> productIds);
+
 	Optional<AuctionProductImage> findByImageIdAndDeletedAtIsNull(Long imageId);
 }

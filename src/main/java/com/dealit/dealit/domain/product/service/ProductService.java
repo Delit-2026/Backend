@@ -10,12 +10,15 @@ import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
+import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
 import com.dealit.dealit.domain.product.dto.ProductImagePayload;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
+import com.dealit.dealit.domain.product.dto.SalesManagementListResponse;
+import com.dealit.dealit.domain.product.dto.SalesManagementProductResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
@@ -41,9 +44,12 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -90,6 +96,44 @@ public class ProductService {
 		productImageStorage.delete(image.getImageUrl());
 		image.softDelete();
 		return new DeleteProductImageResponse(image.getImageId(), true);
+	}
+
+	public SalesManagementListResponse getSalesManagementProducts(Long memberId) {
+		loadActiveMember(memberId);
+
+		List<Product> products = productRepository.findAllByMemberIdAndDeletedAtIsNullAndStatusOrderByCreatedAtDesc(
+			memberId,
+			ProductStatus.ON_SALE
+		);
+
+		if (products.isEmpty()) {
+			return new SalesManagementListResponse(List.of());
+		}
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		Map<Long, String> thumbnailUrlsByProductId = loadThumbnailUrls(products);
+
+		List<SalesManagementProductResponse> items = products.stream()
+			.map(product -> toSalesManagementProductResponse(product, categoryNamesById, thumbnailUrlsByProductId))
+			.toList();
+
+		return new SalesManagementListResponse(items);
+	}
+
+	@Transactional
+	public DeleteProductResponse deleteProduct(Long memberId, Long productId) {
+		Product product = productRepository.findByProductIdAndDeletedAtIsNull(productId)
+			.orElseThrow(() -> new InvalidProductRequestException("존재하지 않는 상품입니다."));
+
+		if (!product.getMemberId().equals(memberId)) {
+			throw new ProductAccessDeniedException("본인 상품만 삭제할 수 있습니다.");
+		}
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			throw new InvalidProductRequestException("판매 중인 상품만 삭제할 수 있습니다.");
+		}
+
+		product.softDeleteWithImages();
+		return new DeleteProductResponse(product.getProductId(), true);
 	}
 
 	@Transactional
@@ -341,6 +385,56 @@ public class ProductService {
 			category.getDepth(),
 			category.getParentId(),
 			node.children().stream().map(this::toCategoryResponse).toList()
+		);
+	}
+
+	private Map<Long, String> loadCategoryNames(List<Product> products) {
+		Set<Long> categoryIds = products.stream()
+			.map(Product::getCategoryId)
+			.collect(java.util.stream.Collectors.toSet());
+
+		Map<Long, String> categoryNamesById = new HashMap<>();
+		categoryRepository.findAllById(categoryIds)
+			.forEach(category -> categoryNamesById.put(category.getId(), category.getNameKo()));
+		return categoryNamesById;
+	}
+
+	private Map<Long, String> loadThumbnailUrls(List<Product> products) {
+		List<Long> productIds = products.stream()
+			.map(Product::getProductId)
+			.toList();
+
+		Map<Long, String> thumbnailUrlsByProductId = new HashMap<>();
+		productImageRepository.findAllByProduct_ProductIdInAndDeletedAtIsNullOrderBySortOrderAscCreatedAtAsc(productIds).stream()
+			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+				.thenComparing(ProductImage::getCreatedAt))
+			.forEach(image -> thumbnailUrlsByProductId.putIfAbsent(
+				image.getProduct().getProductId(),
+				imageUrlService.toPublicUrl(image.getImageUrl())
+			));
+
+		return thumbnailUrlsByProductId;
+	}
+
+	private SalesManagementProductResponse toSalesManagementProductResponse(
+		Product product,
+		Map<Long, String> categoryNamesById,
+		Map<Long, String> thumbnailUrlsByProductId
+	) {
+		return new SalesManagementProductResponse(
+			product.getProductId(),
+			product.getName(),
+			product.getDescription(),
+			product.getSaleType(),
+			product.getStatus(),
+			product.getPrice(),
+			product.getLocation(),
+			product.getCategoryId(),
+			categoryNamesById.get(product.getCategoryId()),
+			thumbnailUrlsByProductId.get(product.getProductId()),
+			true,
+			true,
+			product.getCreatedAt()
 		);
 	}
 

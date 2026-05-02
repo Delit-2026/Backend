@@ -52,6 +52,9 @@ public class AuctionProduct extends BaseEntity {
 	@Column(name = "category_id", nullable = false)
 	private Long categoryId;
 
+	@Column(name = "member_id", nullable = false)
+	private Long memberId;
+
 	@Column(name = "price", precision = 15, scale = 2)
 	private BigDecimal price;
 
@@ -82,6 +85,7 @@ public class AuctionProduct extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -94,6 +98,7 @@ public class AuctionProduct extends BaseEntity {
 		this.description = description;
 		this.saleType = saleType;
 		this.categoryId = categoryId;
+		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
 		this.auctionStartAt = auctionStartAt;
@@ -108,6 +113,7 @@ public class AuctionProduct extends BaseEntity {
 		String description,
 		ProductSaleType saleType,
 		Long categoryId,
+		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
 		OffsetDateTime auctionStartAt,
@@ -121,6 +127,7 @@ public class AuctionProduct extends BaseEntity {
 			description,
 			saleType,
 			categoryId,
+			memberId,
 			price,
 			startPrice,
 			auctionStartAt,
@@ -136,5 +143,12 @@ public class AuctionProduct extends BaseEntity {
 			images.add(image);
 		}
 		image.assignToProduct(this, sortOrder);
+	}
+
+	public void softDeleteWithImages() {
+		softDelete();
+		for (AuctionProductImage image : images) {
+			image.softDelete();
+		}
 	}
 }

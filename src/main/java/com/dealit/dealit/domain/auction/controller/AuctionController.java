@@ -1,13 +1,15 @@
 package com.dealit.dealit.domain.auction.controller;
 
+import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
-import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
+import com.dealit.dealit.domain.auction.dto.DeleteAuctionProductResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceResponse;
+import com.dealit.dealit.domain.auction.dto.SalesManagementAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
@@ -36,7 +38,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "Auction", description = "경매 상품 등록 API")
+@Tag(name = "Auction", description = "경매 상품 등록 및 판매 관리 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auction")
@@ -44,7 +46,7 @@ public class AuctionController {
 
 	private final AuctionService auctionService;
 
-	@Operation(summary = "상품 이미지 업로드", description = "경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.")
+	@Operation(summary = "경매 상품 이미지 업로드")
 	@ApiResponse(responseCode = "200", description = "이미지 업로드 성공",
 		content = @Content(schema = @Schema(implementation = UploadAuctionImageResponse.class)))
 	@PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -52,7 +54,7 @@ public class AuctionController {
 		return auctionService.uploadImage(file);
 	}
 
-	@Operation(summary = "상품 이미지 삭제", description = "등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.")
+	@Operation(summary = "경매 상품 이미지 삭제")
 	@ApiResponse(responseCode = "200", description = "이미지 삭제 성공",
 		content = @Content(schema = @Schema(implementation = DeleteAuctionImageResponse.class)))
 	@DeleteMapping("/image/{imageId}")
@@ -60,7 +62,28 @@ public class AuctionController {
 		return auctionService.deleteImage(imageId);
 	}
 
-	@Operation(summary = "경매 상품 임시저장", description = "등록 직전 폼 데이터를 draft 상태로 저장한다.")
+	@Operation(summary = "내 진행 중 경매 상품 목록 조회")
+	@ApiResponse(responseCode = "200", description = "경매 판매 관리 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = SalesManagementAuctionListResponse.class)))
+	@GetMapping("/me/sales-management")
+	public SalesManagementAuctionListResponse getSalesManagementProducts(
+		@AuthenticationPrincipal AuthenticatedMember member
+	) {
+		return auctionService.getSalesManagementProducts(member.memberId());
+	}
+
+	@Operation(summary = "내 진행 중 경매 상품 삭제")
+	@ApiResponse(responseCode = "200", description = "경매 상품 삭제 성공",
+		content = @Content(schema = @Schema(implementation = DeleteAuctionProductResponse.class)))
+	@DeleteMapping("/{productId}")
+	public DeleteAuctionProductResponse deleteProduct(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long productId
+	) {
+		return auctionService.deleteProduct(member.memberId(), productId);
+	}
+
+	@Operation(summary = "경매 상품 임시저장")
 	@ApiResponse(responseCode = "200", description = "임시저장 성공",
 		content = @Content(schema = @Schema(implementation = SaveAuctionDraftResponse.class)))
 	@PostMapping("/draft")
@@ -71,7 +94,7 @@ public class AuctionController {
 		return auctionService.saveDraft(member.memberId(), request);
 	}
 
-	@Operation(summary = "카테고리 추천", description = "입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.")
+	@Operation(summary = "카테고리 추천")
 	@ApiResponse(responseCode = "200", description = "카테고리 추천 성공",
 		content = @Content(schema = @Schema(implementation = RecommendCategoryResponse.class)))
 	@PostMapping("/category/recommend")
@@ -79,7 +102,7 @@ public class AuctionController {
 		return auctionService.recommendCategory(request);
 	}
 
-	@Operation(summary = "카테고리 목록 조회", description = "상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.")
+	@Operation(summary = "카테고리 목록 조회")
 	@ApiResponse(responseCode = "200", description = "카테고리 조회 성공",
 		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class)))
 	@GetMapping("/categories")
@@ -87,7 +110,7 @@ public class AuctionController {
 		return auctionService.getCategories();
 	}
 
-	@Operation(summary = "가격 추천", description = "상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.")
+	@Operation(summary = "가격 추천")
 	@ApiResponse(responseCode = "200", description = "가격 추천 성공",
 		content = @Content(schema = @Schema(implementation = RecommendPriceResponse.class)))
 	@PostMapping("/price/recommend")
@@ -95,12 +118,15 @@ public class AuctionController {
 		return auctionService.recommendPrice(request);
 	}
 
-	@Operation(summary = "경매 상품 등록", description = "프론트가 가공한 최종 payload로 상품을 등록한다.")
-	@ApiResponse(responseCode = "201", description = "상품 등록 성공",
+	@Operation(summary = "경매 상품 등록")
+	@ApiResponse(responseCode = "201", description = "경매 상품 등록 성공",
 		content = @Content(schema = @Schema(implementation = CreateAuctionResponse.class)))
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public CreateAuctionResponse createAuction(@Valid @RequestBody CreateAuctionRequest request) {
-		return auctionService.createAuction(request);
+	public CreateAuctionResponse createAuction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@Valid @RequestBody CreateAuctionRequest request
+	) {
+		return auctionService.createAuction(member.memberId(), request);
 	}
 }

@@ -118,4 +118,11 @@ public class Product extends BaseEntity {
 		}
 		image.assignToProduct(this, sortOrder);
 	}
+
+	public void softDeleteWithImages() {
+		softDelete();
+		for (ProductImage image : images) {
+			image.softDelete();
+		}
+	}
 }

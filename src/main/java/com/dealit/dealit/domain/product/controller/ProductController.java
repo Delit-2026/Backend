@@ -4,10 +4,12 @@ import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
+import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
+import com.dealit.dealit.domain.product.dto.SalesManagementListResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
@@ -36,7 +38,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "Product", description = "일반 상품 등록 API")
+@Tag(name = "Product", description = "일반 상품 등록 및 판매 관리 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/products")
@@ -64,6 +66,27 @@ public class ProductController {
 		@PathVariable Long imageId
 	) {
 		return productService.deleteImage(member.memberId(), imageId);
+	}
+
+	@Operation(summary = "내 판매 중 상품 목록 조회")
+	@ApiResponse(responseCode = "200", description = "판매 중 관리 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = SalesManagementListResponse.class)))
+	@GetMapping("/me/sales-management")
+	public SalesManagementListResponse getSalesManagementProducts(
+		@AuthenticationPrincipal AuthenticatedMember member
+	) {
+		return productService.getSalesManagementProducts(member.memberId());
+	}
+
+	@Operation(summary = "내 판매 중 상품 삭제")
+	@ApiResponse(responseCode = "200", description = "판매 중 상품 삭제 성공",
+		content = @Content(schema = @Schema(implementation = DeleteProductResponse.class)))
+	@DeleteMapping("/{productId}")
+	public DeleteProductResponse deleteProduct(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long productId
+	) {
+		return productService.deleteProduct(member.memberId(), productId);
 	}
 
 	@Operation(summary = "일반 상품 임시저장")
