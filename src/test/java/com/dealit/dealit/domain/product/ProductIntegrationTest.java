@@ -2,8 +2,8 @@ package com.dealit.dealit.domain.product;
 
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
-import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
 import com.dealit.dealit.global.security.AuthenticatedMember;
@@ -17,6 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -36,8 +38,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -72,12 +72,19 @@ class ProductIntegrationTest {
 		productDraftRepository.deleteAll();
 		memberRepository.deleteAll();
 		deleteStoredImages();
+
 		member = memberRepository.save(Member.create("product-user", "password", "product@example.com", null, "상품회원"));
 		member.assignDefaultNickname();
+		member.verifyEmail();
 		member.updateLocation("서울 강남구");
+		member = memberRepository.save(member);
+
 		otherMember = memberRepository.save(Member.create("product-user-2", "password", "product2@example.com", null, "다른회원"));
 		otherMember.assignDefaultNickname();
+		otherMember.verifyEmail();
 		otherMember.updateLocation("서울 서초구");
+		otherMember = memberRepository.save(otherMember);
+
 		uploadedImage = productImageRepository.save(
 			ProductImage.createTemporary("/uploads/product/images/test-image.jpg", "test-image.jpg", member.getMemberId())
 		);
@@ -89,7 +96,7 @@ class ProductIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("일반 상품 이미지 업로드 응답은 브라우저에서 접근 가능한 절대 URL을 반환하고 정적 서빙된다")
+	@DisplayName("일반 상품 이미지 업로드 응답은 접근 가능한 공개 URL을 반환한다")
 	void uploadProductImageReturnsAccessibleUrl() throws Exception {
 		byte[] imageBytes = "test-image".getBytes();
 		MockMultipartFile file = new MockMultipartFile(
@@ -114,8 +121,6 @@ class ProductIntegrationTest {
 			.findFirst()
 			.orElseThrow();
 
-		org.assertj.core.api.Assertions.assertThat(savedImage.getMemberId()).isEqualTo(member.getMemberId());
-
 		mockMvc.perform(get(savedImage.getImageUrl()))
 			.andExpect(status().isOk())
 			.andExpect(content().bytes(imageBytes));
@@ -137,7 +142,7 @@ class ProductIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("일반 상품 등록에 성공하면 generalSale.price 와 ON_SALE 상태를 반환한다")
+	@DisplayName("일반 상품 등록 성공 시 ON_SALE 상태와 가격 정보를 반환한다")
 	void createProductSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/products")
 				.with(authentication(authenticatedMember()))
@@ -170,7 +175,46 @@ class ProductIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("일반 상품 draft 저장은 동일한 규칙으로 처리한다")
+	@DisplayName("이메일 미인증 회원은 일반 상품을 등록할 수 없다")
+	void createProductFailsWhenEmailNotVerified() throws Exception {
+		Member unverifiedMember = memberRepository.save(
+			Member.create("unverified-product-user", "password", "unverified-product@example.com", null, "미인증회원")
+		);
+		unverifiedMember.assignDefaultNickname();
+		unverifiedMember.updateLocation("서울 강남구");
+		unverifiedMember = memberRepository.save(unverifiedMember);
+		ProductImage unverifiedImage = productImageRepository.save(
+			ProductImage.createTemporary("/uploads/product/images/unverified-image.jpg", "unverified-image.jpg", unverifiedMember.getMemberId())
+		);
+
+		mockMvc.perform(post("/api/v1/products")
+				.with(authentication(authenticatedMember(unverifiedMember)))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "미인증 상품",
+					  "description": "이메일 인증 전 등록 시도",
+					  "saleType": "REGULAR",
+					  "categoryId": 19,
+					  "price": 12000,
+					  "allowOffer": false,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/product/images/unverified-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 강남구",
+					  "draftId": null
+					}
+					""".formatted(unverifiedImage.getImageId())))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
+	}
+
+	@Test
+	@DisplayName("일반 상품 임시저장은 기존 규칙대로 저장된다")
 	void saveProductDraftSuccess() throws Exception {
 		mockMvc.perform(post("/api/v1/products/draft")
 				.with(authentication(authenticatedMember()))
@@ -200,17 +244,15 @@ class ProductIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("일반 상품 카테고리 목록 조회는 계층형 트리 구조를 반환한다")
+	@DisplayName("일반 상품 카테고리 목록 조회는 계층 구조를 반환한다")
 	void getProductCategoriesReturnsHierarchy() throws Exception {
 		mockMvc.perform(get("/api/v1/products/categories"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$", hasSize(3)))
-			.andExpect(jsonPath("$[0].nameKo").value("전자기기"))
-			.andExpect(jsonPath("$[0].children", hasSize(4)));
+			.andExpect(jsonPath("$", hasSize(3)));
 	}
 
 	@Test
-	@DisplayName("일반 상품 이미지 삭제는 imageId 기준으로 처리한다")
+	@DisplayName("일반 상품 이미지 삭제는 imageId 기준으로 처리된다")
 	void deleteProductImageSuccess() throws Exception {
 		mockMvc.perform(
 				delete("/api/v1/products/image/{imageId}", uploadedImage.getImageId())

@@ -32,6 +32,7 @@ import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
@@ -109,7 +110,7 @@ public class AuctionService {
 		if (file == null || file.isEmpty()) {
 			throw new InvalidAuctionRequestException("이미지 파일은 필수입니다.");
 		}
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
 		ProductImage savedImage = productImageRepository.save(
@@ -615,6 +616,14 @@ public class AuctionService {
 	private Member loadActiveMember(Long memberId) {
 		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
 			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
+	}
+
+	private Member loadVerifiedMember(Long memberId) {
+		Member member = loadActiveMember(memberId);
+		if (!member.isVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+		return member;
 	}
 
 	private void validateRequestBySaleType(CreateAuctionRequest request) {

@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -201,7 +202,7 @@ public class ProductService {
 	@Transactional
 	public SaveProductDraftResponse saveDraft(Long memberId, SaveProductDraftRequest request) {
 		validateDraftRequest(request);
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		String location = resolveLocation(member, request.location());
 
 		OffsetDateTime savedAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -427,6 +428,14 @@ public class ProductService {
 			throw new ProductAccessDeniedException("본인 상품만 조회하거나 수정할 수 있습니다.");
 		}
 		return product;
+	}
+
+	private Member loadVerifiedMember(Long memberId) {
+		Member member = loadActiveMember(memberId);
+		if (!member.isVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+		return member;
 	}
 
 	private String resolveLocation(Member member, String requestLocation) {
