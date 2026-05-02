@@ -115,13 +115,22 @@ public record ProductDetailResponse(
             @Schema(description = "최소 다음 입찰가", example = "70700")
             BigDecimal minimumNextBidPrice,
 
-            @Schema(description = "입찰 수", example = "0")
-            long bidCount,
+		@Schema(description = "입찰 수", example = "0")
+		long bidCount,
 
-            @Schema(description = "경매 종료 시각", example = "2026-05-05T10:30:00+09:00")
-            OffsetDateTime endAt,
+		@Schema(description = "조회수", example = "10")
+		long viewCount,
 
-            @Schema(description = "경매 상태", example = "AUCTION_LIVE")
+		@Schema(description = "찜 수", example = "2")
+		long favoriteCount,
+
+		@Schema(description = "채팅 수", example = "1")
+		long chatCount,
+
+		@Schema(description = "경매 종료 시각", example = "2026-05-05T10:30:00+09:00")
+		OffsetDateTime endAt,
+
+		@Schema(description = "경매 상태", example = "AUCTION_LIVE")
             AuctionStatus status
     ) {
     }

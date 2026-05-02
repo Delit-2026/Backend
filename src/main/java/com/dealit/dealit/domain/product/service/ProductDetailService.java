@@ -138,14 +138,17 @@ public class ProductDetailService {
 
         return new ProductDetailResponse.AuctionResponse(
                 auction.getAuctionId(),
-                auction.getStartPrice(),
-                currentPrice,
-                resolveMinimumNextBidPrice(currentPrice),
-                getBidCount(auction),
-                toSeoulOffsetDateTime(auction.getAuctionEndAt()),
-                auction.getStatus()
-        );
-    }
+				auction.getStartPrice(),
+				currentPrice,
+				resolveMinimumNextBidPrice(currentPrice),
+				getBidCount(auction),
+				product.getViewCount(),
+				product.getFavoriteCount(),
+				product.getChatCount(),
+				toSeoulOffsetDateTime(auction.getAuctionEndAt()),
+				auction.getStatus()
+		);
+	}
 
     private BigDecimal resolveCurrentPrice(Auction auction) {
         if (auction.getCurrentPrice() == null) {
