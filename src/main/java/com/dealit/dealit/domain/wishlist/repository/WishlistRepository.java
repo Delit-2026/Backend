@@ -16,8 +16,8 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
 
 	boolean existsByMemberIdAndProductProductIdAndDeletedAtIsNull(Long memberId, Long productId);
 
-	long countByMemberIdAndDeletedAtIsNull(Long memberId);
+	long countByMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(Long memberId);
 
 	@EntityGraph(attributePaths = {"product", "product.images"})
-	Page<Wishlist> findAllByMemberIdAndDeletedAtIsNull(Long memberId, Pageable pageable);
+	Page<Wishlist> findAllByMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(Long memberId, Pageable pageable);
 }

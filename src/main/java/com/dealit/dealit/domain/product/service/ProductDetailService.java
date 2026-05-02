@@ -146,9 +146,6 @@ public class ProductDetailService {
 				currentPrice,
 				resolveMinimumNextBidPrice(currentPrice),
 				getBidCount(auction),
-				product.getViewCount(),
-				product.getFavoriteCount(),
-				product.getChatCount(),
 				toSeoulOffsetDateTime(auction.getAuctionEndAt()),
 				auction.getStatus()
 		);

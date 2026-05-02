@@ -5,6 +5,7 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.exception.InvalidProductRequestException;
@@ -71,7 +72,7 @@ public class WishlistService {
 		loadActiveMember(memberId);
 		Product product = loadProduct(productId);
 		Wishlist wishlist = wishlistRepository.findByMemberIdAndProductProductIdAndDeletedAtIsNull(memberId, productId)
-			.orElseThrow(() -> new InvalidProductRequestException("찜한 상품이 아닙니다."));
+			.orElseThrow(() -> new InvalidProductRequestException("찜한 상품이 없습니다."));
 
 		wishlist.softDelete();
 		product.decreaseFavoriteCount();
@@ -83,7 +84,7 @@ public class WishlistService {
 		int normalizedPage = Math.max(page, 0);
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
 
-		Page<Wishlist> wishlistPage = wishlistRepository.findAllByMemberIdAndDeletedAtIsNull(
+		Page<Wishlist> wishlistPage = wishlistRepository.findAllByMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(
 			memberId,
 			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
 		);
@@ -103,7 +104,7 @@ public class WishlistService {
 	}
 
 	public long countWishlist(Long memberId) {
-		return wishlistRepository.countByMemberIdAndDeletedAtIsNull(memberId);
+		return wishlistRepository.countByMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(memberId);
 	}
 
 	public boolean isLiked(Long memberId, Long productId) {
@@ -126,6 +127,9 @@ public class WishlistService {
 		}
 		if (product.getMemberId().equals(memberId)) {
 			throw new InvalidProductRequestException("본인 상품은 찜할 수 없습니다.");
+		}
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			throw new InvalidProductRequestException("판매 중인 상품만 찜할 수 있습니다.");
 		}
 	}
 
