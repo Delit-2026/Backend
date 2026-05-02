@@ -9,8 +9,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.text.Normalizer;
+import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -29,7 +31,7 @@ public class ProfileImageStorage {
 		validate(file);
 
 		String originalFilename = file.getOriginalFilename() == null ? "profile.jpg" : file.getOriginalFilename();
-		String storedFileName = memberId + "-" + Instant.now().toEpochMilli() + "-" + sanitizeFilename(originalFilename);
+		String storedFileName = memberId + "-" + UUID.randomUUID() + resolveExtension(originalFilename, file.getContentType());
 		Path directory = imageProperties.profileImageDirectory();
 		Path targetFile = directory.resolve(storedFileName);
 
@@ -56,21 +58,22 @@ public class ProfileImageStorage {
 		}
 	}
 
-	private String sanitizeFilename(String originalFilename) {
-		if (originalFilename == null || originalFilename.isBlank()) {
-			return "profile.jpg";
+	private String resolveExtension(String originalFilename, String contentType) {
+		String normalizedFilename = originalFilename == null
+			? ""
+			: Normalizer.normalize(Path.of(originalFilename).getFileName().toString().trim(), Normalizer.Form.NFC);
+		int dotIndex = normalizedFilename.lastIndexOf('.');
+		if (dotIndex >= 0 && dotIndex < normalizedFilename.length() - 1) {
+			String extension = normalizedFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+			if (Set.of("jpg", "jpeg", "png", "webp").contains(extension)) {
+				return "." + extension;
+			}
 		}
 
-		String fileNameOnly = Path.of(originalFilename).getFileName().toString().trim();
-		String normalized = fileNameOnly
-			.replaceAll("\\s+", "-")
-			.replaceAll("[^\\p{L}\\p{N}._()-]", "-")
-			.replaceAll("-{2,}", "-");
-
-		if (normalized.isBlank()) {
-			return "profile.jpg";
-		}
-
-		return normalized;
+		return switch (contentType == null ? "" : contentType.toLowerCase(Locale.ROOT)) {
+			case "image/png" -> ".png";
+			case "image/webp" -> ".webp";
+			default -> ".jpg";
+		};
 	}
 }

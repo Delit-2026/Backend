@@ -7,7 +7,7 @@ public record UploadProductImageResponse(
 	@Schema(description = "업로드된 이미지 ID", example = "301")
 	Long imageId,
 
-	@Schema(description = "업로드된 이미지 URL", example = "http://localhost:8080/product/images/301-sample.jpg")
+	@Schema(description = "업로드된 이미지 URL", example = "http://localhost:8080/uploads/product/images/301-sample.jpg")
 	String imageUrl
 ) {
 }

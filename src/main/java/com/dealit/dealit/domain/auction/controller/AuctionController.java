@@ -4,12 +4,10 @@ import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
-import com.dealit.dealit.domain.auction.dto.DeleteAuctionProductResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceResponse;
-import com.dealit.dealit.domain.auction.dto.SalesManagementAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
@@ -38,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "Auction", description = "경매 상품 등록 및 판매 관리 API")
+@Tag(name = "Auction", description = "경매 상품 등록 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auction")
@@ -47,45 +45,39 @@ public class AuctionController {
 	private final AuctionService auctionService;
 
 	@Operation(summary = "경매 상품 이미지 업로드")
-	@ApiResponse(responseCode = "200", description = "이미지 업로드 성공",
-		content = @Content(schema = @Schema(implementation = UploadAuctionImageResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "이미지 업로드 성공",
+		content = @Content(schema = @Schema(implementation = UploadAuctionImageResponse.class))
+	)
 	@PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public UploadAuctionImageResponse uploadImage(@RequestPart("file") MultipartFile file) {
-		return auctionService.uploadImage(file);
+	public UploadAuctionImageResponse uploadImage(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestPart("file") MultipartFile file
+	) {
+		return auctionService.uploadImage(member.memberId(), file);
 	}
 
 	@Operation(summary = "경매 상품 이미지 삭제")
-	@ApiResponse(responseCode = "200", description = "이미지 삭제 성공",
-		content = @Content(schema = @Schema(implementation = DeleteAuctionImageResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "이미지 삭제 성공",
+		content = @Content(schema = @Schema(implementation = DeleteAuctionImageResponse.class))
+	)
 	@DeleteMapping("/image/{imageId}")
-	public DeleteAuctionImageResponse deleteImage(@PathVariable Long imageId) {
-		return auctionService.deleteImage(imageId);
-	}
-
-	@Operation(summary = "내 진행 중 경매 상품 목록 조회")
-	@ApiResponse(responseCode = "200", description = "경매 판매 관리 목록 조회 성공",
-		content = @Content(schema = @Schema(implementation = SalesManagementAuctionListResponse.class)))
-	@GetMapping("/me/sales-management")
-	public SalesManagementAuctionListResponse getSalesManagementProducts(
-		@AuthenticationPrincipal AuthenticatedMember member
-	) {
-		return auctionService.getSalesManagementProducts(member.memberId());
-	}
-
-	@Operation(summary = "내 진행 중 경매 상품 삭제")
-	@ApiResponse(responseCode = "200", description = "경매 상품 삭제 성공",
-		content = @Content(schema = @Schema(implementation = DeleteAuctionProductResponse.class)))
-	@DeleteMapping("/{productId}")
-	public DeleteAuctionProductResponse deleteProduct(
+	public DeleteAuctionImageResponse deleteImage(
 		@AuthenticationPrincipal AuthenticatedMember member,
-		@PathVariable Long productId
+		@PathVariable Long imageId
 	) {
-		return auctionService.deleteProduct(member.memberId(), productId);
+		return auctionService.deleteImage(member.memberId(), imageId);
 	}
 
 	@Operation(summary = "경매 상품 임시저장")
-	@ApiResponse(responseCode = "200", description = "임시저장 성공",
-		content = @Content(schema = @Schema(implementation = SaveAuctionDraftResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "임시저장 성공",
+		content = @Content(schema = @Schema(implementation = SaveAuctionDraftResponse.class))
+	)
 	@PostMapping("/draft")
 	public SaveAuctionDraftResponse saveDraft(
 		@AuthenticationPrincipal AuthenticatedMember member,
@@ -95,32 +87,44 @@ public class AuctionController {
 	}
 
 	@Operation(summary = "카테고리 추천")
-	@ApiResponse(responseCode = "200", description = "카테고리 추천 성공",
-		content = @Content(schema = @Schema(implementation = RecommendCategoryResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "카테고리 추천 성공",
+		content = @Content(schema = @Schema(implementation = RecommendCategoryResponse.class))
+	)
 	@PostMapping("/category/recommend")
 	public RecommendCategoryResponse recommendCategory(@Valid @RequestBody RecommendCategoryRequest request) {
 		return auctionService.recommendCategory(request);
 	}
 
 	@Operation(summary = "카테고리 목록 조회")
-	@ApiResponse(responseCode = "200", description = "카테고리 조회 성공",
-		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "카테고리 조회 성공",
+		content = @Content(schema = @Schema(implementation = CategoryOptionResponse.class))
+	)
 	@GetMapping("/categories")
 	public List<CategoryOptionResponse> getCategories() {
 		return auctionService.getCategories();
 	}
 
 	@Operation(summary = "가격 추천")
-	@ApiResponse(responseCode = "200", description = "가격 추천 성공",
-		content = @Content(schema = @Schema(implementation = RecommendPriceResponse.class)))
+	@ApiResponse(
+		responseCode = "200",
+		description = "가격 추천 성공",
+		content = @Content(schema = @Schema(implementation = RecommendPriceResponse.class))
+	)
 	@PostMapping("/price/recommend")
 	public RecommendPriceResponse recommendPrice(@Valid @RequestBody RecommendPriceRequest request) {
 		return auctionService.recommendPrice(request);
 	}
 
 	@Operation(summary = "경매 상품 등록")
-	@ApiResponse(responseCode = "201", description = "경매 상품 등록 성공",
-		content = @Content(schema = @Schema(implementation = CreateAuctionResponse.class)))
+	@ApiResponse(
+		responseCode = "201",
+		description = "경매 상품 등록 성공",
+		content = @Content(schema = @Schema(implementation = CreateAuctionResponse.class))
+	)
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public CreateAuctionResponse createAuction(
