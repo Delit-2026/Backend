@@ -16,6 +16,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	List<Product> findAllByMemberIdAndDeletedAtIsNullAndStatusInOrderByCreatedAtDesc(Long memberId, Collection<ProductStatus> statuses);
 
+	@EntityGraph(attributePaths = {"images"})
 	Optional<Product> findByProductIdAndDeletedAtIsNull(Long productId);
 
 	@EntityGraph(attributePaths = {"images"})

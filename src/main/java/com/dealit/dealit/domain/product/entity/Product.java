@@ -71,6 +71,15 @@ public class Product extends BaseEntity {
 	@Column(name = "status", nullable = false, length = 30)
 	private ProductStatus status;
 
+	@Column(name = "view_count", nullable = false)
+	private long viewCount = 0L;
+
+	@Column(name = "favorite_count", nullable = false)
+	private long favoriteCount = 0L;
+
+	@Column(name = "chat_count", nullable = false)
+	private long chatCount = 0L;
+
 	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
 	private final List<ProductImage> images = new ArrayList<>();
 
@@ -125,6 +134,10 @@ public class Product extends BaseEntity {
 		for (ProductImage image : images) {
 			image.softDelete();
 		}
+	}
+
+	public void increaseViewCount() {
+		this.viewCount++;
 	}
 
 	public void updateEditableDetails(
