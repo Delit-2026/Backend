@@ -140,6 +140,16 @@ public class Product extends BaseEntity {
 		this.viewCount++;
 	}
 
+	public void increaseFavoriteCount() {
+		this.favoriteCount++;
+	}
+
+	public void decreaseFavoriteCount() {
+		if (this.favoriteCount > 0) {
+			this.favoriteCount--;
+		}
+	}
+
 	public void updateEditableDetails(
 		String name,
 		String description,

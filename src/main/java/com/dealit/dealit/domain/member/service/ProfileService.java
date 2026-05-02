@@ -12,6 +12,7 @@ import com.dealit.dealit.domain.member.dto.UploadProfileImageResponse;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ProfileService {
 	private final MemberRepository memberRepository;
 	private final ProfileImageStorage profileImageStorage;
 	private final ImageUrlService imageUrlService;
+	private final WishlistService wishlistService;
 
 	@Transactional(readOnly = true)
 	public MyPageProfileResponse getMyPageProfile(Long memberId) {
@@ -130,7 +132,7 @@ public class ProfileService {
 			0,
 			0,
 			0,
-			0
+			(int) wishlistService.countWishlist(member.getMemberId())
 		);
 	}
 

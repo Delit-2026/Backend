@@ -15,6 +15,7 @@ import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.wishlist.repository.WishlistRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class ProductDetailService {
     private final CategoryRepository categoryRepository;
     private final MemberRepository memberRepository;
     private final ImageUrlService imageUrlService;
+    private final WishlistRepository wishlistRepository;
 
     @Transactional
     public ProductDetailResponse getProductDetail(Long memberId, Long productId) {
@@ -54,6 +56,7 @@ public class ProductDetailService {
                 .orElseThrow(() -> new ProductNotFoundException("상품 판매자 정보를 찾을 수 없습니다."));
 
         boolean owner = seller.getMemberId().equals(viewer.getMemberId());
+        boolean liked = wishlistRepository.existsByMemberIdAndProductProductIdAndDeletedAtIsNull(viewer.getMemberId(), product.getProductId());
 
         return new ProductDetailResponse(
                 product.getProductId(),
@@ -71,7 +74,8 @@ public class ProductDetailService {
                 canChat(product, owner),
                 canBid(product, owner),
                 canPurchase(product, owner),
-                canFavorite(product, owner)
+                canFavorite(product, owner),
+                liked
         );
     }
 
