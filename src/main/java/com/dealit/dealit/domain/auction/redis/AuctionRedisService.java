@@ -125,6 +125,10 @@ public class AuctionRedisService {
 		stringRedisTemplate.opsForZSet().remove(ENDING_KEY, auctionId.toString());
 	}
 
+	public void removeEndingValue(String auctionId) {
+		stringRedisTemplate.opsForZSet().remove(ENDING_KEY, auctionId);
+	}
+
 	public void deleteState(Long auctionId) {
 		stringRedisTemplate.delete(stateKey(auctionId));
 	}

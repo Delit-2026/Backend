@@ -44,9 +44,13 @@ public record CreateAuctionRequest(
 	@Positive(message = "최소 입찰 금액은 0보다 커야 합니다.")
 	BigDecimal minimumBidAmount,
 
-	@Schema(description = "경매 진행 기간(일 단위)", example = "3", nullable = true)
+	@Schema(description = "경매 진행 기간(일 단위, 테스트용 소수 허용)", example = "3", nullable = true)
 	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
-	Integer auctionDurationDays,
+	BigDecimal auctionDurationDays,
+
+	@Schema(description = "경매 진행 기간(초 단위, 테스트용)", example = "10", nullable = true)
+	@Positive(message = "경매 진행 기간(초)은 0보다 커야 합니다.")
+	Integer auctionDurationSeconds,
 
 	@Schema(description = "경매 종료 시각", example = "2026-05-02T12:00:00Z", nullable = true)
 	OffsetDateTime endsAt,

@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.auction.scheduler;
 
+import com.dealit.dealit.domain.auction.exception.AuctionNotFoundException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
 import java.time.Clock;
@@ -30,9 +31,21 @@ public class AuctionEndingScheduler {
 		}
 
 		for (String auctionId : auctionIds) {
-			Long parsedAuctionId = Long.valueOf(auctionId);
-			auctionBidService.endAuction(parsedAuctionId);
-			auctionRedisService.removeEnding(parsedAuctionId);
+			Long parsedAuctionId;
+			try {
+				parsedAuctionId = Long.valueOf(auctionId);
+			} catch (NumberFormatException exception) {
+				auctionRedisService.removeEndingValue(auctionId);
+				continue;
+			}
+
+			try {
+				auctionBidService.endAuction(parsedAuctionId);
+			} catch (AuctionNotFoundException exception) {
+				// DB reset or deleted auctions can leave stale members in Redis.
+			} finally {
+				auctionRedisService.removeEnding(parsedAuctionId);
+			}
 		}
 	}
 }

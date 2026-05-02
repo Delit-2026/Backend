@@ -35,9 +35,9 @@ public record SaveAuctionDraftRequest(
 	@Positive(message = "최소 입찰 금액은 0보다 커야 합니다.")
 	BigDecimal minimumBidAmount,
 
-	@Schema(description = "경매 진행 기간(일 단위)", example = "3", nullable = true)
+	@Schema(description = "경매 진행 기간(일 단위, 테스트용 소수 허용)", example = "3", nullable = true)
 	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
-	Integer auctionDurationDays,
+	BigDecimal auctionDurationDays,
 
 	@Schema(description = "상품 이미지 목록", nullable = true)
 	List<@Valid ProductImagePayload> images,

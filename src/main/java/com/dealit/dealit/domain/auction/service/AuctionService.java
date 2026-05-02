@@ -645,15 +645,18 @@ public class AuctionService {
 		if (request.startPrice() == null) {
 			throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 		}
-		if (request.auctionDurationDays() == null && request.endsAt() == null) {
+		if (request.auctionDurationDays() == null && request.auctionDurationSeconds() == null && request.endsAt() == null) {
 			throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간 또는 종료 시각이 필수입니다.");
 		}
 		if (request.startPrice().signum() <= 0) {
 			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
 		}
 		resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
-		if (request.auctionDurationDays() != null && request.auctionDurationDays() <= 0) {
+		if (request.auctionDurationDays() != null && request.auctionDurationDays().signum() <= 0) {
 			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
+		}
+		if (request.auctionDurationSeconds() != null && request.auctionDurationSeconds() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간(초)은 0보다 커야 합니다.");
 		}
 	}
 
@@ -679,8 +682,23 @@ public class AuctionService {
 
 	private AuctionPeriod resolveAuctionPeriod(CreateAuctionRequest request, OffsetDateTime now) {
 		OffsetDateTime startAt = now;
-		OffsetDateTime endAt = request.endsAt() == null ? startAt.plusDays(request.auctionDurationDays()) : request.endsAt();
+		OffsetDateTime endAt;
+		if (request.endsAt() != null) {
+			endAt = request.endsAt();
+		} else if (request.auctionDurationSeconds() != null) {
+			endAt = startAt.plusSeconds(request.auctionDurationSeconds());
+		} else {
+			endAt = startAt.plus(toDurationFromDays(request.auctionDurationDays()));
+		}
 		return new AuctionPeriod(startAt, endAt);
+	}
+
+	private Duration toDurationFromDays(BigDecimal auctionDurationDays) {
+		long millis = auctionDurationDays
+			.multiply(BigDecimal.valueOf(24L * 60L * 60L * 1000L))
+			.setScale(0, RoundingMode.HALF_UP)
+			.longValueExact();
+		return Duration.ofMillis(millis);
 	}
 
 	private AuctionStatus determineStatus(

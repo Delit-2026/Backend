@@ -23,8 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Comparator;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -379,6 +381,42 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.auction.status").value("AUCTION_LIVE"))
 			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
 			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
+	}
+
+	@Test
+	@DisplayName("경매 등록은 테스트용 소수 day 기간으로 10초 경매를 생성할 수 있다")
+	void createAuctionSupportsFractionalDurationDaysForTenSecondAuction() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "10 second auction",
+					  "description": "Short auction for completion test.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 500000,
+					  "minimumBidAmount": 5000,
+					  "auctionDurationDays": 0.00011574074074074075,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
+
+		var auction = auctionRepository.findAll().getFirst();
+		assertThat(Duration.between(auction.getAuctionStartAt(), auction.getAuctionEndAt()))
+			.isEqualTo(Duration.ofSeconds(10));
 	}
 
 	@Test

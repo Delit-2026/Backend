@@ -93,6 +93,9 @@ public class AuctionBidService {
 		if (!auction.isOngoing()) {
 			throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
 		}
+		if (!auction.getEndsAt().isAfter(serverTime())) {
+			throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
+		}
 		if (bidPrice.compareTo(auction.getCurrentPrice().add(auction.getMinimumBidAmount())) < 0) {
 			throw new InvalidAuctionRequestException("최소 입찰 금액을 충족해야 합니다.");
 		}
@@ -123,6 +126,8 @@ public class AuctionBidService {
 		AuctionState state = auctionRedisService.getState(auctionId);
 		if (state.highestBidderId() == null) {
 			auction.completeWithoutBid();
+			auction.getProduct().markEnded();
+			auction.softDelete();
 			auctionRedisService.removeEnding(auctionId);
 			auctionRedisService.deleteState(auctionId);
 			auctionEventPublisher.publishAuctionEnded(
@@ -137,6 +142,7 @@ public class AuctionBidService {
 		}
 
 		auction.completeWithWinner(state.highestBidderId(), state.currentPrice());
+		auction.getProduct().markSold();
 		auctionRedisService.removeEnding(auctionId);
 		auctionRedisService.deleteState(auctionId);
 		auctionEventPublisher.publishAuctionEnded(

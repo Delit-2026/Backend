@@ -66,8 +66,8 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
-	@Column(name = "auction_duration_days")
-	private Integer auctionDurationDays;
+	@Column(name = "auction_duration_days", precision = 20, scale = 16)
+	private BigDecimal auctionDurationDays;
 
 	@Column(name = "location", length = 100)
 	private String location;
@@ -90,7 +90,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -122,7 +122,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -156,7 +156,7 @@ public class AuctionDraft extends BaseEntity {
 		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt

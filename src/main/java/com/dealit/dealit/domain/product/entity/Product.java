@@ -134,6 +134,15 @@ public class Product extends BaseEntity {
 		this.location = location;
 	}
 
+	public void markSold() {
+		this.status = ProductStatus.SOLD;
+	}
+
+	public void markEnded() {
+		this.status = ProductStatus.ENDED;
+		softDelete();
+	}
+
 	public void replaceImages(Collection<ProductImage> nextImages) {
 		List<ProductImage> removedImages = images.stream()
 			.filter(image -> !nextImages.contains(image))

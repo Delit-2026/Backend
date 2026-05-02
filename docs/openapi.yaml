@@ -484,6 +484,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/MySellingAuctionListResponse"
   /api/v1/auctions/{auctionId}:
+    get:
+      tags:
+      - Auction
+      summary: 경매 상세 조회
+      description: 경매 상세페이지에 필요한 상품, 판매자, 이미지, 현재 입찰 정보를 조회한다.
+      operationId: getAuction
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 경매 상세 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuctionDetailResponse"
     patch:
       tags:
       - Auction
@@ -1448,11 +1468,24 @@ components:
           type: number
           description: 경매 시작가
           example: 80000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 800
         auctionDurationDays:
+          type: number
+          description: 경매 진행 기간(일 단위, 테스트용 소수 허용)
+          example: 0.00011574074074074075
+        auctionDurationSeconds:
           type: integer
           format: int32
-          description: 경매 진행 기간(일 단위)
-          example: 3
+          description: 경매 진행 기간(초 단위, 테스트용)
+          example: 10
+        endsAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: "2026-05-02T12:00:00Z"
         images:
           type: array
           items:
@@ -1505,6 +1538,131 @@ components:
           type: boolean
           description: 다음 페이지 존재 여부
           example: false
+    AuctionDetailResponse:
+      type: object
+      description: 경매 상세페이지 응답
+      properties:
+        auctionId:
+          type: integer
+          format: int64
+          description: 경매 ID
+          example: 10
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새것입니다.
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 전자기기
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/AuctionDetailImageResponse"
+        seller:
+          $ref: "#/components/schemas/AuctionDetailSellerResponse"
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 700000
+        currentPrice:
+          type: number
+          description: 현재가
+          example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
+        minimumNextBidPrice:
+          type: number
+          description: 최소 다음 입찰가
+          example: 707000
+        bidCount:
+          type: integer
+          format: int32
+          description: 입찰 수
+          example: 0
+        bidderCount:
+          type: integer
+          format: int32
+          description: 입찰자 수
+          example: 0
+        startAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-30T09:00:00+09:00
+        endsAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-05-03T09:00:00+09:00
+        serverTime:
+          type: string
+          format: date-time
+          description: 서버 현재 시각
+          example: 2026-04-30T09:10:00Z
+        status:
+          type: string
+          description: 경매 상태
+          enum:
+          - AUCTION_LIVE
+          example: AUCTION_LIVE
+    AuctionDetailImageResponse:
+      type: object
+      description: 경매 상세 이미지
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: http://localhost:8080/uploads/auction/images/1-sample.jpg
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+    AuctionDetailSellerResponse:
+      type: object
+      description: 경매 판매자 정보
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 판매자 회원 ID
+          example: 1
+        nickname:
+          type: string
+          description: 판매자 닉네임
+          example: Dealit#1
+        profileImageUrl:
+          type: string
+          nullable: true
+          description: 판매자 프로필 이미지 URL
+          example: http://localhost:8080/uploads/profile/images/1-profile.png
     MySellingAuctionItemResponse:
       type: object
       description: 내 판매중 경매 항목
@@ -1546,6 +1704,10 @@ components:
           type: number
           description: 경매 시작가
           example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
         currentPrice:
           type: number
           description: 현재가
@@ -1553,7 +1715,7 @@ components:
         minimumNextBidPrice:
           type: number
           description: 최소 다음 입찰가
-          example: 700000
+          example: 707000
         bidCount:
           type: integer
           format: int32
@@ -1636,6 +1798,10 @@ components:
           type: number
           description: 경매 시작가
           example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
         auctionDurationDays:
           type: integer
           format: int64
@@ -1704,6 +1870,11 @@ components:
           type: number
           description: 경매 시작가
           example: 400000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위. 생략 시 시작가의 1%로 계산
+          nullable: true
+          example: 4000
         auctionDurationDays:
           type: integer
           format: int32
@@ -1825,6 +1996,10 @@ components:
           type: number
           description: 경매 시작가
           example: 80000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 800
         auctionDurationDays:
           type: integer
           format: int32
