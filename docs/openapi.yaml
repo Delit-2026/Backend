@@ -11,14 +11,14 @@ servers:
 security:
 - bearerAuth: []
 tags:
+- name: Product
+  description: 일반 상품 판매 관리 API
 - name: Events
   description: 앱 전역 실시간 이벤트 API
 - name: Health
   description: 애플리케이션 상태 확인 API
 - name: Product
   description: 일반 상품 등록 API
-- name: Product Detail
-  description: 상품 상세 조회 API
 - name: Location
   description: 위치 보조 API
 - name: Email Verification
@@ -123,7 +123,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "201":
-          description: 상품 등록 성공
+          description: 일반 상품 등록 성공
           content:
             '*/*':
               schema:
@@ -175,7 +175,7 @@ paths:
     post:
       tags:
       - Product
-      summary: 상품 이미지 업로드
+      summary: 일반 상품 이미지 업로드
       operationId: uploadImage
       requestBody:
         content:
@@ -781,7 +781,6 @@ paths:
       tags:
       - Auction
       summary: 경매 상품 등록
-      description: 프론트가 가공한 최종 payload로 상품을 등록한다.
       operationId: createAuction
       requestBody:
         content:
@@ -815,7 +814,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "201":
-          description: 상품 등록 성공
+          description: 경매 상품 등록 성공
           content:
             '*/*':
               schema:
@@ -825,7 +824,6 @@ paths:
       tags:
       - Auction
       summary: 가격 추천
-      description: 상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.
       operationId: recommendPrice_1
       requestBody:
         content:
@@ -868,8 +866,7 @@ paths:
     post:
       tags:
       - Auction
-      summary: 상품 이미지 업로드
-      description: 경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.
+      summary: 경매 상품 이미지 업로드
       operationId: uploadImage_1
       requestBody:
         content:
@@ -918,7 +915,6 @@ paths:
       tags:
       - Auction
       summary: 경매 상품 임시저장
-      description: 등록 직전 폼 데이터를 draft 상태로 저장한다.
       operationId: saveDraft_1
       requestBody:
         content:
@@ -962,7 +958,6 @@ paths:
       tags:
       - Auction
       summary: 카테고리 추천
-      description: 입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.
       operationId: recommendCategory_1
       requestBody:
         content:
@@ -1126,6 +1121,97 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UpdateMyLocationResponse"
+  /api/v1/products/{productId}:
+    delete:
+      tags:
+      - Product
+      summary: 일반 상품 삭제
+      description: 현재 사용자가 등록한 판매 중 일반 상품을 삭제합니다.
+      operationId: deleteProduct
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "204":
+          description: 일반 상품 삭제 성공
+    patch:
+      tags:
+      - Product
+      summary: 일반 상품 수정
+      description: 현재 사용자가 등록한 판매 중 일반 상품을 수정합니다.
+      operationId: updateProduct
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 일반 상품 수정 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProductEditDetailResponse"
   /api/v1/chats/rooms/{roomId}/read:
     patch:
       tags:
@@ -1299,14 +1385,13 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyPageProfileResponse"
-  /api/v1/products/{productId}:
+  /api/v1/products/{productId}/edit:
     get:
       tags:
-      - Product Detail
-      summary: 상품 상세 조회
-      description: productId로 일반 상품 또는 경매 상품의 상세 정보를 조회합니다. 로그인 사용자는 이메일 인증 여부와 관계없이
-        조회할 수 있습니다.
-      operationId: getProductDetail
+      - Product
+      summary: 일반 상품 수정 상세 조회
+      description: 현재 사용자가 등록한 일반 상품의 수정 화면 데이터를 조회합니다.
+      operationId: getProductEditDetail
       parameters:
       - name: productId
         in: path
@@ -1322,7 +1407,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: 상품 없음
+          description: Not Found
           content:
             '*/*':
               schema:
@@ -1340,17 +1425,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "200":
-          description: 상품 상세 조회 성공
+          description: 일반 상품 수정 상세 조회 성공
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ProductDetailResponse"
-        "401":
-          description: 인증 실패
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ProductDetailResponse"
+                $ref: "#/components/schemas/ProductEditDetailResponse"
   /api/v1/products/categories:
     get:
       tags:
@@ -1388,6 +1467,59 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CategoryOptionResponse"
+  /api/v1/mypage/products/selling:
+    get:
+      tags:
+      - Product
+      summary: 내 판매 중 일반 상품 목록
+      description: 마이페이지 판매 중 화면에서 현재 사용자의 판매 중 일반 상품 목록을 페이지 단위로 조회합니다.
+      operationId: getMySellingProducts
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 내 판매 중 일반 상품 목록 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MySellingProductListResponse"
   /api/v1/mypage/auctions/selling:
     get:
       tags:
@@ -1778,7 +1910,6 @@ paths:
       tags:
       - Auction
       summary: 카테고리 목록 조회
-      description: 상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.
       operationId: getCategories_1
       responses:
         "400":
@@ -1815,7 +1946,7 @@ paths:
     delete:
       tags:
       - Product
-      summary: 상품 이미지 삭제
+      summary: 일반 상품 이미지 삭제
       operationId: deleteImage
       parameters:
       - name: imageId
@@ -1899,8 +2030,7 @@ paths:
     delete:
       tags:
       - Auction
-      summary: 상품 이미지 삭제
-      description: 등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.
+      summary: 경매 상품 이미지 삭제
       operationId: deleteImage_1
       parameters:
       - name: imageId
@@ -2056,45 +2186,7 @@ components:
       required:
       - imageId
       - imageUrl
-    AuctionResponse:
-      type: object
-      properties:
-        auctionId:
-          type: integer
-          format: int64
-          description: 경매 ID
-          example: 5
-        startPrice:
-          type: number
-          description: 경매 시작가
-          example: 70000
-        currentPrice:
-          type: number
-          description: 현재가. 입찰 내역이 없으면 시작가와 동일
-          example: 70000
-        minimumNextBidPrice:
-          type: number
-          description: 최소 다음 입찰가
-          example: 70700
-        bidCount:
-          type: integer
-          format: int64
-          description: 입찰 수
-          example: 0
-        endAt:
-          type: string
-          format: date-time
-          description: 경매 종료 시각
-          example: 2026-05-05T10:30:00+09:00
-        status:
-          type: string
-          description: 경매 상태
-          enum:
-          - DRAFT
-          - ON_SALE
-          - AUCTION_LIVE
-          - ENDED
-          example: AUCTION_LIVE
+    AuctionResponse: {}
     CreateProductResponse:
       type: object
       description: 일반 상품 등록 응답
@@ -2131,32 +2223,8 @@ components:
       properties:
         price:
           type: number
-          description: 일반 판매 가격
+          description: 일반 판매가
           example: 12000
-        viewCount:
-          type: integer
-          format: int64
-          description: 조회수
-          example: 10
-        favoriteCount:
-          type: integer
-          format: int64
-          description: 찜 수
-          example: 2
-        chatCount:
-          type: integer
-          format: int64
-          description: 채팅 수
-          example: 1
-        status:
-          type: string
-          description: 일반 판매 상태
-          enum:
-          - DRAFT
-          - ON_SALE
-          - SOLD
-          - ENDED
-          example: ON_SALE
     RecommendPriceRequest:
       type: object
       description: 일반 상품 가격 추천 요청
@@ -2934,6 +3002,115 @@ components:
           - MANUAL
           - POSTCODE
           - GPS
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        categoryId:
+          type: integer
+          format: int64
+        price:
+          type: number
+          minimum: 0.01
+        allowOffer:
+          type: boolean
+        location:
+          type: string
+          maxLength: 100
+          minLength: 0
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+          minItems: 1
+      required:
+      - allowOffer
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - price
+    ProductEditDetailResponse:
+      type: object
+      description: 일반 상품 수정 상세 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새 상품입니다.
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 16
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: iPhone
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울특별시 강남구
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/ProductEditImageResponse"
+        price:
+          type: number
+          description: 판매 가격
+          example: 850000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        editable:
+          type: boolean
+          description: 수정 가능 여부
+          example: true
+    ProductEditImageResponse:
+      type: object
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: https://example.com/product/images/1.jpg
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
     MarkChatRoomAsReadResponse:
       type: object
       properties:
@@ -3111,114 +3288,6 @@ components:
           - MANUAL
           - POSTCODE
           - GPS
-    CategoryResponse:
-      type: object
-      properties:
-        categoryId:
-          type: integer
-          format: int64
-          description: 카테고리 ID
-          example: 19
-        nameKo:
-          type: string
-          description: 카테고리 한글명
-          example: 전자기기
-        nameEn:
-          type: string
-          description: 카테고리 영문명
-          example: Digital/Electronics
-    ProductDetailResponse:
-      type: object
-      description: 상품 상세 조회 응답
-      properties:
-        productId:
-          type: integer
-          format: int64
-          description: 상품 ID
-          example: 1001
-        name:
-          type: string
-          description: 상품명
-          example: 아이폰 14 Pro
-        description:
-          type: string
-          description: 상품 설명
-          example: 거의 새 상품입니다.
-        saleType:
-          type: string
-          description: 판매 유형
-          enum:
-          - REGULAR
-          - AUCTION
-          example: REGULAR
-        category:
-          $ref: "#/components/schemas/CategoryResponse"
-          description: 카테고리 정보
-        imageUrls:
-          type: array
-          description: 상품 이미지 URL 목록
-          items:
-            type: string
-        status:
-          type: string
-          description: 상품 공통 상태
-          enum:
-          - DRAFT
-          - ON_SALE
-          - SOLD
-          - ENDED
-          example: ON_SALE
-        seller:
-          $ref: "#/components/schemas/SellerResponse"
-          description: 판매자 정보
-        createdAt:
-          type: string
-          format: date-time
-          description: 생성 시각
-          example: 2026-05-02T10:30:00+09:00
-        updatedAt:
-          type: string
-          format: date-time
-          description: 수정 시각
-          example: 2026-05-02T11:00:00+09:00
-        generalSale:
-          $ref: "#/components/schemas/GeneralSaleResponse"
-          description: 일반 판매 상세 정보. 경매 상품이면 null
-        auction:
-          $ref: "#/components/schemas/AuctionResponse"
-          description: 경매 상세 정보. 일반 상품이면 null
-        canChat:
-          type: boolean
-          description: 채팅 가능 여부
-          example: true
-        canBid:
-          type: boolean
-          description: 입찰 가능 여부
-          example: false
-        canPurchase:
-          type: boolean
-          description: 구매 가능 여부
-          example: true
-        canFavorite:
-          type: boolean
-          description: 찜 가능 여부
-          example: true
-    SellerResponse:
-      type: object
-      properties:
-        memberId:
-          type: integer
-          format: int64
-          description: 판매자 회원 ID
-          example: 3
-        nickname:
-          type: string
-          description: 판매자 닉네임
-          example: dealit-user-3
-        location:
-          type: string
-          description: 거래 위치
-          example: 서울 강남구
     CategoryOptionResponse:
       type: object
       description: 카테고리 선택 옵션
@@ -3251,6 +3320,94 @@ components:
           description: 하위 카테고리 목록
           items:
             $ref: "#/components/schemas/CategoryOptionResponse"
+    MySellingProductItemResponse:
+      type: object
+      description: 내 판매 중 일반 상품 항목
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새 상품입니다.
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 전자기기
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL
+          example: https://example.com/product/images/10.jpg
+        productStatus:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        price:
+          type: number
+          description: 판매 가격
+          example: 850000
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울특별시 강남구
+        canEdit:
+          type: boolean
+          description: 수정 가능 여부
+          example: true
+        canDelete:
+          type: boolean
+          description: 삭제 가능 여부
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: 생성 시각
+          example: 2026-05-02T10:00:00+09:00
+        updatedAt:
+          type: string
+          format: date-time
+          description: 수정 시각
+          example: 2026-05-02T10:30:00+09:00
+    MySellingProductListResponse:
+      type: object
+      description: 내 판매 중 일반 상품 목록 응답
+      properties:
+        content:
+          type: array
+          description: 판매 중 일반 상품 목록
+          items:
+            $ref: "#/components/schemas/MySellingProductItemResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 상품 수
+          example: 1
+        hasNext:
+          type: boolean
+          description: 다음 페이지 존재 여부
+          example: false
     MySellingAuctionItemResponse:
       type: object
       description: 내 판매중 경매 항목

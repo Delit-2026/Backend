@@ -129,8 +129,25 @@ public class Product extends BaseEntity {
 		image.assignToProduct(this, sortOrder);
 	}
 
+	public void softDeleteWithImages() {
+		softDelete();
+		for (ProductImage image : images) {
+			image.softDelete();
+		}
+	}
+
 	public void increaseViewCount() {
 		this.viewCount++;
+	}
+
+	public void increaseFavoriteCount() {
+		this.favoriteCount++;
+	}
+
+	public void decreaseFavoriteCount() {
+		if (this.favoriteCount > 0) {
+			this.favoriteCount--;
+		}
 	}
 
 	public void updateEditableDetails(
@@ -145,6 +162,10 @@ public class Product extends BaseEntity {
 		this.categoryId = categoryId;
 		this.price = price;
 		this.location = location;
+	}
+
+	public void updateAllowOffer(boolean allowOffer) {
+		this.allowOffer = allowOffer;
 	}
 
 	public void replaceImages(Collection<ProductImage> nextImages) {
