@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 
 @Getter
@@ -39,7 +40,7 @@ public class Auction extends BaseEntity {
 	private Long auctionId;
 
 	@OneToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "product_id", nullable = false)
+	@JoinColumn(name = "product_id", nullable = false, unique = true)
 	private Product product;
 
 	@Column(name = "start_price", nullable = false, precision = 15, scale = 2)
@@ -48,11 +49,20 @@ public class Auction extends BaseEntity {
 	@Column(name = "current_price", nullable = false, precision = 15, scale = 2)
 	private BigDecimal currentPrice;
 
-	@Column(name = "auction_start_at", nullable = false)
-	private OffsetDateTime auctionStartAt;
+	@Column(name = "minimum_bid_amount", precision = 15, scale = 2)
+	private BigDecimal minimumBidAmount;
 
-	@Column(name = "auction_end_at", nullable = false)
-	private OffsetDateTime auctionEndAt;
+	@Column(name = "final_price", precision = 15, scale = 2)
+	private BigDecimal finalPrice;
+
+	@Column(name = "winner_id")
+	private Long winnerId;
+
+	@Column(name = "started_at", nullable = false)
+	private OffsetDateTime startedAt;
+
+	@Column(name = "ends_at", nullable = false)
+	private OffsetDateTime endsAt;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 30)
@@ -62,31 +72,71 @@ public class Auction extends BaseEntity {
 		Product product,
 		BigDecimal startPrice,
 		BigDecimal currentPrice,
-		OffsetDateTime auctionStartAt,
-		OffsetDateTime auctionEndAt,
+		BigDecimal minimumBidAmount,
+		OffsetDateTime startedAt,
+		OffsetDateTime endsAt,
 		AuctionStatus status
 	) {
 		this.product = product;
 		this.startPrice = startPrice;
 		this.currentPrice = currentPrice;
-		this.auctionStartAt = auctionStartAt;
-		this.auctionEndAt = auctionEndAt;
+		this.minimumBidAmount = minimumBidAmount;
+		this.startedAt = startedAt;
+		this.endsAt = endsAt;
 		this.status = status;
 	}
 
 	public static Auction create(
 		Product product,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		AuctionStatus status
 	) {
-		return new Auction(product, startPrice, startPrice, auctionStartAt, auctionEndAt, status);
+		return new Auction(product, startPrice, startPrice, minimumBidAmount, auctionStartAt, auctionEndAt, status);
 	}
 
-	public void updateEditableDetails(BigDecimal startPrice, OffsetDateTime auctionEndAt) {
+	public void updateEditableDetails(BigDecimal startPrice, BigDecimal minimumBidAmount, OffsetDateTime auctionEndAt) {
 		this.startPrice = startPrice;
 		this.currentPrice = startPrice;
-		this.auctionEndAt = auctionEndAt;
+		this.minimumBidAmount = minimumBidAmount;
+		this.endsAt = auctionEndAt;
+	}
+
+	public void updateCurrentPrice(BigDecimal currentPrice) {
+		this.currentPrice = currentPrice;
+	}
+
+	public BigDecimal getMinimumBidAmount() {
+		if (minimumBidAmount != null) {
+			return minimumBidAmount;
+		}
+		return startPrice.multiply(BigDecimal.valueOf(0.01)).setScale(0, RoundingMode.CEILING);
+	}
+
+	public void completeWithWinner(Long winnerId, BigDecimal finalPrice) {
+		this.winnerId = winnerId;
+		this.finalPrice = finalPrice;
+		this.currentPrice = finalPrice;
+		this.status = AuctionStatus.SUCCESSFUL_BID;
+	}
+
+	public void completeWithoutBid() {
+		this.finalPrice = null;
+		this.winnerId = null;
+		this.status = AuctionStatus.NO_BID;
+	}
+
+	public boolean isOngoing() {
+		return this.status == AuctionStatus.ONGOING;
+	}
+
+	public OffsetDateTime getAuctionStartAt() {
+		return startedAt;
+	}
+
+	public OffsetDateTime getAuctionEndAt() {
+		return endsAt;
 	}
 }

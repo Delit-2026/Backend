@@ -57,14 +57,17 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "start_price", precision = 15, scale = 2)
 	private BigDecimal startPrice;
 
+	@Column(name = "minimum_bid_amount", precision = 15, scale = 2)
+	private BigDecimal minimumBidAmount;
+
 	@Column(name = "auction_start_at")
 	private OffsetDateTime auctionStartAt;
 
 	@Column(name = "auction_end_at")
 	private OffsetDateTime auctionEndAt;
 
-	@Column(name = "auction_duration_days")
-	private Integer auctionDurationDays;
+	@Column(name = "auction_duration_days", precision = 20, scale = 16)
+	private BigDecimal auctionDurationDays;
 
 	@Column(name = "location", length = 100)
 	private String location;
@@ -84,9 +87,10 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -98,6 +102,7 @@ public class AuctionDraft extends BaseEntity {
 		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
+		this.minimumBidAmount = minimumBidAmount;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
 		this.auctionDurationDays = auctionDurationDays;
@@ -114,9 +119,10 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -129,6 +135,7 @@ public class AuctionDraft extends BaseEntity {
 			memberId,
 			price,
 			startPrice,
+			minimumBidAmount,
 			auctionStartAt,
 			auctionEndAt,
 			auctionDurationDays,
@@ -146,9 +153,10 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
-		Integer auctionDurationDays,
+		BigDecimal auctionDurationDays,
 		String location,
 		String payloadJson,
 		OffsetDateTime savedAt
@@ -160,6 +168,7 @@ public class AuctionDraft extends BaseEntity {
 		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
+		this.minimumBidAmount = minimumBidAmount;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
 		this.auctionDurationDays = auctionDurationDays;

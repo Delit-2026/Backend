@@ -23,8 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Comparator;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -138,6 +140,26 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.content[0].productId").isNumber())
 			.andExpect(jsonPath("$.content[0].auctionId").isNumber())
 			.andExpect(jsonPath("$.content[0].name").value("Nintendo Switch OLED"))
+			.andExpect(jsonPath("$.content[0].description").value("Includes dock and controller."))
+			.andExpect(jsonPath("$.content[0].categoryName").value("사무용노트북"))
+			.andExpect(jsonPath("$.content[0].thumbnailUrl").value("http://localhost:8080/uploads/auction/images/test-image.jpg"))
+			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.content[0].startPrice").value(180000))
+			.andExpect(jsonPath("$.content[0].minimumBidAmount").value(1800))
+			.andExpect(jsonPath("$.content[0].currentPrice").value(180000))
+			.andExpect(jsonPath("$.content[0].minimumNextBidPrice").value(181800))
+			.andExpect(jsonPath("$.content[0].bidCount").value(0))
+			.andExpect(jsonPath("$.content[0].bidderCount").value(0))
+			.andExpect(jsonPath("$.content[0].startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].endAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].canEdit").value(true))
+			.andExpect(jsonPath("$.content[0].canDelete").value(true))
+			.andExpect(jsonPath("$.content[0].createdAt").value(notNullValue()))
+			.andExpect(jsonPath("$.content[0].updatedAt").value(notNullValue()))
+			.andExpect(jsonPath("$.page").value(0))
+			.andExpect(jsonPath("$.size").value(20))
+			.andExpect(jsonPath("$.totalElements").value(1))
+			.andExpect(jsonPath("$.hasNext").value(false));
 			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"));
 	}
 
@@ -348,6 +370,186 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.auction.status").value("AUCTION_LIVE"))
 			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
 			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
+	}
+
+	@Test
+	@DisplayName("경매 등록은 테스트용 소수 day 기간으로 10초 경매를 생성할 수 있다")
+	void createAuctionSupportsFractionalDurationDaysForTenSecondAuction() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "10 second auction",
+					  "description": "Short auction for completion test.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 500000,
+					  "minimumBidAmount": 5000,
+					  "auctionDurationDays": 0.00011574074074074075,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
+
+		var auction = auctionRepository.findAll().getFirst();
+		assertThat(Duration.between(auction.getAuctionStartAt(), auction.getAuctionEndAt()))
+			.isEqualTo(Duration.ofSeconds(10));
+	}
+
+	@Test
+	@DisplayName("경매 상세 조회는 상품, 판매자, 이미지, 입찰 메타 정보를 함께 반환한다")
+	void getAuctionDetailReturnsProductSellerImagesAndBidMeta() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Nintendo Switch OLED",
+					  "description": "Includes dock and controller.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "minimumBidAmount": 1800,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
+
+		mockMvc.perform(get("/api/v1/auctions/{auctionId}", auctionId)
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.auctionId").value(auctionId))
+			.andExpect(jsonPath("$.productId").isNumber())
+			.andExpect(jsonPath("$.name").value("Nintendo Switch OLED"))
+			.andExpect(jsonPath("$.description").value("Includes dock and controller."))
+			.andExpect(jsonPath("$.categoryId").value(21))
+			.andExpect(jsonPath("$.categoryName").value("사무용노트북"))
+			.andExpect(jsonPath("$.location").value("서울 마포구"))
+			.andExpect(jsonPath("$.images", hasSize(1)))
+			.andExpect(jsonPath("$.images[0].imageId").value(uploadedImage.getImageId()))
+			.andExpect(jsonPath("$.images[0].imageUrl").value("http://localhost:8080/uploads/auction/images/test-image.jpg"))
+			.andExpect(jsonPath("$.images[0].sortOrder").value(1))
+			.andExpect(jsonPath("$.seller.memberId").isNumber())
+			.andExpect(jsonPath("$.seller.nickname").value(startsWith("Dealit#")))
+			.andExpect(jsonPath("$.startPrice").value(180000))
+			.andExpect(jsonPath("$.currentPrice").value(180000))
+			.andExpect(jsonPath("$.minimumBidAmount").value(1800))
+			.andExpect(jsonPath("$.minimumNextBidPrice").value(181800))
+			.andExpect(jsonPath("$.bidCount").value(0))
+			.andExpect(jsonPath("$.bidderCount").value(0))
+			.andExpect(jsonPath("$.startAt").value(notNullValue()))
+			.andExpect(jsonPath("$.endsAt").value(notNullValue()))
+			.andExpect(jsonPath("$.serverTime").value(notNullValue()))
+			.andExpect(jsonPath("$.status").value("AUCTION_LIVE"));
+	}
+
+	@Test
+	@DisplayName("입찰가는 현재가에 최소 입찰 금액을 더한 금액 이상이어야 한다")
+	void bidFailsWhenBidPriceIsBelowMinimumNextBidPrice() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Nintendo Switch OLED",
+					  "description": "Includes dock and controller.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 180000,
+					  "minimumBidAmount": 1800,
+					  "auctionDurationDays": 2,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
+		Member bidder = Member.create(
+			"auction-bidder",
+			passwordEncoder.encode("Password123!"),
+			"auction-bidder@dealit.com",
+			null,
+			"입찰자"
+		);
+		Member savedBidder = memberRepository.save(bidder);
+		savedBidder.assignDefaultNickname();
+		String bidderToken = jwtService.generateAccessToken(memberRepository.save(savedBidder));
+
+		mockMvc.perform(post("/api/v1/auctions/{auctionId}/bids", auctionId)
+				.header("Authorization", "Bearer " + bidderToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "bidPrice": 181000
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.message").value("최소 입찰 금액을 충족해야 합니다."));
+	}
+
+	@Test
+	@DisplayName("경매 판매에서 진행 기간이 없으면 비즈니스 검증 오류를 반환한다")
+	void createAuctionFailsWhenDurationMissing() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Rolex Datejust",
+					  "description": "Authentic watch in good condition.",
+					  "saleType": "AUCTION",
+					  "categoryId": 44,
+					  "price": null,
+					  "startPrice": 500000,
+					  "auctionDurationDays": null,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "Busan",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.message").value("경매 판매에서는 진행 기간이 필수입니다."));
 	}
 
 	private void deleteStoredImages() throws IOException {

@@ -32,6 +32,10 @@ public record UpdateAuctionRequest(
 	@NotNull(message = "경매 시작가는 필수입니다.")
 	BigDecimal startPrice,
 
+	@Schema(description = "최소 입찰 금액/입찰 단위. 생략 시 시작가의 1%로 계산", example = "4000", nullable = true)
+	@Positive(message = "최소 입찰 금액은 0보다 커야 합니다.")
+	BigDecimal minimumBidAmount,
+
 	@Schema(description = "경매 진행 기간(일 단위)", example = "1")
 	@NotNull(message = "경매 진행 기간은 필수입니다.")
 	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
