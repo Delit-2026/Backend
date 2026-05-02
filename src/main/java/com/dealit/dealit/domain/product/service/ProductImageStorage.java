@@ -9,15 +9,27 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class ProductImageStorage {
 
+	private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+		"image/jpeg",
+		"image/png",
+		"image/webp"
+	);
+
 	private final ImageProperties imageProperties;
 
 	public String store(Long imageId, MultipartFile file, String originalFilename) {
-		String storedFileName = imageId + "-" + sanitizeFilename(originalFilename);
+		validate(file);
+
+		String storedFileName = imageId + "-" + UUID.randomUUID() + resolveExtension(originalFilename, file.getContentType());
 		Path directory = imageProperties.productImageDirectory();
 		Path targetFile = directory.resolve(storedFileName);
 
@@ -31,8 +43,15 @@ public class ProductImageStorage {
 		return storedFileName;
 	}
 
+	private void validate(MultipartFile file) {
+		String contentType = file.getContentType();
+		if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+			throw new InvalidProductRequestException("상품 이미지는 jpg, jpeg, png, webp 형식만 업로드할 수 있습니다.");
+		}
+	}
+
 	public void delete(String imagePath) {
-		Path relativePath = Path.of(imagePath.replaceFirst("^/+", ""));
+		Path relativePath = Path.of(imagePath.replaceFirst("^/+", "").replaceFirst("^uploads/", ""));
 		Path targetFile = imageProperties.productImageDirectory().getParent().getParent().resolve(relativePath);
 
 		try {
@@ -42,17 +61,22 @@ public class ProductImageStorage {
 		}
 	}
 
-	private String sanitizeFilename(String originalFilename) {
-		String fileNameOnly = Path.of(originalFilename).getFileName().toString().trim();
-		String normalized = fileNameOnly
-			.replaceAll("\\s+", "-")
-			.replaceAll("[^\\p{L}\\p{N}._()-]", "-")
-			.replaceAll("-{2,}", "-");
-
-		if (normalized.isBlank()) {
-			return "image.jpg";
+	private String resolveExtension(String originalFilename, String contentType) {
+		String normalizedFilename = originalFilename == null
+			? ""
+			: Normalizer.normalize(Path.of(originalFilename).getFileName().toString().trim(), Normalizer.Form.NFC);
+		int dotIndex = normalizedFilename.lastIndexOf('.');
+		if (dotIndex >= 0 && dotIndex < normalizedFilename.length() - 1) {
+			String extension = normalizedFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+			if (Set.of("jpg", "jpeg", "png", "webp").contains(extension)) {
+				return "." + extension;
+			}
 		}
 
-		return normalized;
+		return switch (contentType == null ? "" : contentType.toLowerCase(Locale.ROOT)) {
+			case "image/png" -> ".png";
+			case "image/webp" -> ".webp";
+			default -> ".jpg";
+		};
 	}
 }

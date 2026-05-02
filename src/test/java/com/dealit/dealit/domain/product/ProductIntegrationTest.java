@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
@@ -85,7 +84,7 @@ class ProductIntegrationTest {
 		otherMember.assignDefaultNickname();
 		otherMember.updateLocation("서울 서초구");
 		uploadedImage = productImageRepository.save(
-			ProductImage.createTemporary("/product/images/test-image.jpg", "test-image.jpg", member.getMemberId())
+			ProductImage.createTemporary("/uploads/product/images/test-image.jpg", "test-image.jpg", member.getMemberId())
 		);
 	}
 
@@ -112,8 +111,8 @@ class ProductIntegrationTest {
 			)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.imageId").isNumber())
-			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/product/images/")))
-			.andExpect(jsonPath("$.imageUrl").value(containsString("regular-product.png")));
+			.andExpect(jsonPath("$.imageUrl").value(startsWith("http://localhost:8080/uploads/product/images/")))
+			.andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")));
 
 		ProductImage savedImage = productImageRepository.findAll().stream()
 			.filter(image -> image.getOriginalFileName().equals("regular-product.png"))
@@ -159,7 +158,7 @@ class ProductIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/product/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/product/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],
@@ -192,7 +191,7 @@ class ProductIntegrationTest {
 					  "images": [
 					    {
 					      "imageId": %d,
-					      "imageUrl": "http://localhost:8080/product/images/test-image.jpg",
+					      "imageUrl": "http://localhost:8080/uploads/product/images/test-image.jpg",
 					      "sortOrder": 1
 					    }
 					  ],

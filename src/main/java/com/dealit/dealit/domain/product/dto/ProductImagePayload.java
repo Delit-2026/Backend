@@ -11,7 +11,7 @@ public record ProductImagePayload(
 	@NotNull(message = "imageId는 필수입니다.")
 	Long imageId,
 
-	@Schema(description = "이미지 URL", example = "http://localhost:8080/product/images/1-sample.jpg")
+	@Schema(description = "이미지 URL", example = "http://localhost:8080/uploads/product/images/1-sample.jpg")
 	@NotBlank(message = "imageUrl은 필수입니다.")
 	String imageUrl,
 

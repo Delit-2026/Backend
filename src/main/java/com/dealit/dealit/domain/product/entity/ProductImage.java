@@ -68,6 +68,11 @@ public class ProductImage extends BaseEntity {
 		this.sortOrder = sortOrder;
 	}
 
+	public void detachFromProduct() {
+		this.product = null;
+		this.sortOrder = null;
+	}
+
 	@Override
 	public boolean equals(Object object) {
 		if (this == object) {

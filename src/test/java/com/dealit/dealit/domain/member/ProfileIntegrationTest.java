@@ -309,10 +309,11 @@ class ProfileIntegrationTest {
 				.file(file)
 				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/profile/images/")));
+			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/uploads/profile/images/")))
+			.andExpect(jsonPath("$.profileImageUrl").value(org.hamcrest.Matchers.endsWith(".png")));
 
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
-		assertThat(updatedMember.getProfileImage()).startsWith("/profile/images/");
+		assertThat(updatedMember.getProfileImage()).startsWith("/uploads/profile/images/");
 
 		mockMvc.perform(get(updatedMember.getProfileImage()))
 			.andExpect(status().isOk())
@@ -334,10 +335,10 @@ class ProfileIntegrationTest {
 				.file(file)
 				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/profile/images/")));
+			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/uploads/profile/images/")));
 
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
-		assertThat(updatedMember.getProfileImage()).endsWith("-profile.jpg");
+		assertThat(updatedMember.getProfileImage()).endsWith(".jpg");
 	}
 
 	@Test
