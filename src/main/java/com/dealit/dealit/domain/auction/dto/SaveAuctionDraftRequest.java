@@ -31,6 +31,10 @@ public record SaveAuctionDraftRequest(
 	@Schema(description = "경매 시작가", example = "80000", nullable = true)
 	BigDecimal startPrice,
 
+	@Schema(description = "최소 입찰 금액/입찰 단위", example = "800", nullable = true)
+	@Positive(message = "최소 입찰 금액은 0보다 커야 합니다.")
+	BigDecimal minimumBidAmount,
+
 	@Schema(description = "경매 진행 기간(일 단위)", example = "3", nullable = true)
 	@Positive(message = "경매 진행 기간은 0보다 커야 합니다.")
 	Integer auctionDurationDays,
@@ -53,6 +57,7 @@ public record SaveAuctionDraftRequest(
 			request.categoryId(),
 			request.price(),
 			request.startPrice(),
+			request.minimumBidAmount(),
 			request.auctionDurationDays(),
 			request.images(),
 			request.location(),

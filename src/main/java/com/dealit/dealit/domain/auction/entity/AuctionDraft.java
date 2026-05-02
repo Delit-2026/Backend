@@ -57,6 +57,9 @@ public class AuctionDraft extends BaseEntity {
 	@Column(name = "start_price", precision = 15, scale = 2)
 	private BigDecimal startPrice;
 
+	@Column(name = "minimum_bid_amount", precision = 15, scale = 2)
+	private BigDecimal minimumBidAmount;
+
 	@Column(name = "auction_start_at")
 	private OffsetDateTime auctionStartAt;
 
@@ -84,6 +87,7 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		Integer auctionDurationDays,
@@ -98,6 +102,7 @@ public class AuctionDraft extends BaseEntity {
 		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
+		this.minimumBidAmount = minimumBidAmount;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
 		this.auctionDurationDays = auctionDurationDays;
@@ -114,6 +119,7 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		Integer auctionDurationDays,
@@ -129,6 +135,7 @@ public class AuctionDraft extends BaseEntity {
 			memberId,
 			price,
 			startPrice,
+			minimumBidAmount,
 			auctionStartAt,
 			auctionEndAt,
 			auctionDurationDays,
@@ -146,6 +153,7 @@ public class AuctionDraft extends BaseEntity {
 		Long memberId,
 		BigDecimal price,
 		BigDecimal startPrice,
+		BigDecimal minimumBidAmount,
 		OffsetDateTime auctionStartAt,
 		OffsetDateTime auctionEndAt,
 		Integer auctionDurationDays,
@@ -160,6 +168,7 @@ public class AuctionDraft extends BaseEntity {
 		this.memberId = memberId;
 		this.price = price;
 		this.startPrice = startPrice;
+		this.minimumBidAmount = minimumBidAmount;
 		this.auctionStartAt = auctionStartAt;
 		this.auctionEndAt = auctionEndAt;
 		this.auctionDurationDays = auctionDurationDays;

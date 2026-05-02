@@ -26,11 +26,14 @@ public record MySellingAuctionItemResponse(
 	@Schema(description = "썸네일 이미지 URL", example = "https://example.com/auction/images/10.jpg")
 	String thumbnailUrl,
 
-	@Schema(description = "경매 상태", example = "AUCTION_LIVE")
+	@Schema(description = "경매 상태", example = "ONGOING")
 	AuctionStatus auctionStatus,
 
 	@Schema(description = "경매 시작가", example = "700000")
 	BigDecimal startPrice,
+
+	@Schema(description = "최소 입찰 금액/입찰 단위", example = "7000")
+	BigDecimal minimumBidAmount,
 
 	@Schema(description = "현재가", example = "700000")
 	BigDecimal currentPrice,

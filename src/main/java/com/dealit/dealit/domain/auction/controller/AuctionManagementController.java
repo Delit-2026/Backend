@@ -1,8 +1,12 @@
 package com.dealit.dealit.domain.auction.controller;
 
+import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
+import com.dealit.dealit.domain.auction.dto.BidRequest;
+import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
+import com.dealit.dealit.domain.auction.service.AuctionBidService;
 import com.dealit.dealit.domain.auction.service.AuctionService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import jakarta.validation.Valid;
 
@@ -32,6 +37,23 @@ import jakarta.validation.Valid;
 public class AuctionManagementController {
 
 	private final AuctionService auctionService;
+	private final AuctionBidService auctionBidService;
+
+	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
+	@GetMapping("/auctions/{auctionId}")
+	public AuctionDetailResponse getAuction(@PathVariable Long auctionId) {
+		return auctionBidService.getAuction(auctionId);
+	}
+
+	@Operation(summary = "경매 입찰", description = "서버 도착 시간 기준으로 입찰을 처리한다.")
+	@PostMapping("/auctions/{auctionId}/bids")
+	public BidResponse bid(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId,
+		@Valid @RequestBody BidRequest request
+	) {
+		return auctionBidService.bid(auctionId, member.memberId(), request.bidPrice());
+	}
 
 	@Operation(summary = "내 판매중 경매 목록", description = "마이페이지 판매중 화면에서 현재 사용자의 진행중 경매 목록을 페이징 조회한다.")
 	@ApiResponse(responseCode = "200", description = "내 판매중 경매 목록 조회 성공",
