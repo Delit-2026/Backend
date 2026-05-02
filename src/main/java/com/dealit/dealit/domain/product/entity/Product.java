@@ -164,6 +164,10 @@ public class Product extends BaseEntity {
 		this.location = location;
 	}
 
+	public void updateAllowOffer(boolean allowOffer) {
+		this.allowOffer = allowOffer;
+	}
+
 	public void markSold() {
 		this.status = ProductStatus.SOLD;
 	}
