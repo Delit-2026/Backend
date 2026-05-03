@@ -359,15 +359,24 @@ public class ProductService {
 	}
 
 	private Map<Long, ProductImage> loadRequestedImagesForUpdate(Product product, List<ProductImagePayload> imagePayloads) {
-		Map<Long, ProductImage> imagesById = loadRequestedImages(imagePayloads);
-		for (ProductImage image : imagesById.values()) {
+		List<Long> imageIds = imagePayloads.stream().map(ProductImagePayload::imageId).toList();
+
+		List<ProductImage> images = productImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
+		if (images.size() != imageIds.size()) {
+			throw new ProductImageNotFoundException("상품이미지를 찾을 수 없습니다.");
+		}
+
+		Map<Long, ProductImage> imagesById = new LinkedHashMap<>();
+		for (ProductImage image : images) {
 			if (!image.getMemberId().equals(product.getMemberId())) {
 				throw new ProductAccessDeniedException("본인이 업로드한 이미지로만 수정할 수 있습니다.");
 			}
 			if (image.getProduct() != null && !image.getProduct().getProductId().equals(product.getProductId())) {
 				throw new InvalidProductRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
 			}
+			imagesById.put(image.getImageId(), image);
 		}
+		validateDuplicateImageIds(imageIds, imagesById.keySet());
 		return imagesById;
 	}
 

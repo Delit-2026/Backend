@@ -159,7 +159,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.page").value(0))
 			.andExpect(jsonPath("$.size").value(20))
 			.andExpect(jsonPath("$.totalElements").value(1))
-			.andExpect(jsonPath("$.hasNext").value(false));
+			.andExpect(jsonPath("$.hasNext").value(false))
 			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"));
 	}
 
