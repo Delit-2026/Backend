@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auth;
 
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +32,9 @@ class AuthIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private FcmTokenRepository fcmTokenRepository;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -40,6 +44,7 @@ class AuthIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		fcmTokenRepository.deleteAll();
 		memberRepository.deleteAll();
 
 		Member member = Member.create(

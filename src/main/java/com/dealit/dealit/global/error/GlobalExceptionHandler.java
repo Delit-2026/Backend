@@ -12,6 +12,7 @@ import com.dealit.dealit.domain.location.exception.LocationException;
 import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.exception.MemberException;
+import com.dealit.dealit.domain.notification.exception.NotificationException;
 import com.dealit.dealit.domain.product.exception.ProductException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -120,6 +121,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(ProductException.class)
 	public ResponseEntity<ErrorResponse> handleProductException(ProductException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(NotificationException.class)
+	public ResponseEntity<ErrorResponse> handleNotificationException(NotificationException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}

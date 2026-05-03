@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.member;
 import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -43,6 +43,9 @@ class ProfileIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private FcmTokenRepository fcmTokenRepository;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -56,6 +59,7 @@ class ProfileIntegrationTest {
 
 	@BeforeEach
 	void setUp() throws IOException {
+		fcmTokenRepository.deleteAll();
 		memberRepository.deleteAll();
 		deleteStoredImages();
 
@@ -69,6 +73,7 @@ class ProfileIntegrationTest {
 		savedMember = memberRepository.save(member);
 		savedMember.assignDefaultNickname();
 		savedMember.updateProfile(
+			savedMember.getName(),
 			savedMember.getNickname(),
 			"좋은 거래 부탁드려요.",
 			null
@@ -140,6 +145,7 @@ class ProfileIntegrationTest {
 	@DisplayName("프로필 수정 요청에서 소개글과 이미지가 빠지면 기존 값을 유지한다")
 	void updateProfilePreservesBioAndImageWhenFieldsMissing() throws Exception {
 		savedMember.updateProfile(
+			savedMember.getName(),
 			savedMember.getNickname(),
 			"기존 소개글",
 			"/profile/images/existing.png"
@@ -174,7 +180,7 @@ class ProfileIntegrationTest {
 			null,
 			null
 		));
-		otherMember.updateProfile("이미있는닉네임", null, null);
+		otherMember.updateProfile(otherMember.getName(), "이미있는닉네임", null, null);
 		memberRepository.save(otherMember);
 
 		mockMvc.perform(patch("/api/v1/users/me/profile")
@@ -221,8 +227,6 @@ class ProfileIntegrationTest {
 					  "roadAddress": "인천광역시 연수구 센트럴로 123",
 					  "jibunAddress": "인천광역시 연수구 송도동 24-1",
 					  "detailAddress": "101동 1203호",
-					  "latitude": 37.3891000,
-					  "longitude": 126.6430000,
 					  "locationSource": "POSTCODE"
 					}
 					"""))
@@ -232,8 +236,6 @@ class ProfileIntegrationTest {
 			.andExpect(jsonPath("$.roadAddress").value("인천광역시 연수구 센트럴로 123"))
 			.andExpect(jsonPath("$.jibunAddress").value("인천광역시 연수구 송도동 24-1"))
 			.andExpect(jsonPath("$.detailAddress").value("101동 1203호"))
-			.andExpect(jsonPath("$.latitude").value(37.3891))
-			.andExpect(jsonPath("$.longitude").value(126.643))
 			.andExpect(jsonPath("$.locationSource").value("POSTCODE"));
 
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
@@ -242,8 +244,6 @@ class ProfileIntegrationTest {
 		assertThat(updatedMember.getRoadAddress()).isEqualTo("인천광역시 연수구 센트럴로 123");
 		assertThat(updatedMember.getJibunAddress()).isEqualTo("인천광역시 연수구 송도동 24-1");
 		assertThat(updatedMember.getDetailAddress()).isEqualTo("101동 1203호");
-		assertThat(updatedMember.getLatitude()).isEqualByComparingTo(new BigDecimal("37.3891000"));
-		assertThat(updatedMember.getLongitude()).isEqualByComparingTo(new BigDecimal("126.6430000"));
 		assertThat(updatedMember.getLocationSource()).isEqualTo(LocationSource.POSTCODE);
 	}
 
@@ -279,8 +279,6 @@ class ProfileIntegrationTest {
 			"경기도 성남시 분당구 판교역로 166",
 			"경기도 성남시 분당구 백현동 532",
 			"101동 1203호",
-			new BigDecimal("37.3948000"),
-			new BigDecimal("127.1112000"),
 			LocationSource.POSTCODE
 		);
 		memberRepository.save(savedMember);
@@ -293,8 +291,6 @@ class ProfileIntegrationTest {
 			.andExpect(jsonPath("$.roadAddress").value("경기도 성남시 분당구 판교역로 166"))
 			.andExpect(jsonPath("$.jibunAddress").value("경기도 성남시 분당구 백현동 532"))
 			.andExpect(jsonPath("$.detailAddress").value("101동 1203호"))
-			.andExpect(jsonPath("$.latitude").value(37.3948))
-			.andExpect(jsonPath("$.longitude").value(127.1112))
 			.andExpect(jsonPath("$.locationSource").value("POSTCODE"));
 	}
 

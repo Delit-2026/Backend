@@ -55,7 +55,7 @@ class EmailVerificationServiceTest {
 		when(valueOperations.get("email-verification:code:user@dealit.com")).thenReturn("123456");
 
 		EmailVerificationService service = new EmailVerificationService(redisTemplate, emailSender, properties, memberRepository);
-		ConfirmEmailVerificationResponse response = service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "123456"));
+		ConfirmEmailVerificationResponse response = service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "123456"), null);
 
 		assertThat(response.email()).isEqualTo("user@dealit.com");
 		assertThat(response.verified()).isTrue();
@@ -74,7 +74,7 @@ class EmailVerificationServiceTest {
 
 		EmailVerificationService service = new EmailVerificationService(redisTemplate, emailSender, properties, memberRepository);
 
-		assertThatThrownBy(() -> service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "123456")))
+		assertThatThrownBy(() -> service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "123456"), null))
 			.isInstanceOf(EmailVerificationCodeNotFoundException.class);
 	}
 
@@ -91,7 +91,7 @@ class EmailVerificationServiceTest {
 
 		EmailVerificationService service = new EmailVerificationService(redisTemplate, emailSender, properties, memberRepository);
 
-		assertThatThrownBy(() -> service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "654321")))
+		assertThatThrownBy(() -> service.confirm(new ConfirmEmailVerificationRequest("user@dealit.com", "654321"), null))
 			.isInstanceOf(EmailVerificationCodeMismatchException.class);
 	}
 }

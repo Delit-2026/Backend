@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.product;
 
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
@@ -58,6 +59,9 @@ class ProductIntegrationTest {
 	@Autowired
 	private MemberRepository memberRepository;
 
+	@Autowired
+	private FcmTokenRepository fcmTokenRepository;
+
 	@Value("${app.images.storage-root}")
 	private String imageStorageRoot;
 
@@ -70,6 +74,7 @@ class ProductIntegrationTest {
 		productImageRepository.deleteAll();
 		productRepository.deleteAll();
 		productDraftRepository.deleteAll();
+		fcmTokenRepository.deleteAll();
 		memberRepository.deleteAll();
 		deleteStoredImages();
 
