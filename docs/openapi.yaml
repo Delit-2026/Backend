@@ -11,6 +11,10 @@ servers:
 security:
 - bearerAuth: []
 tags:
+- name: Product
+  description: 일반 상품 판매 관리 API
+- name: Events
+  description: 앱 전역 실시간 이벤트 API
 - name: Health
   description: 애플리케이션 상태 확인 API
 - name: Product
@@ -23,193 +27,16 @@ tags:
   description: 경매 상품 등록 API
 - name: Member
   description: 회원 API
+- name: Auction
+  description: 경매 상품 관리 API
+- name: Chats
+  description: 채팅 API
 - name: Profile
   description: 마이페이지 프로필 API
 - name: Auth
   description: 인증 API
-- name: Chats
-  description: 채팅 API
-- name: Events
-  description: 앱 전역 실시간 이벤트 API
 paths:
-  "/api/v1/events/stream":
-    get:
-      tags:
-      - Events
-      summary: 앱 전역 SSE 구독
-      operationId: subscribeEventStream
-      responses:
-        '200':
-          description: SSE stream connected
-          content:
-            text/event-stream:
-              schema:
-                "$ref": "#/components/schemas/EventStreamConnectedEvent"
-  "/api/v1/chats/rooms":
-    get:
-      tags:
-      - Chats
-      summary: 채팅방 목록 조회
-      operationId: getChatRooms
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/ChatRoomListResponse"
-    post:
-      tags:
-      - Chats
-      summary: 채팅방 생성
-      operationId: createChatRoom
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateChatRoomRequest"
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/CreateChatRoomResponse"
-  "/api/v1/chats/rooms/{roomId}/messages":
-    get:
-      tags:
-      - Chats
-      summary: 채팅 메시지 목록 조회
-      operationId: getChatMessages
-      parameters:
-      - name: roomId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/ChatMessageListResponse"
-    post:
-      tags:
-      - Chats
-      summary: 채팅 메시지 전송
-      operationId: sendMessage
-      parameters:
-      - name: roomId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/SendChatMessageRequest"
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/SendChatMessageResponse"
-  "/api/v1/chats/rooms/{roomId}/read":
-    patch:
-      tags:
-      - Chats
-      summary: 채팅방 읽음 처리
-      operationId: markAsRead
-      parameters:
-      - name: roomId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/MarkChatRoomAsReadResponse"
-  "/api/v1/chats/rooms/{roomId}/unread-count":
-    get:
-      tags:
-      - Chats
-      summary: 채팅방 안읽음 개수 조회
-      operationId: getRoomUnreadCount
-      parameters:
-      - name: roomId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/RoomUnreadCountResponse"
-  "/api/v1/chats/unread-count":
-    get:
-      tags:
-      - Chats
-      summary: 전체 안읽음 개수 조회
-      operationId: getUnreadCount
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/UnreadCountResponse"
-  "/api/v1/chats/messages/{messageId}":
-    delete:
-      tags:
-      - Chats
-      summary: 채팅 메시지 삭제
-      operationId: deleteChatMessage
-      parameters:
-      - name: messageId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        '200':
-          description: OK
-  "/api/v1/chats/messages/{messageId}/reports":
-    post:
-      tags:
-      - Chats
-      summary: 채팅 메시지 신고
-      operationId: reportMessage
-      parameters:
-      - name: messageId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/ReportChatMessageRequest"
-      responses:
-        '200':
-          description: OK
-  "/api/v1/users/me/profile-image":
+  /api/v1/users/me/profile-image:
     post:
       tags:
       - Profile
@@ -228,13 +55,37 @@ paths:
               required:
               - file
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/UploadProfileImageResponse"
-  "/api/v1/products":
+                $ref: "#/components/schemas/UploadProfileImageResponse"
+  /api/v1/products:
     post:
       tags:
       - Product
@@ -244,16 +95,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/CreateProductRequest"
+              $ref: "#/components/schemas/CreateProductRequest"
         required: true
       responses:
-        '201':
-          description: 상품 등록 성공
+        "400":
+          description: Bad Request
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/CreateProductResponse"
-  "/api/v1/products/price/recommend":
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "201":
+          description: 일반 상품 등록 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateProductResponse"
+  /api/v1/products/price/recommend:
     post:
       tags:
       - Product
@@ -263,20 +138,44 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/RecommendPriceRequest"
+              $ref: "#/components/schemas/RecommendPriceRequest"
         required: true
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 가격 추천 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/RecommendPriceResponse"
-  "/api/v1/products/image":
+                $ref: "#/components/schemas/RecommendPriceResponse"
+  /api/v1/products/image:
     post:
       tags:
       - Product
-      summary: 상품 이미지 업로드
+      summary: 일반 상품 이미지 업로드
       operationId: uploadImage
       requestBody:
         content:
@@ -290,13 +189,37 @@ paths:
               required:
               - file
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 이미지 업로드 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/UploadProductImageResponse"
-  "/api/v1/products/draft":
+                $ref: "#/components/schemas/UploadProductImageResponse"
+  /api/v1/products/draft:
     post:
       tags:
       - Product
@@ -306,16 +229,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/SaveProductDraftRequest"
+              $ref: "#/components/schemas/SaveProductDraftRequest"
         required: true
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 임시저장 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/SaveProductDraftResponse"
-  "/api/v1/products/category/recommend":
+                $ref: "#/components/schemas/SaveProductDraftResponse"
+  /api/v1/products/category/recommend:
     post:
       tags:
       - Product
@@ -325,16 +272,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/RecommendCategoryRequest"
+              $ref: "#/components/schemas/RecommendCategoryRequest"
         required: true
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 카테고리 추천 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/RecommendCategoryResponse"
-  "/api/v1/members/signup":
+                $ref: "#/components/schemas/RecommendCategoryResponse"
+  /api/v1/members/signup:
     post:
       tags:
       - Member
@@ -345,16 +316,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/SignUpRequest"
+              $ref: "#/components/schemas/SignUpRequest"
         required: true
       responses:
-        '201':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "201":
           description: Created
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/SignUpResponse"
-  "/api/v1/locations/resolve":
+                $ref: "#/components/schemas/SignUpResponse"
+  /api/v1/locations/resolve:
     post:
       tags:
       - Location
@@ -365,16 +360,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/ResolveLocationRequest"
+              $ref: "#/components/schemas/ResolveLocationRequest"
         required: true
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/ResolvedLocationResponse"
-  "/api/v1/email/verification/send":
+                $ref: "#/components/schemas/ResolvedLocationResponse"
+  /api/v1/email/verification/send:
     post:
       tags:
       - Email Verification
@@ -385,16 +404,40 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/SendEmailVerificationRequest"
+              $ref: "#/components/schemas/SendEmailVerificationRequest"
         required: true
       responses:
-        '201':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "201":
           description: Created
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/SendEmailVerificationResponse"
-  "/api/v1/email/verification/confirm":
+                $ref: "#/components/schemas/SendEmailVerificationResponse"
+  /api/v1/email/verification/confirm:
     post:
       tags:
       - Email Verification
@@ -405,62 +448,45 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/ConfirmEmailVerificationRequest"
+              $ref: "#/components/schemas/ConfirmEmailVerificationRequest"
         required: true
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/ConfirmEmailVerificationResponse"
-  "/api/v1/auth/login":
-    post:
-      tags:
-      - Auth
-      summary: 로그인
-      description: 로그인 성공 시 JWT Access Token을 발급합니다.
-      operationId: login
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/LoginRequest"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/LoginResponse"
-  "/api/v1/auction":
-    post:
-      tags:
-      - Auction
-      summary: 경매 상품 등록
-      description: 프론트가 가공한 최종 payload로 상품을 등록한다.
-      operationId: createAuction
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateAuctionRequest"
-        required: true
-      responses:
-        '201':
-          description: 상품 등록 성공
-          content:
-            "*/*":
-              schema:
-                $ref: "#/components/schemas/CreateAuctionResponse"
-  /api/v1/mypage/auctions/selling:
+                $ref: "#/components/schemas/ConfirmEmailVerificationResponse"
+  /api/v1/chats/rooms:
     get:
       tags:
-      - Auction
-      summary: 내 판매중 경매 목록
-      description: 마이페이지 판매중 화면에서 현재 사용자의 진행중 경매 목록을 페이징 조회한다.
-      operationId: getMySellingAuctionProducts
+      - Chats
+      summary: 채팅방 목록 조회
+      operationId: getChatRooms
       parameters:
       - name: page
         in: query
@@ -477,13 +503,821 @@ paths:
           format: int32
           default: 20
       responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "200":
-          description: 내 판매중 경매 목록 조회 성공
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChatRoomListResponse"
+    post:
+      tags:
+      - Chats
+      summary: 채팅방 생성
+      operationId: createChatRoom
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChatRoomRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateChatRoomResponse"
+  /api/v1/chats/rooms/{roomId}/messages:
+    get:
+      tags:
+      - Chats
+      summary: 채팅 메시지 목록 조회
+      operationId: getChatMessages
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MySellingAuctionListResponse"
   /api/v1/auctions/{auctionId}:
+    get:
+      tags:
+      - Auction
+      summary: 경매 상세 조회
+      description: 경매 상세페이지에 필요한 상품, 판매자, 이미지, 현재 입찰 정보를 조회한다.
+      operationId: getAuction
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 경매 상세 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuctionDetailResponse"
+    patch:
+      tags:
+      - Chats
+      summary: 채팅 메시지 전송
+      operationId: sendMessage
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendChatMessageRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SendChatMessageResponse"
+  /api/v1/chats/messages/{messageId}/reports:
+    post:
+      tags:
+      - Chats
+      summary: 채팅 메시지 신고
+      operationId: reportMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportChatMessageRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReportChatMessageResponse"
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: 로그인
+      description: 로그인 성공 시 JWT Access Token을 발급합니다.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+  /api/v1/auction:
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 등록
+      operationId: createAuction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuctionRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "201":
+          description: 경매 상품 등록 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateAuctionResponse"
+  /api/v1/auction/price/recommend:
+    post:
+      tags:
+      - Auction
+      summary: 가격 추천
+      operationId: recommendPrice_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendPriceRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 가격 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendPriceResponse"
+  /api/v1/auction/image:
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 이미지 업로드
+      operationId: uploadImage_1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 이미지 업로드 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UploadAuctionImageResponse"
+  /api/v1/auction/draft:
+    post:
+      tags:
+      - Auction
+      summary: 경매 상품 임시저장
+      operationId: saveDraft_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveAuctionDraftRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 임시저장 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SaveAuctionDraftResponse"
+  /api/v1/auction/category/recommend:
+    post:
+      tags:
+      - Auction
+      summary: 카테고리 추천
+      operationId: recommendCategory_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendCategoryRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 카테고리 추천 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecommendCategoryResponse"
+  /api/v1/users/me/profile:
+    patch:
+      tags:
+      - Profile
+      summary: 프로필 수정
+      description: "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다."
+      operationId: updateProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyProfileRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyPageProfileResponse"
+  /api/v1/users/me/location:
+    get:
+      tags:
+      - Profile
+      summary: 내 지역 조회
+      description: 현재 로그인한 사용자의 지역 및 구조화된 위치 정보를 조회합니다.
+      operationId: getMyLocation
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyLocationResponse"
+    patch:
+      tags:
+      - Profile
+      summary: 지역 수정
+      description: 현재 로그인한 사용자의 대표 지역과 상세 위치 정보를 수정합니다.
+      operationId: updateLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyLocationRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UpdateMyLocationResponse"
+  /api/v1/products/{productId}:
+    delete:
+      tags:
+      - Product
+      summary: 일반 상품 삭제
+      description: 현재 사용자가 등록한 판매 중 일반 상품을 삭제합니다.
+      operationId: deleteProduct
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "204":
+          description: 일반 상품 삭제 성공
+    patch:
+      tags:
+      - Product
+      summary: 일반 상품 수정
+      description: 현재 사용자가 등록한 판매 중 일반 상품을 수정합니다.
+      operationId: updateProduct
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 일반 상품 수정 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProductEditDetailResponse"
+  /api/v1/chats/rooms/{roomId}/read:
+    patch:
+      tags:
+      - Chats
+      summary: 채팅방 읽음 처리
+      operationId: markAsRead
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MarkChatRoomAsReadResponse"
+  /api/v1/auctions/{auctionId}:
+    delete:
+      tags:
+      - Auction
+      summary: 경매 삭제
+      description: 입찰이 없는 현재 사용자의 경매를 삭제한다.
+      operationId: deleteAuction
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 입찰자가 있는 경매는 삭제 불가
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "204":
+          description: 경매 삭제 성공
     patch:
       tags:
       - Auction
@@ -504,192 +1338,37 @@ paths:
               $ref: "#/components/schemas/UpdateAuctionRequest"
         required: true
       responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 입찰자가 있는 경매는 수정 불가
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "200":
           description: 경매 수정 성공
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuctionEditDetailResponse"
-        "409":
-          description: 입찰자가 있는 경매는 수정 불가
-    delete:
-      tags:
-      - Auction
-      summary: 경매 삭제
-      description: 입찰이 없는 현재 사용자의 경매를 삭제한다.
-      operationId: deleteAuction
-      parameters:
-      - name: auctionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "204":
-          description: 경매 삭제 성공
-        "409":
-          description: 입찰자가 있는 경매는 삭제 불가
-  /api/v1/auctions/{auctionId}/edit:
-    get:
-      tags:
-      - Auction
-      summary: 경매 수정용 상세 조회
-      description: 현재 사용자가 등록한 경매의 수정 화면 데이터를 조회한다.
-      operationId: getAuctionEditDetail
-      parameters:
-      - name: auctionId
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: 경매 수정용 상세 조회 성공
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/AuctionEditDetailResponse"
-  /api/v1/auction/price/recommend:
-    post:
-      tags:
-      - Auction
-      summary: 가격 추천
-      description: 상품 정보와 판매 유형을 기반으로 추천 가격을 반환한다.
-      operationId: recommendPrice_1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/RecommendPriceRequest"
-        required: true
-      responses:
-        '200':
-          description: 가격 추천 성공
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/RecommendPriceResponse"
-  "/api/v1/auction/image":
-    post:
-      tags:
-      - Auction
-      summary: 상품 이미지 업로드
-      description: 경매 상품 등록 전 이미지를 업로드하고 임시 URL을 반환한다.
-      operationId: uploadImage_1
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-              required:
-              - file
-      responses:
-        '200':
-          description: 이미지 업로드 성공
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/UploadAuctionImageResponse"
-  "/api/v1/auction/draft":
-    post:
-      tags:
-      - Auction
-      summary: 경매 상품 임시저장
-      description: 등록 직전 폼 데이터를 draft 상태로 저장한다.
-      operationId: saveDraft_1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/SaveAuctionDraftRequest"
-        required: true
-      responses:
-        '200':
-          description: 임시저장 성공
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/SaveAuctionDraftResponse"
-  "/api/v1/auction/category/recommend":
-    post:
-      tags:
-      - Auction
-      summary: 카테고리 추천
-      description: 입력된 상품명과 설명을 기준으로 추천 카테고리를 반환한다.
-      operationId: recommendCategory_1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/RecommendCategoryRequest"
-        required: true
-      responses:
-        '200':
-          description: 카테고리 추천 성공
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/RecommendCategoryResponse"
-  "/api/v1/users/me/profile":
-    patch:
-      tags:
-      - Profile
-      summary: 프로필 수정
-      description: 현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.
-      operationId: updateProfile
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateMyProfileRequest"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/MyPageProfileResponse"
-  "/api/v1/users/me/location":
-    get:
-      tags:
-      - Profile
-      summary: 내 지역 조회
-      description: 현재 로그인한 사용자의 지역 및 구조화된 위치 정보를 조회합니다.
-      operationId: getMyLocation
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/MyLocationResponse"
-    patch:
-      tags:
-      - Profile
-      summary: 지역 수정
-      description: 현재 로그인한 사용자의 대표 지역과 상세 위치 정보를 수정합니다.
-      operationId: updateLocation
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateMyLocationRequest"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            "*/*":
-              schema:
-                "$ref": "#/components/schemas/UpdateMyLocationResponse"
-  "/api/v1/users/me/mypage":
+  /api/v1/users/me/mypage:
     get:
       tags:
       - Profile
@@ -697,26 +1376,225 @@ paths:
       description: 현재 로그인한 사용자의 마이페이지 프로필 정보를 조회합니다.
       operationId: getMyPageProfile
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/MyPageProfileResponse"
-  "/api/v1/products/categories":
+                $ref: "#/components/schemas/MyPageProfileResponse"
+  /api/v1/products/{productId}/edit:
+    get:
+      tags:
+      - Product
+      summary: 일반 상품 수정 상세 조회
+      description: 현재 사용자가 등록한 일반 상품의 수정 화면 데이터를 조회합니다.
+      operationId: getProductEditDetail
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 일반 상품 수정 상세 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProductEditDetailResponse"
+  /api/v1/products/categories:
     get:
       tags:
       - Product
       summary: 카테고리 목록 조회
       operationId: getCategories
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 카테고리 조회 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/CategoryOptionResponse"
-  "/api/v1/members/nickname/check":
+                $ref: "#/components/schemas/CategoryOptionResponse"
+  /api/v1/mypage/products/selling:
+    get:
+      tags:
+      - Product
+      summary: 내 판매 중 일반 상품 목록
+      description: 마이페이지 판매 중 화면에서 현재 사용자의 판매 중 일반 상품 목록을 페이지 단위로 조회합니다.
+      operationId: getMySellingProducts
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 내 판매 중 일반 상품 목록 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MySellingProductListResponse"
+  /api/v1/mypage/auctions/selling:
+    get:
+      tags:
+      - Auction
+      summary: 내 판매중 경매 목록
+      description: 마이페이지 판매중 화면에서 현재 사용자의 진행중 경매 목록을 페이징 조회한다.
+      operationId: getMySellingAuctions
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 내 판매중 경매 목록 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MySellingAuctionListResponse"
+  /api/v1/members/nickname/check:
     get:
       tags:
       - Member
@@ -732,13 +1610,37 @@ paths:
           maxLength: 30
           minLength: 2
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/NicknameCheckResponse"
-  "/api/v1/members/login-id/check":
+                $ref: "#/components/schemas/NicknameCheckResponse"
+  /api/v1/members/login-id/check:
     get:
       tags:
       - Member
@@ -754,13 +1656,37 @@ paths:
           maxLength: 30
           minLength: 0
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/LoginIdCheckResponse"
-  "/api/v1/health":
+                $ref: "#/components/schemas/LoginIdCheckResponse"
+  /api/v1/health:
     get:
       tags:
       - Health
@@ -768,14 +1694,156 @@ paths:
       description: 애플리케이션의 기본 상태 정보를 반환합니다.
       operationId: health
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
                 type: object
                 additionalProperties: {}
-  "/api/v1/auth/me":
+  /api/v1/events/stream:
+    get:
+      tags:
+      - Events
+      summary: 앱 전역 SSE 구독
+      operationId: subscribe
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEmitter"
+  /api/v1/chats/unread-count:
+    get:
+      tags:
+      - Chats
+      summary: 전체 안읽음 개수 조회
+      operationId: getUnreadCount
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UnreadCountResponse"
+  /api/v1/chats/rooms/{roomId}/unread-count:
+    get:
+      tags:
+      - Chats
+      summary: 채팅방 안읽음 개수 조회
+      operationId: getRoomUnreadCount
+      parameters:
+      - name: roomId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RoomUnreadCountResponse"
+  /api/v1/auth/me:
     get:
       tags:
       - Auth
@@ -783,31 +1851,123 @@ paths:
       description: 현재 인증된 회원의 기본 정보를 조회합니다.
       operationId: me
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: OK
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/CurrentMemberResponse"
-  "/api/v1/auction/categories":
+                $ref: "#/components/schemas/CurrentMemberResponse"
+  /api/v1/auctions/{auctionId}/edit:
+    get:
+      tags:
+      - Auction
+      summary: 경매 수정용 상세 조회
+      description: 현재 사용자가 등록한 경매의 수정 화면 데이터를 조회한다.
+      operationId: getAuctionEditDetail
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 경매 수정용 상세 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuctionEditDetailResponse"
+  /api/v1/auction/categories:
     get:
       tags:
       - Auction
       summary: 카테고리 목록 조회
-      description: 상품 등록 화면에서 사용할 계층형 카테고리 목록을 반환한다.
       operationId: getCategories_1
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 카테고리 조회 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/CategoryOptionResponse"
-  "/api/v1/products/image/{imageId}":
+                $ref: "#/components/schemas/CategoryOptionResponse"
+  /api/v1/products/image/{imageId}:
     delete:
       tags:
       - Product
-      summary: 상품 이미지 삭제
+      summary: 일반 상품 이미지 삭제
       operationId: deleteImage
       parameters:
       - name: imageId
@@ -817,18 +1977,81 @@ paths:
           type: integer
           format: int64
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 이미지 삭제 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/DeleteProductImageResponse"
-  "/api/v1/auction/image/{imageId}":
+                $ref: "#/components/schemas/DeleteProductImageResponse"
+  /api/v1/chats/messages/{messageId}:
+    delete:
+      tags:
+      - Chats
+      summary: 채팅 메시지 삭제
+      operationId: deleteMessage
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+  /api/v1/auction/image/{imageId}:
     delete:
       tags:
       - Auction
-      summary: 상품 이미지 삭제
-      description: 등록 전에 업로드된 임시 이미지를 imageId 기준으로 삭제한다.
+      summary: 경매 상품 이미지 삭제
       operationId: deleteImage_1
       parameters:
       - name: imageId
@@ -838,133 +2061,63 @@ paths:
           type: integer
           format: int64
       responses:
-        '200':
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
           description: 이미지 삭제 성공
           content:
-            "*/*":
+            '*/*':
               schema:
-                "$ref": "#/components/schemas/DeleteAuctionImageResponse"
+                $ref: "#/components/schemas/DeleteAuctionImageResponse"
 components:
   schemas:
-    CreateChatRoomRequest:
-      type: object
-      required:
-      - productId
-      - receiverId
-      properties:
-        productId:
-          type: integer
-          format: int64
-        receiverId:
-          type: integer
-          format: int64
-    EventStreamConnectedEvent:
+    ErrorResponse:
       type: object
       properties:
-        type:
-          type: string
-          example: event.stream.connected
-        userId:
-          type: integer
-          format: int64
-        connectedAt:
+        timestamp:
           type: string
           format: date-time
-    CreateChatRoomResponse:
-      type: object
-      properties:
-        roomId:
+        status:
           type: integer
-          format: int64
-        chatType:
+          format: int32
+        code:
           type: string
-          enum:
-          - GENERAL
-          - AUCTION
-    ChatRoomListResponse:
-      type: object
-      properties:
-        content:
+        message:
+          type: string
+        errors:
           type: array
           items:
-            "$ref": "#/components/schemas/ChatRoomListItemResponse"
-    ChatRoomListItemResponse:
+            $ref: "#/components/schemas/FieldErrorDetail"
+    FieldErrorDetail:
       type: object
       properties:
-        roomId:
-          type: integer
-          format: int64
-        unreadCount:
-          type: integer
-    ChatMessageListResponse:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            "$ref": "#/components/schemas/ChatMessageResponse"
-    ChatMessageResponse:
-      type: object
-      properties:
-        messageId:
-          type: integer
-          format: int64
-        content:
+        field:
           type: string
-        senderNickname:
-          type: string
-        sentAt:
-          type: string
-          format: date-time
-    SendChatMessageRequest:
-      type: object
-      required:
-      - content
-      - messageType
-      properties:
-        content:
-          type: string
-        messageType:
-          type: string
-          enum:
-          - TEXT
-          - IMAGE
-          - SYSTEM
-          - TALK
-    SendChatMessageResponse:
-      "$ref": "#/components/schemas/ChatMessageResponse"
-    MarkChatRoomAsReadResponse:
-      type: object
-      properties:
-        roomId:
-          type: integer
-          format: int64
-        unreadCount:
-          type: integer
-    RoomUnreadCountResponse:
-      type: object
-      properties:
-        roomId:
-          type: integer
-          format: int64
-        unreadCount:
-          type: integer
-        updatedAt:
-          type: string
-          format: date-time
-    UnreadCountResponse:
-      type: object
-      properties:
-        totalUnreadCount:
-          type: integer
-    ReportChatMessageRequest:
-      type: object
-      required:
-      - reason
-      properties:
+        rejectedValue: {}
         reason:
           type: string
-          maxLength: 255
     UploadProfileImageResponse:
       type: object
       properties:
@@ -1009,7 +2162,7 @@ components:
         images:
           type: array
           items:
-            "$ref": "#/components/schemas/ProductImagePayload"
+            $ref: "#/components/schemas/ProductImagePayload"
             minItems: 1
           minItems: 1
         location:
@@ -1081,10 +2234,10 @@ components:
           - ENDED
           example: ON_SALE
         auction:
-          "$ref": "#/components/schemas/AuctionResponse"
+          $ref: "#/components/schemas/AuctionResponse"
           description: 경매 메타 정보
         generalSale:
-          "$ref": "#/components/schemas/GeneralSaleResponse"
+          $ref: "#/components/schemas/GeneralSaleResponse"
           description: 일반 판매 정보
     GeneralSaleResponse:
       type: object
@@ -1185,7 +2338,7 @@ components:
           type: array
           description: 상품 이미지 목록
           items:
-            "$ref": "#/components/schemas/ProductImagePayload"
+            $ref: "#/components/schemas/ProductImagePayload"
         location:
           type: string
           description: 거래 위치
@@ -1209,7 +2362,7 @@ components:
           type: string
           format: date-time
           description: 저장 시각
-          example: 2026-04-12 20:00:00.000000000 Z
+          example: 2026-04-12T20:00:00Z
     RecommendCategoryRequest:
       type: object
       description: 일반 상품 카테고리 추천 요청
@@ -1326,6 +2479,10 @@ components:
           type: string
         detailAddress:
           type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
         locationSource:
           type: string
           enum:
@@ -1378,6 +2535,143 @@ components:
           type: string
         verified:
           type: boolean
+    CreateChatRoomRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+      required:
+      - productId
+    ActionButtons:
+      type: object
+      properties:
+        canPay:
+          type: boolean
+        canCompleteTrade:
+          type: boolean
+        payButtonType:
+          type: string
+        completeTradeButtonType:
+          type: string
+    CreateChatRoomResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        chatType:
+          type: string
+          enum:
+          - GENERAL
+          - AUCTION
+        product:
+          $ref: "#/components/schemas/ProductInfo"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantInfo"
+        isWinner:
+          type: boolean
+        actionButtons:
+          $ref: "#/components/schemas/ActionButtons"
+        createdAt:
+          type: string
+          format: date-time
+    ParticipantInfo:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        role:
+          type: string
+    ProductInfo:
+      type: object
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+        saleType:
+          type: string
+        status:
+          type: string
+    SendChatMessageRequest:
+      type: object
+      properties:
+        messageType:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - SYSTEM
+          - TALK
+        content:
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+      - content
+      - messageType
+    SendChatMessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: integer
+          format: int64
+        roomId:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        messageType:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - SYSTEM
+          - TALK
+        content:
+          type: string
+        isRead:
+          type: boolean
+        sentAt:
+          type: string
+          format: date-time
+    ReportChatMessageRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 255
+          minLength: 1
+        description:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - reason
+    ReportChatMessageResponse:
+      type: object
+      properties:
+        reportId:
+          type: integer
+          format: int64
+        messageId:
+          type: integer
+          format: int64
+        reason:
+          type: string
+        reportedAt:
+          type: string
+          format: date-time
     LoginRequest:
       type: object
       description: 로그인 요청
@@ -1433,6 +2727,7 @@ components:
           type: string
           description: 판매 유형
           enum:
+          - REGULAR
           - AUCTION
           example: AUCTION
         categoryId:
@@ -1456,7 +2751,7 @@ components:
         images:
           type: array
           items:
-            "$ref": "#/components/schemas/ProductImagePayload"
+            $ref: "#/components/schemas/ProductImagePayload"
             minItems: 1
           minItems: 1
         location:
@@ -1477,47 +2772,301 @@ components:
       - location
       - name
       - saleType
-    MySellingAuctionListResponse:
+    AuctionScheduleResponse:
       type: object
-      description: 내 판매중 경매 목록 응답
+      description: 경매 일정 및 상태 정보
       properties:
-        content:
-          type: array
-          description: 판매중 경매 목록
-          items:
-            $ref: "#/components/schemas/MySellingAuctionItemResponse"
-        page:
-          type: integer
-          format: int32
-          description: 현재 페이지 번호(0부터 시작)
-          example: 0
-        size:
-          type: integer
-          format: int32
-          description: 페이지 크기
-          example: 20
-        totalElements:
+        status:
+          type: string
+          description: 경매 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        startAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-15T10:00:00Z
+        endAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-04-15T12:00:00Z
+    CreateAuctionResponse:
+      type: object
+      description: 경매 상품 등록 응답
+      properties:
+        productId:
           type: integer
           format: int64
-          description: 전체 상품 수
-          example: 1
-        hasNext:
-          type: boolean
-          description: 다음 페이지 존재 여부
-          example: false
-    MySellingAuctionItemResponse:
+          description: 등록된 상품 ID
+          example: 1001
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        status:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        auction:
+          $ref: "#/components/schemas/AuctionScheduleResponse"
+          description: 경매 메타 정보
+    UploadAuctionImageResponse:
       type: object
-      description: 내 판매중 경매 항목
+      description: 상품 이미지 업로드 응답
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 업로드된 이미지 ID
+          example: 301
+        imageUrl:
+          type: string
+          description: 업로드된 이미지 URL
+          example: http://localhost:8080/uploads/auction/images/301-sample.jpg
+    SaveAuctionDraftRequest:
+      type: object
+      description: 경매 상품 임시저장 요청
+      properties:
+        name:
+          type: string
+          description: 상품명
+          example: 애플워치 시리즈 9
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 개봉 후 몇 번 사용하지 않았고 충전기도 함께 드립니다.
+          maxLength: 2000
+          minLength: 0
+        saleType:
+          type: string
+          description: 판매 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: AUCTION
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 3
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+          maxLength: 100
+          minLength: 0
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 5
+    SaveAuctionDraftResponse:
+      type: object
+      description: 경매 상품 임시저장 응답
+      properties:
+        draftId:
+          type: integer
+          format: int64
+          description: 임시저장 ID
+          example: 10
+        savedAt:
+          type: string
+          format: date-time
+          description: 저장 시각
+          example: 2026-04-12T20:00:00Z
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nickname:
+          type: string
+          maxLength: 30
+          minLength: 2
+        bio:
+          type: string
+          maxLength: 500
+          minLength: 0
+        profileImageUrl:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - nickname
+    MyPageProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+        location:
+          type: string
+        verified:
+          type: boolean
+        rating:
+          type: number
+          format: double
+        warningCount:
+          type: integer
+          format: int32
+        biddingCount:
+          type: integer
+          format: int32
+        sellingCount:
+          type: integer
+          format: int32
+        wishlistCount:
+          type: integer
+          format: int32
+    UpdateMyLocationRequest:
+      type: object
+      properties:
+        location:
+          type: string
+          maxLength: 100
+          minLength: 0
+        postalCode:
+          type: string
+          maxLength: 10
+          minLength: 0
+        roadAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        jibunAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        detailAddress:
+          type: string
+          maxLength: 255
+          minLength: 0
+        latitude:
+          type: number
+          maximum: 90.0
+          minimum: -90.0
+        longitude:
+          type: number
+          maximum: 180.0
+          minimum: -180.0
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    UpdateMyLocationResponse:
+      type: object
+      properties:
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        categoryId:
+          type: integer
+          format: int64
+        price:
+          type: number
+          minimum: 0.01
+        allowOffer:
+          type: boolean
+        location:
+          type: string
+          maxLength: 100
+          minLength: 0
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+          minItems: 1
+      required:
+      - allowOffer
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - price
+    ProductEditDetailResponse:
+      type: object
+      description: 일반 상품 수정 상세 응답
       properties:
         productId:
           type: integer
           format: int64
           description: 상품 ID
-          example: 10
-        auctionId:
-          type: integer
-          format: int64
-          description: 경매 ID. 별도 경매 테이블 도입 전까지 상품 ID와 동일
           example: 10
         name:
           type: string
@@ -1526,72 +3075,127 @@ components:
         description:
           type: string
           description: 상품 설명
-          example: 거의 새것입니다.
+          example: 거의 새 상품입니다.
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 16
         categoryName:
           type: string
           description: 카테고리명
-          example: 전자기기
-        thumbnailUrl:
+          example: iPhone
+        location:
           type: string
-          description: 썸네일 이미지 URL
-          nullable: true
-          example: https://example.com/auction/images/10.jpg
-        auctionStatus:
+          description: 거래 위치
+          example: 서울특별시 강남구
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/ProductEditImageResponse"
+        price:
+          type: number
+          description: 판매 가격
+          example: 850000
+        allowOffer:
+          type: boolean
+          description: 가격 제안 허용 여부
+          example: false
+        status:
           type: string
-          description: 경매 상태
+          description: 상품 상태
           enum:
-          - AUCTION_LIVE
-          example: AUCTION_LIVE
-        startPrice:
-          type: number
-          description: 경매 시작가
-          example: 700000
-        currentPrice:
-          type: number
-          description: 현재가
-          example: 700000
-        minimumNextBidPrice:
-          type: number
-          description: 최소 다음 입찰가
-          example: 700000
-        bidCount:
-          type: integer
-          format: int32
-          description: 입찰 수
-          example: 0
-        bidderCount:
-          type: integer
-          format: int32
-          description: 입찰자 수
-          example: 0
-        startAt:
-          type: string
-          format: date-time
-          description: 경매 시작 시각
-          example: 2026-04-30T09:00:00+09:00
-        endAt:
-          type: string
-          format: date-time
-          description: 경매 종료 시각
-          example: 2026-05-03T09:00:00+09:00
-        canEdit:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        editable:
           type: boolean
           description: 수정 가능 여부
           example: true
-        canDelete:
-          type: boolean
-          description: 삭제 가능 여부
-          example: true
-        createdAt:
+    ProductEditImageResponse:
+      type: object
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: https://example.com/product/images/1.jpg
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+    MarkChatRoomAsReadResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        message:
+          type: string
+        unreadCount:
+          type: integer
+          format: int32
+        readAt:
           type: string
           format: date-time
-          description: 생성 시각
-          example: 2026-04-30T08:40:00+09:00
-        updatedAt:
+    UpdateAuctionRequest:
+      type: object
+      description: 경매 상품 수정 요청
+      properties:
+        name:
           type: string
-          format: date-time
-          description: 수정 시각
-          example: 2026-04-30T10:12:00+09:00
+          description: 상품명
+          example: 맥북에어입니다
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: 상품 설명
+          example: 맥북입니다!!! 에어이고 많이안써서 깨끗해용
+          maxLength: 2000
+          minLength: 0
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 400000
+        auctionDurationDays:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(일 단위)
+          example: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 경기도 부천시 소사구 소사동로72번길 32
+          maxLength: 100
+          minLength: 0
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+      required:
+      - auctionDurationDays
+      - categoryId
+      - description
+      - images
+      - location
+      - name
+      - startPrice
     AuctionEditDetailResponse:
       type: object
       description: 경매 수정용 상세 응답
@@ -1636,6 +3240,496 @@ components:
           type: number
           description: 경매 시작가
           example: 700000
+        auctionDurationDays:
+          type: integer
+          format: int64
+          description: 경매 진행 기간(일)
+          example: 3
+        auctionStatus:
+          type: string
+          description: 경매 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        bidCount:
+          type: integer
+          format: int32
+          description: 입찰 수
+          example: 0
+        bidderCount:
+          type: integer
+          format: int32
+          description: 입찰자 수
+          example: 0
+        canEdit:
+          type: boolean
+          description: 수정 가능 여부
+          example: true
+    AuctionEditImageResponse:
+      type: object
+      description: 경매 수정용 이미지
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: https://example.com/auction/images/10.jpg
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+    MyLocationResponse:
+      type: object
+      properties:
+        location:
+          type: string
+        postalCode:
+          type: string
+        roadAddress:
+          type: string
+        jibunAddress:
+          type: string
+        detailAddress:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        locationSource:
+          type: string
+          enum:
+          - MANUAL
+          - POSTCODE
+          - GPS
+    CategoryOptionResponse:
+      type: object
+      description: 카테고리 선택 옵션
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 1
+        nameKo:
+          type: string
+          description: 카테고리 한글명
+          example: 전자기기
+        nameEn:
+          type: string
+          description: 카테고리 영문명
+          example: Electronics
+        depth:
+          type: integer
+          format: int32
+          description: 카테고리 깊이
+          example: 1
+        parentId:
+          type: integer
+          format: int64
+          description: 부모 카테고리 ID
+          example: "null"
+        children:
+          type: array
+          description: 하위 카테고리 목록
+          items:
+            $ref: "#/components/schemas/CategoryOptionResponse"
+    MySellingProductItemResponse:
+      type: object
+      description: 내 판매 중 일반 상품 항목
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새 상품입니다.
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 전자기기
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL
+          example: https://example.com/product/images/10.jpg
+        productStatus:
+          type: string
+          description: 상품 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - SOLD
+          - ENDED
+          example: ON_SALE
+        price:
+          type: number
+          description: 판매 가격
+          example: 850000
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울특별시 강남구
+        canEdit:
+          type: boolean
+          description: 수정 가능 여부
+          example: true
+        canDelete:
+          type: boolean
+          description: 삭제 가능 여부
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: 생성 시각
+          example: 2026-05-02T10:00:00+09:00
+        updatedAt:
+          type: string
+          format: date-time
+          description: 수정 시각
+          example: 2026-05-02T11:00:00+09:00
+        generalSale:
+          $ref: "#/components/schemas/GeneralSaleResponse"
+          description: 일반 판매 상세 정보. 경매 상품이면 null
+        auction:
+          $ref: "#/components/schemas/AuctionResponse"
+          description: 경매 상세 정보. 일반 상품이면 null
+        canChat:
+          type: boolean
+          description: 채팅 가능 여부
+          example: true
+        canBid:
+          type: boolean
+          description: 입찰 가능 여부
+          example: false
+        canPurchase:
+          type: boolean
+          description: 구매 가능 여부
+          example: true
+        canFavorite:
+          type: boolean
+          description: 찜 가능 여부
+          example: true
+    SellerResponse:
+      type: object
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 101
+        price:
+          type: number
+          description: 일반 판매가
+          example: 120000
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 80000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 800
+        auctionDurationDays:
+          type: number
+          description: 경매 진행 기간(일 단위, 테스트용 소수 허용)
+          example: 0.00011574074074074075
+        auctionDurationSeconds:
+          type: integer
+          format: int32
+          description: 경매 진행 기간(초 단위, 테스트용)
+          example: 10
+        endsAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: "2026-05-02T12:00:00Z"
+        images:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ProductImagePayload"
+            minItems: 1
+          minItems: 1
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+    CategoryOptionResponse:
+      type: object
+      description: 내 판매 중 일반 상품 목록 응답
+      properties:
+        content:
+          type: array
+          description: 판매 중 일반 상품 목록
+          items:
+            $ref: "#/components/schemas/MySellingProductItemResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 상품 수
+          example: 1
+        hasNext:
+          type: boolean
+          description: 다음 페이지 존재 여부
+          example: false
+    AuctionDetailResponse:
+      type: object
+      description: 경매 상세페이지 응답
+      properties:
+        auctionId:
+          type: integer
+          format: int64
+          description: 경매 ID
+          example: 10
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새것입니다.
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 19
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 전자기기
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+        images:
+          type: array
+          description: 상품 이미지 목록
+          items:
+            $ref: "#/components/schemas/AuctionDetailImageResponse"
+        seller:
+          $ref: "#/components/schemas/AuctionDetailSellerResponse"
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 700000
+        currentPrice:
+          type: number
+          description: 현재가
+          example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
+        minimumNextBidPrice:
+          type: number
+          description: 최소 다음 입찰가
+          example: 707000
+        bidCount:
+          type: integer
+          format: int32
+          description: 입찰 수
+          example: 0
+        bidderCount:
+          type: integer
+          format: int32
+          description: 입찰자 수
+          example: 0
+        startAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-30T09:00:00+09:00
+        endsAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-05-03T09:00:00+09:00
+        serverTime:
+          type: string
+          format: date-time
+          description: 서버 현재 시각
+          example: 2026-04-30T09:10:00Z
+        status:
+          type: string
+          description: 경매 상태
+          enum:
+          - AUCTION_LIVE
+          example: AUCTION_LIVE
+    AuctionDetailImageResponse:
+      type: object
+      description: 경매 상세 이미지
+      properties:
+        imageId:
+          type: integer
+          format: int64
+          description: 이미지 ID
+          example: 1
+        imageUrl:
+          type: string
+          description: 이미지 URL
+          example: http://localhost:8080/uploads/auction/images/1-sample.jpg
+        sortOrder:
+          type: integer
+          format: int32
+          description: 정렬 순서
+          example: 1
+    AuctionDetailSellerResponse:
+      type: object
+      description: 경매 판매자 정보
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 판매자 회원 ID
+          example: 1
+        nickname:
+          type: string
+          description: 판매자 닉네임
+          example: Dealit#1
+        profileImageUrl:
+          type: string
+          nullable: true
+          description: 판매자 프로필 이미지 URL
+          example: http://localhost:8080/uploads/profile/images/1-profile.png
+    MySellingAuctionItemResponse:
+      type: object
+      description: 내 판매중 경매 항목
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 10
+        auctionId:
+          type: integer
+          format: int64
+          description: 경매 ID. 별도 경매 테이블 도입 전까지 상품 ID와 동일
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 아이폰 14 Pro
+        description:
+          type: string
+          description: 상품 설명
+          example: 거의 새것입니다.
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 전자기기
+        thumbnailUrl:
+          type: string
+          description: 썸네일 이미지 URL
+          example: https://example.com/auction/images/10.jpg
+        auctionStatus:
+          type: string
+          description: 경매 상태
+          enum:
+          - DRAFT
+          - ON_SALE
+          - AUCTION_LIVE
+          - ENDED
+          example: AUCTION_LIVE
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
+        currentPrice:
+          type: number
+          description: 현재가
+          example: 700000
+        minimumNextBidPrice:
+          type: number
+          description: 최소 다음 입찰가
+          example: 707000
+        bidCount:
+          type: integer
+          format: int32
+          description: 입찰 수
+          example: 0
+        bidderCount:
+          type: integer
+          format: int32
+          description: 입찰자 수
+          example: 0
+        startAt:
+          type: string
+          format: date-time
+          description: 경매 시작 시각
+          example: 2026-04-30T09:00:00+09:00
+        endAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-05-03T09:00:00+09:00
+        canEdit:
+          type: boolean
+          description: 수정 가능 여부
+          example: true
+        canDelete:
+          type: boolean
+          description: 삭제 가능 여부
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: 생성 시각
+          example: 2026-04-30T08:40:00+09:00
+        updatedAt:
+          type: string
+          format: date-time
+          description: 수정 시각
+          example: 2026-04-30T10:12:00+09:00
+    MySellingAuctionListResponse:
+      type: object
+      description: 내 판매중 경매 목록 응답
+      properties:
+        content:
+          type: array
+          description: 판매중 경매 목록
+          items:
+            $ref: "#/components/schemas/AuctionEditImageResponse"
+        startPrice:
+          type: number
+          description: 경매 시작가
+          example: 700000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 7000
         auctionDurationDays:
           type: integer
           format: int64
@@ -1704,6 +3798,11 @@ components:
           type: number
           description: 경매 시작가
           example: 400000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위. 생략 시 시작가의 1%로 계산
+          nullable: true
+          example: 4000
         auctionDurationDays:
           type: integer
           format: int32
@@ -1825,196 +3924,24 @@ components:
           type: number
           description: 경매 시작가
           example: 80000
+        minimumBidAmount:
+          type: number
+          description: 최소 입찰 금액/입찰 단위
+          example: 800
         auctionDurationDays:
           type: integer
           format: int32
-          description: 경매 진행 기간(일 단위)
-          example: 3
-        images:
-          type: array
-          description: 상품 이미지 목록
-          items:
-            "$ref": "#/components/schemas/ProductImagePayload"
-        location:
-          type: string
-          description: 거래 위치
-          example: 서울 강남구
-          maxLength: 100
-          minLength: 0
-        draftId:
+          description: 페이지 크기
+          example: 20
+        totalElements:
           type: integer
           format: int64
-          description: 임시저장 ID
-          example: 5
-    SaveAuctionDraftResponse:
-      type: object
-      description: 경매 상품 임시저장 응답
-      properties:
-        draftId:
-          type: integer
-          format: int64
-          description: 임시저장 ID
-          example: 10
-        savedAt:
-          type: string
-          format: date-time
-          description: 저장 시각
-          example: 2026-04-12 20:00:00.000000000 Z
-    UpdateMyProfileRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 30
-          minLength: 0
-        nickname:
-          type: string
-          maxLength: 30
-          minLength: 2
-        bio:
-          type: string
-          maxLength: 500
-          minLength: 0
-        profileImageUrl:
-          type: string
-          maxLength: 500
-          minLength: 0
-      required:
-      - nickname
-    MyPageProfileResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        nickname:
-          type: string
-        email:
-          type: string
-        bio:
-          type: string
-        profileImageUrl:
-          type: string
-        location:
-          type: string
-        verified:
+          description: 전체 상품 수
+          example: 1
+        hasNext:
           type: boolean
-        rating:
-          type: number
-          format: double
-        warningCount:
-          type: integer
-          format: int32
-        biddingCount:
-          type: integer
-          format: int32
-        sellingCount:
-          type: integer
-          format: int32
-        wishlistCount:
-          type: integer
-          format: int32
-    UpdateMyLocationRequest:
-      type: object
-      properties:
-        location:
-          type: string
-          maxLength: 100
-          minLength: 0
-        postalCode:
-          type: string
-          maxLength: 10
-          minLength: 0
-        roadAddress:
-          type: string
-          maxLength: 255
-          minLength: 0
-        jibunAddress:
-          type: string
-          maxLength: 255
-          minLength: 0
-        detailAddress:
-          type: string
-          maxLength: 255
-          minLength: 0
-        locationSource:
-          type: string
-          enum:
-          - MANUAL
-          - POSTCODE
-          - GPS
-    UpdateMyLocationResponse:
-      type: object
-      properties:
-        location:
-          type: string
-        postalCode:
-          type: string
-        roadAddress:
-          type: string
-        jibunAddress:
-          type: string
-        detailAddress:
-          type: string
-        locationSource:
-          type: string
-          enum:
-          - MANUAL
-          - POSTCODE
-          - GPS
-    MyLocationResponse:
-      type: object
-      properties:
-        location:
-          type: string
-        postalCode:
-          type: string
-        roadAddress:
-          type: string
-        jibunAddress:
-          type: string
-        detailAddress:
-          type: string
-        locationSource:
-          type: string
-          enum:
-          - MANUAL
-          - POSTCODE
-          - GPS
-    CategoryOptionResponse:
-      type: object
-      description: 카테고리 선택 옵션
-      properties:
-        id:
-          type: integer
-          format: int64
-          description: 카테고리 ID
-          example: 1
-        nameKo:
-          type: string
-          description: 카테고리 한글명
-          example: 전자기기
-        nameEn:
-          type: string
-          description: 카테고리 영문명
-          example: Electronics
-        depth:
-          type: integer
-          format: int32
-          description: 카테고리 깊이
-          example: 1
-        parentId:
-          type: integer
-          format: int64
-          description: 부모 카테고리 ID
-          example: 'null'
-        children:
-          type: array
-          description: 하위 카테고리 목록
-          items:
-            "$ref": "#/components/schemas/CategoryOptionResponse"
+          description: 다음 페이지 존재 여부
+          example: false
     NicknameCheckResponse:
       type: object
       properties:
@@ -2029,6 +3956,146 @@ components:
           type: string
         available:
           type: boolean
+    SseEmitter:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          format: int64
+    UnreadCountResponse:
+      type: object
+      properties:
+        totalUnreadCount:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    ChatRoomListItemResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        opponent:
+          $ref: "#/components/schemas/OpponentInfo"
+        product:
+          $ref: "#/components/schemas/ProductInfo"
+        chatType:
+          type: string
+          enum:
+          - GENERAL
+          - AUCTION
+        lastMessage:
+          $ref: "#/components/schemas/LastMessageInfo"
+        unreadCount:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    ChatRoomListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatRoomListItemResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        hasNext:
+          type: boolean
+    LastMessageInfo:
+      type: object
+      properties:
+        messageId:
+          type: integer
+          format: int64
+        type:
+          type: string
+        content:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+    OpponentInfo:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        profileImageUrl:
+          type: string
+    RoomUnreadCountResponse:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          format: int64
+        unreadCount:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    ChatMessageListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessageResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        hasNext:
+          type: boolean
+    ChatMessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        senderNickname:
+          type: string
+        messageType:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - SYSTEM
+          - TALK
+        content:
+          type: string
+        isRead:
+          type: boolean
+        sentAt:
+          type: string
+          format: date-time
     CurrentMemberResponse:
       type: object
       description: 현재 인증된 회원 정보

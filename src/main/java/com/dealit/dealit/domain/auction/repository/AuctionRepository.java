@@ -26,4 +26,10 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 
 	@EntityGraph(attributePaths = {"product", "product.images"})
 	Optional<Auction> findByProductProductIdAndDeletedAtIsNullAndProductDeletedAtIsNull(Long productId);
+
+	@EntityGraph(attributePaths = {"product"})
+	Optional<Auction> findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(Long auctionId);
+
+	@EntityGraph(attributePaths = {"product", "product.images"})
+	Optional<Auction> findDetailByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(Long auctionId);
 }

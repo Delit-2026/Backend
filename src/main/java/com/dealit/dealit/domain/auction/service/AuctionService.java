@@ -24,14 +24,17 @@ import com.dealit.dealit.domain.auction.entity.AuctionDraft;
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.exception.AuctionAccessDeniedException;
-import com.dealit.dealit.domain.auction.exception.AuctionConflictException;
+import com.dealit.dealit.domain.auction.exception.AuctionAlreadyBiddedException;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.AuctionProductNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
+import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
+import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
@@ -51,6 +54,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -71,6 +75,7 @@ public class AuctionService {
 
 	private final AuctionRepository auctionRepository;
 	private final AuctionDraftRepository auctionDraftRepository;
+	private final BidRepository bidRepository;
 	private final CategoryRepository categoryRepository;
 	private final MemberRepository memberRepository;
 	private final ProductRepository productRepository;
@@ -78,6 +83,8 @@ public class AuctionService {
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
+	private final AuctionRedisService auctionRedisService;
+	private final Clock clock;
 
 	public MySellingAuctionListResponse getMySellingAuctionProducts(Long memberId, int page, int size) {
 		loadActiveMember(memberId);
@@ -85,7 +92,7 @@ public class AuctionService {
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
 		Page<Auction> auctionPage = auctionRepository.findAllByProductMemberIdAndStatusAndDeletedAtIsNullAndProductDeletedAtIsNull(
 			memberId,
-			AuctionStatus.AUCTION_LIVE,
+			AuctionStatus.ONGOING,
 			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
 		);
 
@@ -109,7 +116,7 @@ public class AuctionService {
 		if (file == null || file.isEmpty()) {
 			throw new InvalidAuctionRequestException("이미지 파일은 필수입니다.");
 		}
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 
 		String originalFilename = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename().trim();
 		ProductImage savedImage = productImageRepository.save(
@@ -142,6 +149,7 @@ public class AuctionService {
 			resolveThumbnailUrl(product),
 			auction.getStatus(),
 			auction.getStartPrice(),
+			auction.getMinimumBidAmount(),
 			resolveCurrentPrice(auction),
 			resolveMinimumNextBidPrice(auction),
 			bidCount,
@@ -182,6 +190,7 @@ public class AuctionService {
 			product.getLocation(),
 			images,
 			auction.getStartPrice(),
+			auction.getMinimumBidAmount(),
 			resolveAuctionDurationDays(auction),
 			auction.getStatus(),
 			bidCount,
@@ -195,7 +204,7 @@ public class AuctionService {
 		loadActiveMember(memberId);
 		Auction auction = loadOwnedAuction(memberId, auctionId);
 		if (getBidCount(auction) > 0) {
-			throw new AuctionConflictException("입찰자가 있는 경매는 삭제할 수 없습니다.");
+			throw new AuctionAlreadyBiddedException();
 		}
 		for (ProductImage image : auction.getProduct().getImages()) {
 			auctionImageStorage.delete(image.getImageUrl());
@@ -211,28 +220,30 @@ public class AuctionService {
 		Auction auction = loadOwnedAuction(memberId, auctionId);
 		Product product = auction.getProduct();
 		if (getBidCount(auction) > 0) {
-			throw new AuctionConflictException("입찰자가 있는 경매는 수정할 수 없습니다.");
+			throw new AuctionAlreadyBiddedException();
 		}
 
 		validateUpdateAuctionRequest(request);
 		validateCategorySelection(request.categoryId());
 
 		OffsetDateTime startAt = auction.getAuctionStartAt() == null
-			? OffsetDateTime.now(ZoneOffset.UTC)
+			? OffsetDateTime.now(clock)
 			: auction.getAuctionStartAt();
 		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
-		if (!endAt.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) {
+		if (!endAt.isAfter(OffsetDateTime.now(clock))) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
 		}
+		BigDecimal minimumBidAmount = resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
 
 		product.updateEditableDetails(
 			request.name().trim(),
 			request.description().trim(),
 			request.categoryId(),
 			request.startPrice(),
-			request.location().trim()
+				request.location().trim()
 		);
-		auction.updateEditableDetails(request.startPrice(), endAt);
+		auction.updateEditableDetails(request.startPrice(), minimumBidAmount, endAt);
+		auctionRedisService.refreshEnding(auction);
 
 		replaceAuctionImages(product, request.images());
 
@@ -310,19 +321,23 @@ public class AuctionService {
 	}
 
 	private BigDecimal resolveCurrentPrice(Auction auction) {
-		return auction.getCurrentPrice();
+		BigDecimal currentPrice = auction.getCurrentPrice();
+		if (currentPrice == null || currentPrice.signum() <= 0) {
+			return auction.getStartPrice();
+		}
+		return currentPrice;
 	}
 
 	private BigDecimal resolveMinimumNextBidPrice(Auction auction) {
-		return resolveCurrentPrice(auction);
+		return resolveCurrentPrice(auction).add(auction.getMinimumBidAmount());
 	}
 
 	private int getBidCount(Auction auction) {
-		return 0;
+		return (int) bidRepository.countByAuctionAuctionId(auction.getAuctionId());
 	}
 
 	private int getBidderCount(Auction auction) {
-		return 0;
+		return (int) bidRepository.countDistinctBidderIdByAuctionId(auction.getAuctionId());
 	}
 
 	private long resolveAuctionDurationDays(Auction auction) {
@@ -360,7 +375,7 @@ public class AuctionService {
 				.findByProductProductIdAndDeletedAtIsNullAndProductDeletedAtIsNull(image.getProduct().getProductId())
 				.orElseThrow(() -> new InvalidAuctionRequestException("경매 상품 이미지가 아닙니다."));
 			if (getBidCount(auction) > 0) {
-				throw new AuctionConflictException("입찰자가 있는 경매는 수정할 수 없습니다.");
+				throw new AuctionAlreadyBiddedException();
 			}
 			auction.getProduct().removeImage(image);
 		}
@@ -387,6 +402,7 @@ public class AuctionService {
 				member.getMemberId(),
 				request.price(),
 				request.startPrice(),
+				request.minimumBidAmount(),
 				null,
 				null,
 				request.auctionDurationDays(),
@@ -404,6 +420,7 @@ public class AuctionService {
 							member.getMemberId(),
 							request.price(),
 							request.startPrice(),
+							request.minimumBidAmount(),
 							null,
 							null,
 							request.auctionDurationDays(),
@@ -421,6 +438,7 @@ public class AuctionService {
 						member.getMemberId(),
 						request.price(),
 						request.startPrice(),
+						request.minimumBidAmount(),
 						null,
 						null,
 						request.auctionDurationDays(),
@@ -486,8 +504,9 @@ public class AuctionService {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
 		Member member = loadActiveMember(memberId);
-		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+		OffsetDateTime now = OffsetDateTime.now(clock);
 		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
+		BigDecimal minimumBidAmount = resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
 
 		Product product = productRepository.save(
 			Product.create(
@@ -508,6 +527,7 @@ public class AuctionService {
 			Auction.create(
 				product,
 				request.startPrice(),
+				minimumBidAmount,
 				auctionPeriod.startAt(),
 				auctionPeriod.endAt(),
 				determineStatus(
@@ -516,6 +536,7 @@ public class AuctionService {
 				)
 			)
 		);
+		auctionRedisService.initialize(auction);
 
 		Map<Long, ProductImage> imagesById = loadRequestedProductImages(member.getMemberId(), request.images());
 		for (ProductImagePayload imagePayload : request.images()) {
@@ -617,6 +638,14 @@ public class AuctionService {
 			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
 	}
 
+	private Member loadVerifiedMember(Long memberId) {
+		Member member = loadActiveMember(memberId);
+		if (!member.isVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+		return member;
+	}
+
 	private void validateRequestBySaleType(CreateAuctionRequest request) {
 		if (request.saleType() != ProductSaleType.AUCTION) {
 			throw new InvalidAuctionRequestException("경매 등록에서는 AUCTION 판매 유형만 허용됩니다.");
@@ -625,14 +654,18 @@ public class AuctionService {
 		if (request.startPrice() == null) {
 			throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
 		}
-		if (request.auctionDurationDays() == null) {
-			throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간이 필수입니다.");
+		if (request.auctionDurationDays() == null && request.auctionDurationSeconds() == null && request.endsAt() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 진행 기간 또는 종료 시각이 필수입니다.");
 		}
 		if (request.startPrice().signum() <= 0) {
 			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
 		}
-		if (request.auctionDurationDays() <= 0) {
+		resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
+		if (request.auctionDurationDays() != null && request.auctionDurationDays().signum() <= 0) {
 			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
+		}
+		if (request.auctionDurationSeconds() != null && request.auctionDurationSeconds() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간(초)은 0보다 커야 합니다.");
 		}
 	}
 
@@ -640,15 +673,41 @@ public class AuctionService {
 		if (request.startPrice().signum() <= 0) {
 			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
 		}
+		resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
 		if (request.auctionDurationDays() <= 0) {
 			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
 		}
 	}
 
+	private BigDecimal resolveMinimumBidAmount(BigDecimal startPrice, BigDecimal requestedMinimumBidAmount) {
+		if (requestedMinimumBidAmount != null) {
+			if (requestedMinimumBidAmount.signum() <= 0) {
+				throw new InvalidAuctionRequestException("최소 입찰 금액은 0보다 커야 합니다.");
+			}
+			return requestedMinimumBidAmount;
+		}
+		return startPrice.multiply(BigDecimal.valueOf(0.01)).setScale(0, RoundingMode.CEILING);
+	}
+
 	private AuctionPeriod resolveAuctionPeriod(CreateAuctionRequest request, OffsetDateTime now) {
 		OffsetDateTime startAt = now;
-		OffsetDateTime endAt = startAt.plusDays(request.auctionDurationDays());
+		OffsetDateTime endAt;
+		if (request.endsAt() != null) {
+			endAt = request.endsAt();
+		} else if (request.auctionDurationSeconds() != null) {
+			endAt = startAt.plusSeconds(request.auctionDurationSeconds());
+		} else {
+			endAt = startAt.plus(toDurationFromDays(request.auctionDurationDays()));
+		}
 		return new AuctionPeriod(startAt, endAt);
+	}
+
+	private Duration toDurationFromDays(BigDecimal auctionDurationDays) {
+		long millis = auctionDurationDays
+			.multiply(BigDecimal.valueOf(24L * 60L * 60L * 1000L))
+			.setScale(0, RoundingMode.HALF_UP)
+			.longValueExact();
+		return Duration.ofMillis(millis);
 	}
 
 	private AuctionStatus determineStatus(
@@ -658,7 +717,7 @@ public class AuctionService {
 		if (auctionEndAt != null && auctionEndAt.isBefore(now)) {
 			throw new InvalidAuctionRequestException("경매 종료 시각은 현재 시각 이후여야 합니다.");
 		}
-		return AuctionStatus.AUCTION_LIVE;
+		return AuctionStatus.ONGOING;
 	}
 
 	private String serializeDraft(SaveAuctionDraftRequest request) {
@@ -676,6 +735,7 @@ public class AuctionService {
 		boolean hasCategory = request.categoryId() != null;
 		boolean hasPrice = request.price() != null;
 		boolean hasStartPrice = request.startPrice() != null;
+		boolean hasMinimumBidAmount = request.minimumBidAmount() != null;
 		boolean hasAuctionDurationDays = request.auctionDurationDays() != null;
 		boolean hasImages = request.images() != null && !request.images().isEmpty();
 		boolean hasLocation = normalizeBlank(request.location()) != null;
@@ -687,6 +747,7 @@ public class AuctionService {
 			!hasCategory &&
 			!hasPrice &&
 			!hasStartPrice &&
+			!hasMinimumBidAmount &&
 			!hasAuctionDurationDays &&
 			!hasImages &&
 			!hasLocation

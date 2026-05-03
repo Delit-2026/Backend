@@ -1,0 +1,159 @@
+package com.dealit.dealit.domain.auction.redis;
+
+import com.dealit.dealit.domain.auction.entity.Auction;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class AuctionRedisService {
+
+	public static final String ENDING_KEY = "auction:ending";
+
+	private static final DefaultRedisScript<String> BID_SCRIPT = new DefaultRedisScript<>("""
+		local currentPrice = tonumber(redis.call('HGET', KEYS[1], 'currentPrice'))
+		local minimumBidAmount = tonumber(redis.call('HGET', KEYS[1], 'minimumBidAmount'))
+		local endsAt = tonumber(redis.call('HGET', KEYS[1], 'endsAt'))
+		local bidPrice = tonumber(ARGV[1])
+		local bidderId = ARGV[2]
+		local now = tonumber(ARGV[3])
+
+		if currentPrice == nil or endsAt == nil then
+		    return 'AUCTION_ENDED'
+		end
+
+		if now >= endsAt then
+		    return 'AUCTION_ENDED'
+		end
+
+		if minimumBidAmount == nil then
+		    minimumBidAmount = 0
+		end
+
+		if minimumBidAmount <= 0 and bidPrice <= currentPrice then
+		    return 'BID_TOO_LOW'
+		end
+
+		if minimumBidAmount > 0 and bidPrice < currentPrice + minimumBidAmount then
+		    return 'BID_TOO_LOW'
+		end
+
+		local previousBidderId = redis.call('HGET', KEYS[1], 'highestBidderId')
+
+		redis.call('HSET', KEYS[1],
+		    'currentPrice', bidPrice,
+		    'highestBidderId', bidderId
+		)
+
+		if previousBidderId == false then
+		    previousBidderId = ''
+		end
+
+		return 'SUCCESS:' .. previousBidderId
+		""", String.class);
+
+	private final StringRedisTemplate stringRedisTemplate;
+	private final Clock clock;
+
+	public void initialize(Auction auction) {
+		String stateKey = stateKey(auction.getAuctionId());
+		long endsAtEpochMillis = auction.getEndsAt().toInstant().toEpochMilli();
+
+		try {
+			stringRedisTemplate.opsForHash().putAll(
+				stateKey,
+				Map.of(
+					"currentPrice", auction.getCurrentPrice().toPlainString(),
+					"minimumBidAmount", auction.getMinimumBidAmount().toPlainString(),
+					"highestBidderId", "",
+					"endsAt", Long.toString(endsAtEpochMillis)
+				)
+			);
+			stringRedisTemplate.opsForZSet().add(ENDING_KEY, auction.getAuctionId().toString(), endsAtEpochMillis);
+		} catch (RedisConnectionFailureException exception) {
+			// Local/test profiles may run without Redis; bid processing still requires Redis availability.
+		}
+	}
+
+	public BidScriptResult bid(Long auctionId, BigDecimal bidPrice, Long bidderId) {
+		String result = stringRedisTemplate.execute(
+			BID_SCRIPT,
+			List.of(stateKey(auctionId)),
+			bidPrice.toPlainString(),
+			bidderId.toString(),
+			Long.toString(clock.millis())
+		);
+		if (result == null) {
+			return new BidScriptResult(BidScriptStatus.AUCTION_ENDED, null);
+		}
+		if (result.startsWith("SUCCESS:")) {
+			String previousBidderId = result.substring("SUCCESS:".length());
+			return new BidScriptResult(
+				BidScriptStatus.SUCCESS,
+				previousBidderId.isBlank() ? null : Long.valueOf(previousBidderId)
+			);
+		}
+		return new BidScriptResult(BidScriptStatus.valueOf(result), null);
+	}
+
+	public Set<String> findEndingAuctionIds(long nowEpochMillis) {
+		return stringRedisTemplate.opsForZSet().rangeByScore(ENDING_KEY, 0, nowEpochMillis);
+	}
+
+	public AuctionState getState(Long auctionId) {
+		Map<Object, Object> state = stringRedisTemplate.opsForHash().entries(stateKey(auctionId));
+		Object currentPrice = state.get("currentPrice");
+		Object minimumBidAmount = state.get("minimumBidAmount");
+		Object highestBidderId = state.get("highestBidderId");
+		return new AuctionState(
+			currentPrice == null ? null : new BigDecimal(currentPrice.toString()),
+			minimumBidAmount == null ? null : new BigDecimal(minimumBidAmount.toString()),
+			highestBidderId == null || highestBidderId.toString().isBlank() ? null : Long.valueOf(highestBidderId.toString())
+		);
+	}
+
+	public void removeEnding(Long auctionId) {
+		stringRedisTemplate.opsForZSet().remove(ENDING_KEY, auctionId.toString());
+	}
+
+	public void removeEndingValue(String auctionId) {
+		stringRedisTemplate.opsForZSet().remove(ENDING_KEY, auctionId);
+	}
+
+	public void deleteState(Long auctionId) {
+		stringRedisTemplate.delete(stateKey(auctionId));
+	}
+
+	public void refreshEnding(Auction auction) {
+		try {
+			initialize(auction);
+		} catch (DataAccessException exception) {
+			// Redis state is opportunistic for create/update paths; bid and end paths surface Redis failures.
+		}
+	}
+
+	private String stateKey(Long auctionId) {
+		return "auction:%d:state".formatted(auctionId);
+	}
+
+	public record BidScriptResult(BidScriptStatus status, Long previousBidderId) {
+	}
+
+	public record AuctionState(BigDecimal currentPrice, BigDecimal minimumBidAmount, Long highestBidderId) {
+	}
+
+	public enum BidScriptStatus {
+		SUCCESS,
+		AUCTION_ENDED,
+		BID_TOO_LOW
+	}
+}

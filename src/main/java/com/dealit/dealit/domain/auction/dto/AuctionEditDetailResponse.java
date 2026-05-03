@@ -35,10 +35,13 @@ public record AuctionEditDetailResponse(
 	@Schema(description = "경매 시작가", example = "700000")
 	BigDecimal startPrice,
 
+	@Schema(description = "최소 입찰 금액/입찰 단위", example = "7000")
+	BigDecimal minimumBidAmount,
+
 	@Schema(description = "경매 진행 기간(일)", example = "3")
 	long auctionDurationDays,
 
-	@Schema(description = "경매 상태", example = "AUCTION_LIVE")
+	@Schema(description = "경매 상태", example = "ONGOING")
 	AuctionStatus auctionStatus,
 
 	@Schema(description = "입찰 수", example = "0")

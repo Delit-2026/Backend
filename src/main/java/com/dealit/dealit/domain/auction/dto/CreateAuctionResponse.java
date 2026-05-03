@@ -15,7 +15,7 @@ public record CreateAuctionResponse(
 	@Schema(description = "판매 유형", example = "AUCTION")
 	ProductSaleType saleType,
 
-	@Schema(description = "상품 상태", example = "AUCTION_LIVE")
+	@Schema(description = "상품 상태", example = "ONGOING")
 	AuctionStatus status,
 
 	@Schema(description = "경매 메타 정보")
@@ -24,7 +24,7 @@ public record CreateAuctionResponse(
 
 	@Schema(description = "경매 일정 및 상태 정보")
 	public record AuctionScheduleResponse(
-		@Schema(description = "경매 상태", example = "AUCTION_LIVE")
+		@Schema(description = "경매 상태", example = "ONGOING")
 		AuctionStatus status,
 
 		@Schema(description = "경매 시작 시각", example = "2026-04-15T10:00:00Z")

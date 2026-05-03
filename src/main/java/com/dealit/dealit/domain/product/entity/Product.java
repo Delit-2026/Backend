@@ -71,6 +71,15 @@ public class Product extends BaseEntity {
 	@Column(name = "status", nullable = false, length = 30)
 	private ProductStatus status;
 
+	@Column(name = "view_count", nullable = false)
+	private long viewCount = 0L;
+
+	@Column(name = "favorite_count", nullable = false)
+	private long favoriteCount = 0L;
+
+	@Column(name = "chat_count", nullable = false)
+	private long chatCount = 0L;
+
 	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
 	private final List<ProductImage> images = new ArrayList<>();
 
@@ -120,6 +129,27 @@ public class Product extends BaseEntity {
 		image.assignToProduct(this, sortOrder);
 	}
 
+	public void softDeleteWithImages() {
+		softDelete();
+		for (ProductImage image : images) {
+			image.softDelete();
+		}
+	}
+
+	public void increaseViewCount() {
+		this.viewCount++;
+	}
+
+	public void increaseFavoriteCount() {
+		this.favoriteCount++;
+	}
+
+	public void decreaseFavoriteCount() {
+		if (this.favoriteCount > 0) {
+			this.favoriteCount--;
+		}
+	}
+
 	public void updateEditableDetails(
 		String name,
 		String description,
@@ -132,6 +162,19 @@ public class Product extends BaseEntity {
 		this.categoryId = categoryId;
 		this.price = price;
 		this.location = location;
+	}
+
+	public void updateAllowOffer(boolean allowOffer) {
+		this.allowOffer = allowOffer;
+	}
+
+	public void markSold() {
+		this.status = ProductStatus.SOLD;
+	}
+
+	public void markEnded() {
+		this.status = ProductStatus.ENDED;
+		softDelete();
 	}
 
 	public void replaceImages(Collection<ProductImage> nextImages) {
