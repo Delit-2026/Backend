@@ -15,6 +15,8 @@ import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductItemResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductListResponse;
+import com.dealit.dealit.domain.product.dto.PopularProductItemResponse;
+import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse.ProductEditImageResponse;
 import com.dealit.dealit.domain.product.dto.ProductImagePayload;
@@ -47,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -131,6 +134,25 @@ public class ProductService {
 			productPage.getTotalElements(),
 			productPage.hasNext()
 		);
+	}
+
+	public PopularProductListResponse getPopularProducts(int size) {
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		List<Product> products = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		List<PopularProductItemResponse> content = products.stream()
+			.map(product -> toPopularProductItemResponse(product, categoryNamesById))
+			.sorted(Comparator.comparingDouble(PopularProductItemResponse::popularScore).reversed()
+				.thenComparing(PopularProductItemResponse::viewCount, Comparator.reverseOrder())
+				.thenComparing(PopularProductItemResponse::createdAt, Comparator.reverseOrder()))
+			.limit(normalizedSize)
+			.toList();
+
+		return new PopularProductListResponse(content);
 	}
 
 	public ProductEditDetailResponse getProductEditDetail(Long memberId, Long productId) {
@@ -552,6 +574,37 @@ public class ProductService {
 		}
 		productImageRepository.saveAll(imagesById.values());
 		productImageRepository.saveAll(removedImages);
+	}
+
+	private PopularProductItemResponse toPopularProductItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById
+	) {
+		return new PopularProductItemResponse(
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			product.getPrice(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getViewCount(),
+			toSeoulOffsetDateTime(product.getCreatedAt()),
+			calculatePopularScore(product)
+		);
+	}
+
+	private double calculatePopularScore(Product product) {
+		if (product.getViewCount() <= 0) {
+			return 0.0;
+		}
+
+		LocalDateTime createdAt = product.getCreatedAt();
+		if (createdAt == null) {
+			return (double) product.getViewCount();
+		}
+
+		long elapsedHours = Math.max(1L, Duration.between(createdAt, LocalDateTime.now(SEOUL_ZONE)).toHours());
+		return (double) product.getViewCount() / elapsedHours;
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
