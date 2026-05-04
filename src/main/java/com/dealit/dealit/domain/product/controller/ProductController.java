@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductListResponse;
 import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
@@ -147,5 +148,18 @@ public class ProductController {
 		@RequestParam(defaultValue = "10") int size
 	) {
 		return productService.getPopularProducts(size);
+	}
+
+	@Operation(summary = "핫한 일반 상품 목록 조회")
+	@ApiResponse(
+		responseCode = "200",
+		description = "핫한 일반 상품 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = HotListProductListResponse.class))
+	)
+	@GetMapping("/hot-list")
+	public HotListProductListResponse getHotListProducts(
+		@RequestParam(defaultValue = "8") int size
+	) {
+		return productService.getHotListProducts(size);
 	}
 }

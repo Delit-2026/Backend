@@ -13,6 +13,8 @@ import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductItemResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductListResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductItemResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductListResponse;
 import com.dealit.dealit.domain.product.dto.PopularProductItemResponse;
@@ -153,6 +155,31 @@ public class ProductService {
 			.toList();
 
 		return new PopularProductListResponse(content);
+	}
+
+	public HotListProductListResponse getHotListProducts(int size) {
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		List<Product> products = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		List<Product> rankedProducts = products.stream()
+			.sorted(Comparator.comparingDouble(this::calculateHotScore).reversed()
+				.thenComparing(Product::getFavoriteCount, Comparator.reverseOrder())
+				.thenComparing(Product::getViewCount, Comparator.reverseOrder())
+				.thenComparing(Product::getCreatedAt, Comparator.reverseOrder()))
+			.limit(normalizedSize)
+			.toList();
+
+		List<HotListProductItemResponse> content = new ArrayList<>();
+		for (int index = 0; index < rankedProducts.size(); index++) {
+			Product product = rankedProducts.get(index);
+			content.add(toHotListProductItemResponse(product, categoryNamesById, index + 1));
+		}
+
+		return new HotListProductListResponse(content);
 	}
 
 	public ProductEditDetailResponse getProductEditDetail(Long memberId, Long productId) {
@@ -593,6 +620,26 @@ public class ProductService {
 		);
 	}
 
+	private HotListProductItemResponse toHotListProductItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById,
+		int rank
+	) {
+		return new HotListProductItemResponse(
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			product.getPrice(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getViewCount(),
+			product.getFavoriteCount(),
+			calculateHotScore(product),
+			rank,
+			toSeoulOffsetDateTime(product.getCreatedAt())
+		);
+	}
+
 	private double calculatePopularScore(Product product) {
 		if (product.getViewCount() <= 0) {
 			return 0.0;
@@ -605,6 +652,21 @@ public class ProductService {
 
 		long elapsedHours = Math.max(1L, Duration.between(createdAt, LocalDateTime.now(SEOUL_ZONE)).toHours());
 		return (double) product.getViewCount() / elapsedHours;
+	}
+
+	private double calculateHotScore(Product product) {
+		long baseScore = product.getViewCount() + product.getFavoriteCount() * 3;
+		if (baseScore <= 0) {
+			return 0.0;
+		}
+
+		LocalDateTime createdAt = product.getCreatedAt();
+		if (createdAt == null) {
+			return (double) baseScore;
+		}
+
+		long elapsedHours = Math.max(1L, Duration.between(createdAt, LocalDateTime.now(SEOUL_ZONE)).toHours());
+		return (double) baseScore / elapsedHours;
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
