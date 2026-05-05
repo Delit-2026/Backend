@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.auction.controller;
 
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse;
 import com.dealit.dealit.domain.auction.dto.BidRequest;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
@@ -53,6 +54,12 @@ public class AuctionManagementController {
 		@Valid @RequestBody BidRequest request
 	) {
 		return auctionBidService.bid(auctionId, member.memberId(), request.bidPrice());
+	}
+
+	@Operation(summary = "경매 입찰 현황 조회", description = "경매 현재가와 입찰 내역을 최신순으로 조회한다.")
+	@GetMapping("/auctions/{auctionId}/bids")
+	public AuctionBidHistoryResponse getBidHistory(@PathVariable Long auctionId) {
+		return auctionBidService.getBidHistory(auctionId);
 	}
 
 	@Operation(summary = "내 판매중 경매 목록", description = "마이페이지 판매중 화면에서 현재 사용자의 진행중 경매 목록을 페이징 조회한다.")

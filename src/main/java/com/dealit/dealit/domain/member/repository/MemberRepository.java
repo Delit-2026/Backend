@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.dealit.dealit.domain.member.entity.Member;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
@@ -21,4 +23,6 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 	Optional<Member> findByLoginIdAndDeletedAtIsNull(String loginId);
 
 	Optional<Member> findByMemberIdAndDeletedAtIsNull(Long memberId);
+
+	List<Member> findAllByMemberIdInAndDeletedAtIsNull(Collection<Long> memberIds);
 }

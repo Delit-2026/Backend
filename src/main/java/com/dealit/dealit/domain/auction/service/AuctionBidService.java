@@ -4,6 +4,8 @@ import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse.ImageResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse.SellerResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse.BidHistoryItem;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.Category;
@@ -26,8 +28,12 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
@@ -87,6 +93,36 @@ public class AuctionBidService {
 		);
 	}
 
+	public AuctionBidHistoryResponse getBidHistory(Long auctionId) {
+		Auction auction = loadAuction(auctionId);
+		List<Bid> bids = bidRepository.findAllByAuctionAuctionIdOrderByCreatedAtDescBidIdDesc(auctionId);
+		Map<Long, Member> membersById = memberRepository.findAllByMemberIdInAndDeletedAtIsNull(
+				bids.stream().map(Bid::getBidderId).collect(Collectors.toSet())
+			)
+			.stream()
+			.collect(Collectors.toMap(Member::getMemberId, Function.identity()));
+
+		List<BidHistoryItem> bidItems = bids.stream()
+			.map(bid -> new BidHistoryItem(
+				bid.getBidId(),
+				bid.getBidderId(),
+				resolveBidderNickname(membersById.get(bid.getBidderId()), bid.getBidderId()),
+				bid.getBidPrice(),
+				bid.getCreatedAt(),
+				auction.getWinnerId() == null
+					? bid.getBidPrice().compareTo(auction.getCurrentPrice()) == 0
+					: bid.getBidderId().equals(auction.getWinnerId())
+			))
+			.toList();
+
+		return new AuctionBidHistoryResponse(
+			auctionId,
+			resolveDisplayCurrentPrice(auction, auction.getCurrentPrice()),
+			bidItems.size(),
+			bidItems
+		);
+	}
+
 	@Transactional
 	public BidResponse bid(Long auctionId, Long bidderId, BigDecimal bidPrice) {
 		Auction auction = loadAuction(auctionId);
@@ -108,8 +144,30 @@ public class AuctionBidService {
 				bidRepository.save(Bid.create(auction, bidderId, bidPrice));
 				auction.updateCurrentPrice(bidPrice);
 				OffsetDateTime serverTime = serverTime();
+				long bidCount = bidRepository.countByAuctionAuctionId(auction.getAuctionId());
+				long bidderCount = bidRepository.countDistinctBidderIdByAuctionId(auction.getAuctionId());
+				BigDecimal minimumNextBidPrice = bidPrice.add(auction.getMinimumBidAmount());
+				Long sellerId = auction.getProduct().getMemberId();
 				auctionEventPublisher.publishBidUpdated(auctionId, bidPrice, bidderId, serverTime);
 				auctionEventPublisher.publishOutbid(auctionId, result.previousBidderId(), bidderId, bidPrice, serverTime);
+				auctionEventPublisher.publishBidReceived(
+					sellerId,
+					auctionId,
+					bidderId,
+					bidPrice,
+					bidCount,
+					result.previousBidderId() == null,
+					serverTime
+				);
+				auctionEventPublisher.publishAuctionBidUpdated(
+					Arrays.asList(sellerId, bidderId, result.previousBidderId()),
+					auctionId,
+					bidPrice,
+					minimumNextBidPrice,
+					bidCount,
+					bidderCount,
+					serverTime
+				);
 				return new BidResponse(auctionId, bidPrice, bidderId, serverTime);
 			}
 		}
@@ -199,6 +257,13 @@ public class AuctionBidService {
 			? null
 			: imageUrlService.toPublicUrl(seller.getProfileImage());
 		return new SellerResponse(seller.getMemberId(), seller.getNickname(), profileImageUrl);
+	}
+
+	private String resolveBidderNickname(Member bidder, Long bidderId) {
+		if (bidder == null) {
+			return "입찰자 #" + bidderId;
+		}
+		return bidder.getNickname();
 	}
 
 	private BigDecimal resolveDisplayCurrentPrice(Auction auction, BigDecimal currentPrice) {
