@@ -205,6 +205,28 @@ class AuctionBidServiceTest {
 		verify(bidRepository, never()).save(any(Bid.class));
 	}
 
+	@Test
+	@DisplayName("판매자는 자신이 등록한 경매에 입찰할 수 없다")
+	void bidFailsWhenBidderIsSeller() {
+		Long auctionId = 1L;
+		Long sellerId = 10L;
+		Auction auction = auction(sellerId);
+		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+			.thenReturn(Optional.of(auction));
+
+		Object result;
+		try {
+			result = auctionBidService.bid(auctionId, sellerId, new BigDecimal("101000"));
+		} catch (InvalidAuctionRequestException exception) {
+			result = exception;
+		}
+
+		assertThat(result).isInstanceOf(InvalidAuctionRequestException.class);
+		assertThat(((InvalidAuctionRequestException) result).getMessage()).isEqualTo("자신이 등록한 경매에는 입찰할 수 없습니다.");
+		verify(auctionRedisService, never()).bid(anyLong(), any(BigDecimal.class), anyLong());
+		verify(bidRepository, never()).save(any(Bid.class));
+	}
+
 	private Object bidAfterStart(CountDownLatch start, Long auctionId, Long bidderId, BigDecimal bidPrice)
 		throws InterruptedException {
 		start.await();

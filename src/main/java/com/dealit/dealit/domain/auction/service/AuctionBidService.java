@@ -126,6 +126,9 @@ public class AuctionBidService {
 	@Transactional
 	public BidResponse bid(Long auctionId, Long bidderId, BigDecimal bidPrice) {
 		Auction auction = loadAuction(auctionId);
+		if (auction.getProduct().getMemberId().equals(bidderId)) {
+			throw new InvalidAuctionRequestException("자신이 등록한 경매에는 입찰할 수 없습니다.");
+		}
 		if (!auction.isOngoing()) {
 			throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
 		}
