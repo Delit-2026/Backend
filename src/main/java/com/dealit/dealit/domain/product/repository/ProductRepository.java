@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.product.repository;
 
+import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import org.springframework.data.domain.Page;
@@ -28,4 +29,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	@EntityGraph(attributePaths = {"images"})
 	Optional<Product> findByProductIdAndMemberIdAndDeletedAtIsNull(Long productId, Long memberId);
+
+	@EntityGraph(attributePaths = {"images"})
+	List<Product> findAllBySaleTypeAndStatusAndDeletedAtIsNull(ProductSaleType saleType, ProductStatus status);
 }

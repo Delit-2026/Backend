@@ -13,8 +13,12 @@ import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductItemResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductListResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductItemResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductListResponse;
+import com.dealit.dealit.domain.product.dto.PopularProductItemResponse;
+import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse.ProductEditImageResponse;
 import com.dealit.dealit.domain.product.dto.ProductImagePayload;
@@ -47,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -131,6 +136,50 @@ public class ProductService {
 			productPage.getTotalElements(),
 			productPage.hasNext()
 		);
+	}
+
+	public PopularProductListResponse getPopularProducts(int size) {
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		List<Product> products = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		List<PopularProductItemResponse> content = products.stream()
+			.map(product -> toPopularProductItemResponse(product, categoryNamesById))
+			.sorted(Comparator.comparingDouble(PopularProductItemResponse::popularScore).reversed()
+				.thenComparing(PopularProductItemResponse::viewCount, Comparator.reverseOrder())
+				.thenComparing(PopularProductItemResponse::createdAt, Comparator.reverseOrder()))
+			.limit(normalizedSize)
+			.toList();
+
+		return new PopularProductListResponse(content);
+	}
+
+	public HotListProductListResponse getHotListProducts(int size) {
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		List<Product> products = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(products);
+		List<Product> rankedProducts = products.stream()
+			.sorted(Comparator.comparingDouble(this::calculateHotScore).reversed()
+				.thenComparing(Product::getFavoriteCount, Comparator.reverseOrder())
+				.thenComparing(Product::getViewCount, Comparator.reverseOrder())
+				.thenComparing(Product::getCreatedAt, Comparator.reverseOrder()))
+			.limit(normalizedSize)
+			.toList();
+
+		List<HotListProductItemResponse> content = new ArrayList<>();
+		for (int index = 0; index < rankedProducts.size(); index++) {
+			Product product = rankedProducts.get(index);
+			content.add(toHotListProductItemResponse(product, categoryNamesById, index + 1));
+		}
+
+		return new HotListProductListResponse(content);
 	}
 
 	public ProductEditDetailResponse getProductEditDetail(Long memberId, Long productId) {
@@ -359,15 +408,24 @@ public class ProductService {
 	}
 
 	private Map<Long, ProductImage> loadRequestedImagesForUpdate(Product product, List<ProductImagePayload> imagePayloads) {
-		Map<Long, ProductImage> imagesById = loadRequestedImages(imagePayloads);
-		for (ProductImage image : imagesById.values()) {
+		List<Long> imageIds = imagePayloads.stream().map(ProductImagePayload::imageId).toList();
+
+		List<ProductImage> images = productImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
+		if (images.size() != imageIds.size()) {
+			throw new ProductImageNotFoundException("상품이미지를 찾을 수 없습니다.");
+		}
+
+		Map<Long, ProductImage> imagesById = new LinkedHashMap<>();
+		for (ProductImage image : images) {
 			if (!image.getMemberId().equals(product.getMemberId())) {
 				throw new ProductAccessDeniedException("본인이 업로드한 이미지로만 수정할 수 있습니다.");
 			}
 			if (image.getProduct() != null && !image.getProduct().getProductId().equals(product.getProductId())) {
 				throw new InvalidProductRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
 			}
+			imagesById.put(image.getImageId(), image);
 		}
+		validateDuplicateImageIds(imageIds, imagesById.keySet());
 		return imagesById;
 	}
 
@@ -543,6 +601,72 @@ public class ProductService {
 		}
 		productImageRepository.saveAll(imagesById.values());
 		productImageRepository.saveAll(removedImages);
+	}
+
+	private PopularProductItemResponse toPopularProductItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById
+	) {
+		return new PopularProductItemResponse(
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			product.getPrice(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getViewCount(),
+			toSeoulOffsetDateTime(product.getCreatedAt()),
+			calculatePopularScore(product)
+		);
+	}
+
+	private HotListProductItemResponse toHotListProductItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById,
+		int rank
+	) {
+		return new HotListProductItemResponse(
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			product.getPrice(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getViewCount(),
+			product.getFavoriteCount(),
+			calculateHotScore(product),
+			rank,
+			toSeoulOffsetDateTime(product.getCreatedAt())
+		);
+	}
+
+	private double calculatePopularScore(Product product) {
+		if (product.getViewCount() <= 0) {
+			return 0.0;
+		}
+
+		LocalDateTime createdAt = product.getCreatedAt();
+		if (createdAt == null) {
+			return (double) product.getViewCount();
+		}
+
+		long elapsedHours = Math.max(1L, Duration.between(createdAt, LocalDateTime.now(SEOUL_ZONE)).toHours());
+		return (double) product.getViewCount() / elapsedHours;
+	}
+
+	private double calculateHotScore(Product product) {
+		long baseScore = product.getViewCount() + product.getFavoriteCount() * 3;
+		if (baseScore <= 0) {
+			return 0.0;
+		}
+
+		LocalDateTime createdAt = product.getCreatedAt();
+		if (createdAt == null) {
+			return (double) baseScore;
+		}
+
+		long elapsedHours = Math.max(1L, Duration.between(createdAt, LocalDateTime.now(SEOUL_ZONE)).toHours());
+		return (double) baseScore / elapsedHours;
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {

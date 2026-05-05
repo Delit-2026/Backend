@@ -4,6 +4,8 @@ import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.CreateProductRequest;
 import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
+import com.dealit.dealit.domain.product.dto.HotListProductListResponse;
+import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -132,5 +135,31 @@ public class ProductController {
 		@Valid @RequestBody CreateProductRequest request
 	) {
 		return productService.createProduct(member.memberId(), request);
+	}
+
+	@Operation(summary = "실시간 인기 일반 상품 목록 조회")
+	@ApiResponse(
+		responseCode = "200",
+		description = "실시간 인기 일반 상품 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = PopularProductListResponse.class))
+	)
+	@GetMapping("/popular")
+	public PopularProductListResponse getPopularProducts(
+		@RequestParam(defaultValue = "10") int size
+	) {
+		return productService.getPopularProducts(size);
+	}
+
+	@Operation(summary = "핫한 일반 상품 목록 조회")
+	@ApiResponse(
+		responseCode = "200",
+		description = "핫한 일반 상품 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = HotListProductListResponse.class))
+	)
+	@GetMapping("/hot-list")
+	public HotListProductListResponse getHotListProducts(
+		@RequestParam(defaultValue = "8") int size
+	) {
+		return productService.getHotListProducts(size);
 	}
 }
