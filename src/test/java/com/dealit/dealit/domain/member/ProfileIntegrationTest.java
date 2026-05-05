@@ -318,6 +318,52 @@ class ProfileIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("내 관심 카테고리 수정 시 기존 값을 교체하고 새 목록을 반환한다")
+	void updateMyInterestCategoriesSuccess() throws Exception {
+		memberInterestCategoryRepository.saveAll(List.of(
+			MemberInterestCategory.create(savedMember.getMemberId(), 1L),
+			MemberInterestCategory.create(savedMember.getMemberId(), 2L)
+		));
+
+		mockMvc.perform(patch("/api/v1/users/me/interest-categories")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "interestCategoryIds": [2, 3]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(2))
+			.andExpect(jsonPath("$[0].categoryId").value(2))
+			.andExpect(jsonPath("$[1].categoryId").value(3));
+
+		assertThat(memberInterestCategoryRepository.findAllByMemberIdOrderByCategoryIdAsc(savedMember.getMemberId()))
+			.extracting("categoryId")
+			.containsExactly(2L, 3L);
+	}
+
+	@Test
+	@DisplayName("내 관심 카테고리를 빈 목록으로 수정하면 모두 제거된다")
+	void updateMyInterestCategoriesClearsAll() throws Exception {
+		memberInterestCategoryRepository.save(MemberInterestCategory.create(savedMember.getMemberId(), 1L));
+
+		mockMvc.perform(patch("/api/v1/users/me/interest-categories")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "interestCategoryIds": []
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(0));
+
+		assertThat(memberInterestCategoryRepository.findAllByMemberIdOrderByCategoryIdAsc(savedMember.getMemberId()))
+			.isEmpty();
+	}
+
+	@Test
 	@DisplayName("프로필 이미지 업로드에 성공하면 접근 가능한 URL을 반환하고 회원 프로필에 저장한다")
 	void uploadProfileImageSuccess() throws Exception {
 		byte[] imageBytes = "profile-image".getBytes();

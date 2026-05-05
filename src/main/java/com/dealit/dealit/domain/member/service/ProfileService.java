@@ -8,18 +8,23 @@ import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.domain.member.dto.LocationDetails;
 import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
+import com.dealit.dealit.domain.member.dto.UpdateMyInterestCategoriesRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyProfileRequest;
 import com.dealit.dealit.domain.member.dto.UploadProfileImageResponse;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.entity.MemberInterestCategory;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
+import com.dealit.dealit.domain.member.exception.InvalidInterestCategoryRequestException;
 import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -61,7 +66,29 @@ public class ProfileService {
 	@Transactional(readOnly = true)
 	public List<InterestCategoryOptionResponse> getMyInterestCategories(Long memberId) {
 		loadActiveMember(memberId);
+		return getInterestCategoryResponses(memberId);
+	}
 
+	@Transactional
+	public List<InterestCategoryOptionResponse> updateMyInterestCategories(
+		Long memberId,
+		UpdateMyInterestCategoriesRequest request
+	) {
+		loadActiveMember(memberId);
+		List<Category> categories = loadInterestCategories(request == null ? null : request.interestCategoryIds());
+
+		memberInterestCategoryRepository.deleteAllByMemberId(memberId);
+		memberInterestCategoryRepository.flush();
+		if (!categories.isEmpty()) {
+			memberInterestCategoryRepository.saveAll(categories.stream()
+				.map(category -> MemberInterestCategory.create(memberId, category.getId()))
+				.toList());
+		}
+
+		return getInterestCategoryResponses(memberId);
+	}
+
+	private List<InterestCategoryOptionResponse> getInterestCategoryResponses(Long memberId) {
 		List<Long> categoryIds = memberInterestCategoryRepository.findAllByMemberIdOrderByCategoryIdAsc(memberId).stream()
 			.map(memberInterestCategory -> memberInterestCategory.getCategoryId())
 			.toList();
@@ -82,6 +109,35 @@ public class ProfileService {
 				category.getNameEn()
 			))
 			.toList();
+	}
+
+	private List<Category> loadInterestCategories(List<Long> interestCategoryIds) {
+		if (interestCategoryIds == null || interestCategoryIds.isEmpty()) {
+			return List.of();
+		}
+
+		Set<Long> uniqueIds = new LinkedHashSet<>();
+		for (Long interestCategoryId : interestCategoryIds) {
+			if (interestCategoryId == null || interestCategoryId <= 0L) {
+				throw new InvalidInterestCategoryRequestException("관심 카테고리 ID가 올바르지 않습니다.");
+			}
+			if (!uniqueIds.add(interestCategoryId)) {
+				throw new InvalidInterestCategoryRequestException("중복된 관심 카테고리는 선택할 수 없습니다.");
+			}
+		}
+
+		List<Category> categories = categoryRepository.findAllById(uniqueIds);
+		if (categories.size() != uniqueIds.size()) {
+			throw new InvalidInterestCategoryRequestException("존재하지 않는 관심 카테고리가 포함되어 있습니다.");
+		}
+
+		boolean hasNonTopLevelCategory = categories.stream()
+			.anyMatch(category -> category.getDepth() == null || category.getDepth() != 1);
+		if (hasNonTopLevelCategory) {
+			throw new InvalidInterestCategoryRequestException("관심 카테고리는 대분류만 선택할 수 있습니다.");
+		}
+
+		return categories;
 	}
 
 	@Transactional

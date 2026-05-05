@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.member.controller;
 import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
 import com.dealit.dealit.domain.member.dto.InterestCategoryOptionResponse;
+import com.dealit.dealit.domain.member.dto.UpdateMyInterestCategoriesRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyProfileRequest;
@@ -51,6 +52,15 @@ public class ProfileController {
 		@AuthenticationPrincipal AuthenticatedMember member
 	) {
 		return profileService.getMyInterestCategories(member.memberId());
+	}
+
+	@Operation(summary = "내 관심 카테고리 수정", description = "현재 로그인한 사용자의 관심 카테고리 목록을 수정합니다.")
+	@PatchMapping("/interest-categories")
+	public List<InterestCategoryOptionResponse> updateMyInterestCategories(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestBody UpdateMyInterestCategoriesRequest request
+	) {
+		return profileService.updateMyInterestCategories(member.memberId(), request);
 	}
 
 	@Operation(summary = "프로필 수정", description = "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.")

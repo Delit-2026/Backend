@@ -9,4 +9,6 @@ public interface MemberInterestCategoryRepository extends JpaRepository<MemberIn
 	List<MemberInterestCategory> findAllByMemberIdOrderByCategoryIdAsc(Long memberId);
 
 	long countByMemberId(Long memberId);
+
+	void deleteAllByMemberId(Long memberId);
 }
