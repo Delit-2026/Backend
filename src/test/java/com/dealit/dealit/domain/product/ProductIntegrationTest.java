@@ -35,6 +35,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -177,6 +178,67 @@ class ProductIntegrationTest {
 			.andExpect(jsonPath("$.status").value("ON_SALE"))
 			.andExpect(jsonPath("$.auction").value(nullValue()))
 			.andExpect(jsonPath("$.generalSale.price").value(12000));
+	}
+
+	@Test
+	@DisplayName("일반 상품 수정 시 현재 상품에 연결된 기존 이미지는 그대로 유지할 수 있다")
+	void updateProductKeepsExistingImage() throws Exception {
+		String response = mockMvc.perform(post("/api/v1/products")
+				.with(authentication(authenticatedMember()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "수정 전 상품명",
+					  "description": "수정 전 설명",
+					  "saleType": "REGULAR",
+					  "categoryId": 19,
+					  "price": 12000,
+					  "allowOffer": false,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/product/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 강남구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		long productId = com.jayway.jsonpath.JsonPath.read(response, "$.productId");
+
+		mockMvc.perform(patch("/api/v1/products/{productId}", productId)
+				.with(authentication(authenticatedMember()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "수정된 상품명",
+					  "description": "수정된 설명",
+					  "categoryId": 19,
+					  "price": 30000,
+					  "allowOffer": false,
+					  "location": "서울 강남구",
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/product/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ]
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.productId").value(productId))
+			.andExpect(jsonPath("$.name").value("수정된 상품명"))
+			.andExpect(jsonPath("$.description").value("수정된 설명"))
+			.andExpect(jsonPath("$.price").value(30000))
+			.andExpect(jsonPath("$.images", hasSize(1)))
+			.andExpect(jsonPath("$.images[0].imageId").value(uploadedImage.getImageId()));
 	}
 
 	@Test
