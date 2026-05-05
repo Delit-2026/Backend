@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.member.controller;
 
 import com.dealit.dealit.domain.member.dto.LoginIdCheckResponse;
+import com.dealit.dealit.domain.member.dto.InterestCategoryOptionResponse;
 import com.dealit.dealit.domain.member.dto.NicknameCheckResponse;
 import com.dealit.dealit.domain.member.dto.SignUpRequest;
 import com.dealit.dealit.domain.member.dto.SignUpResponse;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 @Tag(name = "Member", description = "회원 API")
 @RestController
@@ -57,5 +59,11 @@ public class MemberController {
 		String nickname
 	) {
 		return memberService.checkNicknameAvailability(nickname);
+	}
+
+	@Operation(summary = "회원가입 관심 카테고리 조회", description = "회원가입 화면에서 사용할 대분류 카테고리 목록을 조회합니다.")
+	@GetMapping("/interest-categories")
+	public List<InterestCategoryOptionResponse> getInterestCategories() {
+		return memberService.getInterestCategories();
 	}
 }

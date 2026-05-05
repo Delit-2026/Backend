@@ -2,6 +2,8 @@ package com.dealit.dealit.domain.member;
 
 import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.entity.MemberInterestCategory;
+import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
@@ -43,6 +46,9 @@ class ProfileIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private MemberInterestCategoryRepository memberInterestCategoryRepository;
+
+	@Autowired
 	private FcmTokenRepository fcmTokenRepository;
 
 	@Autowired
@@ -60,6 +66,7 @@ class ProfileIntegrationTest {
 	@BeforeEach
 	void setUp() throws IOException {
 		fcmTokenRepository.deleteAll();
+		memberInterestCategoryRepository.deleteAll();
 		memberRepository.deleteAll();
 		deleteStoredImages();
 
@@ -292,6 +299,22 @@ class ProfileIntegrationTest {
 			.andExpect(jsonPath("$.jibunAddress").value("경기도 성남시 분당구 백현동 532"))
 			.andExpect(jsonPath("$.detailAddress").value("101동 1203호"))
 			.andExpect(jsonPath("$.locationSource").value("POSTCODE"));
+	}
+
+	@Test
+	@DisplayName("내 관심 카테고리 조회 시 저장된 대분류 목록을 반환한다")
+	void getMyInterestCategoriesSuccess() throws Exception {
+		memberInterestCategoryRepository.saveAll(List.of(
+			MemberInterestCategory.create(savedMember.getMemberId(), 1L),
+			MemberInterestCategory.create(savedMember.getMemberId(), 2L)
+		));
+
+		mockMvc.perform(get("/api/v1/users/me/interest-categories")
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(2))
+			.andExpect(jsonPath("$[0].categoryId").value(1))
+			.andExpect(jsonPath("$[1].categoryId").value(2));
 	}
 
 	@Test

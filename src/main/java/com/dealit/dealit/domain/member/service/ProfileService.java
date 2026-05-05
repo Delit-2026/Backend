@@ -1,6 +1,9 @@
 package com.dealit.dealit.domain.member.service;
 
+import com.dealit.dealit.domain.auction.entity.Category;
+import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.member.dto.InterestCategoryOptionResponse;
 import com.dealit.dealit.domain.member.LocationSource;
 import com.dealit.dealit.domain.member.dto.LocationDetails;
 import com.dealit.dealit.domain.member.dto.MyLocationResponse;
@@ -11,9 +14,13 @@ import com.dealit.dealit.domain.member.dto.UpdateMyProfileRequest;
 import com.dealit.dealit.domain.member.dto.UploadProfileImageResponse;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
+import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProfileService {
 
 	private final MemberRepository memberRepository;
+	private final MemberInterestCategoryRepository memberInterestCategoryRepository;
+	private final CategoryRepository categoryRepository;
 	private final ProfileImageStorage profileImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final WishlistService wishlistService;
@@ -47,6 +56,32 @@ public class ProfileService {
 			locationDetails.longitude(),
 			locationDetails.locationSource()
 		);
+	}
+
+	@Transactional(readOnly = true)
+	public List<InterestCategoryOptionResponse> getMyInterestCategories(Long memberId) {
+		loadActiveMember(memberId);
+
+		List<Long> categoryIds = memberInterestCategoryRepository.findAllByMemberIdOrderByCategoryIdAsc(memberId).stream()
+			.map(memberInterestCategory -> memberInterestCategory.getCategoryId())
+			.toList();
+
+		if (categoryIds.isEmpty()) {
+			return List.of();
+		}
+
+		Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
+			.collect(java.util.stream.Collectors.toMap(Category::getId, Function.identity()));
+
+		return categoryIds.stream()
+			.map(categoryMap::get)
+			.filter(category -> category != null)
+			.map(category -> new InterestCategoryOptionResponse(
+				category.getId(),
+				category.getNameKo(),
+				category.getNameEn()
+			))
+			.toList();
 	}
 
 	@Transactional

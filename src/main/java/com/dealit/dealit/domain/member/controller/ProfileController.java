@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.member.controller;
 
 import com.dealit.dealit.domain.member.dto.MyLocationResponse;
 import com.dealit.dealit.domain.member.dto.MyPageProfileResponse;
+import com.dealit.dealit.domain.member.dto.InterestCategoryOptionResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationRequest;
 import com.dealit.dealit.domain.member.dto.UpdateMyLocationResponse;
 import com.dealit.dealit.domain.member.dto.UpdateMyProfileRequest;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 @Tag(name = "Profile", description = "마이페이지 프로필 API")
 @RestController
@@ -41,6 +43,14 @@ public class ProfileController {
 	@GetMapping("/location")
 	public MyLocationResponse getMyLocation(@AuthenticationPrincipal AuthenticatedMember member) {
 		return profileService.getMyLocation(member.memberId());
+	}
+
+	@Operation(summary = "내 관심 카테고리 조회", description = "현재 로그인한 사용자가 설정한 관심 카테고리 목록을 조회합니다.")
+	@GetMapping("/interest-categories")
+	public List<InterestCategoryOptionResponse> getMyInterestCategories(
+		@AuthenticationPrincipal AuthenticatedMember member
+	) {
+		return profileService.getMyInterestCategories(member.memberId());
 	}
 
 	@Operation(summary = "프로필 수정", description = "현재 로그인한 사용자의 닉네임, 소개글, 프로필 이미지를 수정합니다.")

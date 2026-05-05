@@ -50,6 +50,7 @@ public class SecurityConfig {
 					"/profile/images/**",
 					"/api/v1/health",
 					"/api/v1/members/signup",
+					"/api/v1/members/interest-categories",
 					"/api/v1/members/login-id/check",
 						"/api/v1/members/nickname/check",
 						"/api/v1/auth/login",
@@ -84,6 +85,7 @@ public class SecurityConfig {
 					.requestMatchers(HttpMethod.POST, "/api/v1/products/image").authenticated()
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/products/image/*").authenticated()
 					.requestMatchers(HttpMethod.GET, "/api/v1/products/categories").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/v1/products/popular").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/products/category/recommend").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/products/price/recommend").permitAll()
 				.anyRequest().authenticated()
