@@ -1527,6 +1527,91 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UpdateMyLocationResponse"
+  /api/v1/users/me/interest-categories:
+    get:
+      tags:
+      - Profile
+      summary: 내 관심 카테고리 조회
+      description: 현재 로그인한 사용자가 설정한 관심 카테고리 목록을 조회합니다.
+      operationId: getMyInterestCategories
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
+    patch:
+      tags:
+      - Profile
+      summary: 내 관심 카테고리 수정
+      description: 현재 로그인한 사용자의 관심 카테고리 목록을 수정합니다.
+      operationId: updateMyInterestCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyInterestCategoriesRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
   /api/v1/products/{productId}:
     get:
       tags:
@@ -1974,46 +2059,6 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyPageProfileResponse"
-  /api/v1/users/me/interest-categories:
-    get:
-      tags:
-      - Profile
-      summary: 내 관심 카테고리 조회
-      description: 현재 로그인한 사용자가 설정한 관심 카테고리 목록을 조회합니다.
-      operationId: getMyInterestCategories
-      responses:
-        "400":
-          description: Bad Request
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Conflict
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
   /api/v1/products/{productId}/edit:
     get:
       tags:
@@ -3215,9 +3260,8 @@ components:
           type: string
           description: 비밀번호
           example: Password123!
-          maxLength: 255
+          maxLength: 30
           minLength: 8
-          pattern: "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z\\d]).+$"
         email:
           type: string
           format: email
@@ -3881,6 +3925,36 @@ components:
           - MANUAL
           - POSTCODE
           - GPS
+    UpdateMyInterestCategoriesRequest:
+      type: object
+      description: 내 관심 카테고리 수정 요청
+      properties:
+        interestCategoryIds:
+          type: array
+          description: 관심 카테고리 ID 목록(대분류만 허용)
+          example:
+          - 1
+          - 2
+          items:
+            type: integer
+            format: int64
+    InterestCategoryOptionResponse:
+      type: object
+      description: 관심 카테고리 선택지
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 1
+        nameKo:
+          type: string
+          description: 카테고리명(한글)
+          example: 전자기기
+        nameEn:
+          type: string
+          description: 카테고리명(영문)
+          example: electronics
     UpdateProductRequest:
       type: object
       properties:
@@ -4217,23 +4291,6 @@ components:
           - MANUAL
           - POSTCODE
           - GPS
-    InterestCategoryOptionResponse:
-      type: object
-      description: 관심 카테고리 선택지
-      properties:
-        categoryId:
-          type: integer
-          format: int64
-          description: 카테고리 ID
-          example: 1
-        nameKo:
-          type: string
-          description: 카테고리명(한글)
-          example: 전자기기
-        nameEn:
-          type: string
-          description: 카테고리명(영문)
-          example: electronics
     CategoryResponse:
       type: object
       properties:
