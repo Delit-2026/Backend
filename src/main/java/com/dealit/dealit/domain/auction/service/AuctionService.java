@@ -64,7 +64,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,40 +93,28 @@ public class AuctionService {
 		int normalizedLimit = normalizeLimit(limit);
 		OffsetDateTime now = OffsetDateTime.now(clock);
 		List<AuctionRankProjection> rankedAuctions = auctionRepository.findOngoingAuctionRanks(
-			AuctionStatus.ONGOING,
-			now
+			AuctionStatus.ONGOING.name(),
+			now,
+			PageRequest.of(0, normalizedLimit)
 		);
 
-		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(
-			rankedAuctions.stream()
-				.map(AuctionRankProjection::getAuction)
-				.toList()
-		);
-
-		List<AuctionRankProjection> content = rankedAuctions.stream()
-			.sorted(this::comparePopularAuctionRanks)
-			.limit(normalizedLimit)
-			.toList();
-
-		return new AuctionListResponse(toAuctionListItems(content, categoryNamesById));
+		List<Auction> auctions = loadRankedAuctions(rankedAuctions);
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctions);
+		return new AuctionListResponse(toAuctionListItems(rankedAuctions, auctions, categoryNamesById));
 	}
 
 	public AuctionListResponse getClosingSoonAuctions(int limit) {
 		int normalizedLimit = normalizeLimit(limit);
 		OffsetDateTime now = OffsetDateTime.now(clock);
 		List<AuctionRankProjection> rankedAuctions = auctionRepository.findClosingSoonAuctionRanks(
-			AuctionStatus.ONGOING,
+			AuctionStatus.ONGOING.name(),
 			now,
 			PageRequest.of(0, normalizedLimit)
 		);
 
-		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(
-			rankedAuctions.stream()
-				.map(AuctionRankProjection::getAuction)
-				.toList()
-		);
-
-		return new AuctionListResponse(toAuctionListItems(rankedAuctions, categoryNamesById));
+		List<Auction> auctions = loadRankedAuctions(rankedAuctions);
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctions);
+		return new AuctionListResponse(toAuctionListItems(rankedAuctions, auctions, categoryNamesById));
 	}
 
 	public MySellingAuctionListResponse getMySellingAuctionProducts(Long memberId, int page, int size) {
@@ -351,21 +338,31 @@ public class AuctionService {
 
 	private List<AuctionListItemResponse> toAuctionListItems(
 		List<AuctionRankProjection> rankedAuctions,
+		List<Auction> auctions,
 		Map<Long, String> categoryNamesById
 	) {
+		Map<Long, Auction> auctionsById = new LinkedHashMap<>();
+		for (Auction auction : auctions) {
+			auctionsById.put(auction.getAuctionId(), auction);
+		}
+
 		List<AuctionListItemResponse> content = new ArrayList<>();
 		for (int index = 0; index < rankedAuctions.size(); index++) {
-			content.add(toAuctionListItemResponse(rankedAuctions.get(index), categoryNamesById, index + 1));
+			AuctionRankProjection rank = rankedAuctions.get(index);
+			Auction auction = auctionsById.get(rank.getAuctionId());
+			if (auction != null) {
+				content.add(toAuctionListItemResponse(rank, auction, categoryNamesById, index + 1));
+			}
 		}
 		return content;
 	}
 
 	private AuctionListItemResponse toAuctionListItemResponse(
 		AuctionRankProjection rank,
+		Auction auction,
 		Map<Long, String> categoryNamesById,
 		int displayRank
 	) {
-		Auction auction = rank.getAuction();
 		Product product = auction.getProduct();
 		return new AuctionListItemResponse(
 			auction.getAuctionId(),
@@ -374,43 +371,34 @@ public class AuctionService {
 			resolveThumbnailUrl(product),
 			auction.getStartPrice(),
 			resolveCurrentPrice(auction),
-			rank.getBidCount(),
+			toLong(rank.getBidCount()),
 			toSeoulOffsetDateTime(auction.getAuctionEndAt()),
 			auction.getStatus(),
 			product.getLocation(),
 			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
 			product.getMemberId(),
-			calculateAuctionPopularScore(rank),
+			toDouble(rank.getPopularScore()),
 			displayRank,
 			toSeoulOffsetDateTime(product.getCreatedAt())
 		);
 	}
 
-	private int comparePopularAuctionRanks(AuctionRankProjection left, AuctionRankProjection right) {
-		return Comparator.comparingDouble(this::calculateAuctionPopularScore)
-			.reversed()
-			.thenComparing(AuctionRankProjection::getBidCount, Comparator.reverseOrder())
-			.thenComparing(AuctionRankProjection::getLatestBidAt, Comparator.nullsLast(Comparator.reverseOrder()))
-			.thenComparing(rank -> rank.getAuction().getProduct().getCreatedAt(), Comparator.nullsLast(Comparator.reverseOrder()))
-			.thenComparing(rank -> rank.getAuction().getAuctionId(), Comparator.reverseOrder())
-			.compare(left, right);
+	private List<Auction> loadRankedAuctions(List<AuctionRankProjection> ranks) {
+		List<Long> auctionIds = ranks.stream()
+			.map(AuctionRankProjection::getAuctionId)
+			.toList();
+		if (auctionIds.isEmpty()) {
+			return List.of();
+		}
+		return auctionRepository.findAllByAuctionIdInAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionIds);
 	}
 
-	private double calculateAuctionPopularScore(AuctionRankProjection rank) {
-		if (rank.getBidCount() <= 0) {
-			return 0.0;
-		}
+	private long toLong(Number value) {
+		return value == null ? 0L : value.longValue();
+	}
 
-		LocalDateTime createdAt = rank.getAuction().getProduct().getCreatedAt();
-		if (createdAt == null) {
-			return (double) rank.getBidCount();
-		}
-
-		long elapsedHours = Math.max(
-			1L,
-			Duration.between(createdAt, LocalDateTime.now(clock.withZone(SEOUL_ZONE))).toHours()
-		);
-		return (double) rank.getBidCount() / elapsedHours;
+	private double toDouble(Number value) {
+		return value == null ? 0.0 : value.doubleValue();
 	}
 
 	private int normalizeLimit(int limit) {

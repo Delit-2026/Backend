@@ -58,13 +58,13 @@ public class AuctionManagementController {
 	}
 
 	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
-	@GetMapping("/auctions/{auctionId}")
+	@GetMapping("/auctions/{auctionId:\\d+}")
 	public AuctionDetailResponse getAuction(@PathVariable Long auctionId) {
 		return auctionBidService.getAuction(auctionId);
 	}
 
 	@Operation(summary = "경매 입찰", description = "서버 도착 시간 기준으로 입찰을 처리한다.")
-	@PostMapping("/auctions/{auctionId}/bids")
+	@PostMapping("/auctions/{auctionId:\\d+}/bids")
 	public BidResponse bid(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId,
@@ -74,7 +74,7 @@ public class AuctionManagementController {
 	}
 
 	@Operation(summary = "경매 입찰 현황 조회", description = "경매 현재가와 입찰 내역을 최신순으로 조회한다.")
-	@GetMapping("/auctions/{auctionId}/bids")
+	@GetMapping("/auctions/{auctionId:\\d+}/bids")
 	public AuctionBidHistoryResponse getBidHistory(@PathVariable Long auctionId) {
 		return auctionBidService.getBidHistory(auctionId);
 	}
@@ -94,7 +94,7 @@ public class AuctionManagementController {
 	@Operation(summary = "경매 수정용 상세 조회", description = "현재 사용자가 등록한 경매의 수정 화면 데이터를 조회한다.")
 	@ApiResponse(responseCode = "200", description = "경매 수정용 상세 조회 성공",
 		content = @Content(schema = @Schema(implementation = AuctionEditDetailResponse.class)))
-	@GetMapping("/auctions/{auctionId}/edit")
+	@GetMapping("/auctions/{auctionId:\\d+}/edit")
 	public AuctionEditDetailResponse getAuctionEditDetail(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId
@@ -106,7 +106,7 @@ public class AuctionManagementController {
 	@ApiResponse(responseCode = "200", description = "경매 수정 성공",
 		content = @Content(schema = @Schema(implementation = AuctionEditDetailResponse.class)))
 	@ApiResponse(responseCode = "409", description = "입찰자가 있는 경매는 수정 불가")
-	@PatchMapping("/auctions/{auctionId}")
+	@PatchMapping("/auctions/{auctionId:\\d+}")
 	public AuctionEditDetailResponse updateAuction(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId,
@@ -118,7 +118,7 @@ public class AuctionManagementController {
 	@Operation(summary = "경매 삭제", description = "입찰이 없는 현재 사용자의 경매를 삭제한다.")
 	@ApiResponse(responseCode = "204", description = "경매 삭제 성공")
 	@ApiResponse(responseCode = "409", description = "입찰자가 있는 경매는 삭제 불가")
-	@DeleteMapping("/auctions/{auctionId}")
+	@DeleteMapping("/auctions/{auctionId:\\d+}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteAuction(
 		@AuthenticationPrincipal AuthenticatedMember member,

@@ -1,14 +1,14 @@
 package com.dealit.dealit.domain.auction.repository;
 
-import com.dealit.dealit.domain.auction.entity.Auction;
-
 import java.time.LocalDateTime;
 
 public interface AuctionRankProjection {
 
-	Auction getAuction();
+	Long getAuctionId();
 
-	long getBidCount();
+	Number getBidCount();
 
 	LocalDateTime getLatestBidAt();
+
+	Number getPopularScore();
 }
