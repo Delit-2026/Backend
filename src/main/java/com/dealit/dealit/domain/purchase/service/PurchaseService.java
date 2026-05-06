@@ -7,19 +7,25 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.purchase.dto.PurchaseReceiptResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseResponse;
 import com.dealit.dealit.domain.purchase.entity.Purchase;
 import com.dealit.dealit.domain.purchase.exception.IdempotencyConflictException;
 import com.dealit.dealit.domain.purchase.exception.InsufficientBalanceException;
 import com.dealit.dealit.domain.purchase.exception.ProductNotPurchasableException;
+import com.dealit.dealit.domain.purchase.exception.PurchaseForbiddenException;
+import com.dealit.dealit.domain.purchase.exception.PurchaseNotFoundException;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.domain.wallet.exception.InvalidWalletRequestException;
 import com.dealit.dealit.domain.wallet.service.WalletService;
+import com.dealit.dealit.global.service.ImageUrlService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +42,7 @@ public class PurchaseService {
 	private final ProductRepository productRepository;
 	private final MemberRepository memberRepository;
 	private final WalletService walletService;
+	private final ImageUrlService imageUrlService;
 
 	@Transactional
 	public PurchaseResponse purchase(Long productId, Long buyerId, String idempotencyKey) {
@@ -77,6 +84,30 @@ public class PurchaseService {
 
 		product.markSold();
 		return toPurchaseResponse(purchase);
+	}
+
+	public PurchaseReceiptResponse getReceipt(Long purchaseId, Long memberId) {
+		Purchase purchase = purchaseRepository.findById(purchaseId)
+			.orElseThrow(PurchaseNotFoundException::new);
+		if (!purchase.getBuyerId().equals(memberId) && !purchase.getSellerId().equals(memberId)) {
+			throw new PurchaseForbiddenException();
+		}
+
+		Product product = productRepository.findByProductIdAndDeletedAtIsNull(purchase.getProductId())
+			.orElseThrow(PurchaseNotFoundException::new);
+
+		return new PurchaseReceiptResponse(
+			purchase.getPurchaseId(),
+			purchase.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			purchase.getBuyerId(),
+			purchase.getSellerId(),
+			toWalletAmount(purchase.getPriceSnapshot()),
+			purchase.getStatus(),
+			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
+			purchase.getChatRoomId()
+		);
 	}
 
 	private void validateIdempotencyKey(String idempotencyKey) {
@@ -123,6 +154,19 @@ public class PurchaseService {
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt())
 		);
+	}
+
+	private String resolveThumbnailUrl(Product product) {
+		return product.getImages().stream()
+			.filter(image -> image.getDeletedAt() == null)
+			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
+			.sorted(Comparator.comparing(
+				ProductImage::getSortOrder,
+				Comparator.nullsLast(Integer::compareTo)
+			))
+			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
+			.findFirst()
+			.orElse(null);
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {

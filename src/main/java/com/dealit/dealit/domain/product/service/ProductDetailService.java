@@ -66,7 +66,8 @@ public class ProductDetailService {
 			toSeoulOffsetDateTime(product.getUpdatedAt() == null ? product.getCreatedAt() : product.getUpdatedAt()),
 			toGeneralSaleResponse(product),
 			canChat(product, owner),
-			canPurchase(product, owner),
+			canPurchase(product, owner, viewer),
+			purchaseBlockedReason(product, owner, viewer),
 			canFavorite(product, owner)
 		);
 	}
@@ -122,8 +123,21 @@ public class ProductDetailService {
 		return !owner && product.getStatus() == ProductStatus.ON_SALE;
 	}
 
-	private boolean canPurchase(Product product, boolean owner) {
-		return !owner && product.getStatus() == ProductStatus.ON_SALE;
+	private boolean canPurchase(Product product, boolean owner, Member viewer) {
+		return purchaseBlockedReason(product, owner, viewer) == null;
+	}
+
+	private String purchaseBlockedReason(Product product, boolean owner, Member viewer) {
+		if (!viewer.isVerified()) {
+			return "EMAIL_NOT_VERIFIED";
+		}
+		if (owner) {
+			return "OWN_PRODUCT";
+		}
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			return "PRODUCT_NOT_PURCHASABLE";
+		}
+		return null;
 	}
 
 	private boolean canFavorite(Product product, boolean owner) {

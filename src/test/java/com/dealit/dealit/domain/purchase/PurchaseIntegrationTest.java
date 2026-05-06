@@ -35,6 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -297,6 +298,62 @@ class PurchaseIntegrationTest {
 		assertThat(walletRepository.findByMemberId(failedBuyerId).orElseThrow().getBalance()).isEqualTo(50000);
 	}
 
+	@Test
+	@DisplayName("구매자는 영수증을 조회할 수 있다")
+	void buyerCanGetReceipt() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.productId").value(product.getProductId()))
+			.andExpect(jsonPath("$.productTitle").value("Purchase Product"))
+			.andExpect(jsonPath("$.buyerId").value(buyer.getMemberId()))
+			.andExpect(jsonPath("$.sellerId").value(seller.getMemberId()))
+			.andExpect(jsonPath("$.amount").value(30000))
+			.andExpect(jsonPath("$.status").value("PAID"))
+			.andExpect(jsonPath("$.purchasedAt").exists())
+			.andExpect(jsonPath("$.chatRoomId").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("판매자는 영수증을 조회할 수 있다")
+	void sellerCanGetReceipt() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId));
+	}
+
+	@Test
+	@DisplayName("구매자와 판매자가 아닌 사용자는 영수증을 조회할 수 없다")
+	void strangerCannotGetReceipt() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
+				.with(authentication(authenticatedMember(otherBuyer))))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("PURCHASE_FORBIDDEN"));
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 영수증은 404를 반환한다")
+	void receiptNotFound() throws Exception {
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", 999999L)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("PURCHASE_NOT_FOUND"));
+	}
+
 	private Member saveMember(String loginId, String email, String name, boolean verified) {
 		Member member = memberRepository.save(Member.create(loginId, "password", email, name, verified));
 		member.assignDefaultNickname();
@@ -325,6 +382,16 @@ class PurchaseIntegrationTest {
 			).getContent().stream()
 			.filter(ledger -> ledger.getType() == WalletLedgerType.PURCHASE)
 			.count();
+	}
+
+	private Long purchaseProduct(Product product, Member buyer) throws Exception {
+		mockMvc.perform(post("/api/v1/products/{productId}/purchase", product.getProductId())
+				.with(authentication(authenticatedMember(buyer)))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(requestJson(UUID.randomUUID().toString())))
+			.andExpect(status().isOk());
+
+		return purchaseRepository.findAll().getFirst().getPurchaseId();
 	}
 
 	private int performConcurrentPurchase(
