@@ -53,6 +53,14 @@ public class WalletService {
 		return apply(memberId, -amount, WalletLedgerType.WITHDRAWAL, "내 계좌로 옮기기");
 	}
 
+	@Transactional
+	public WalletResponse payForPurchase(Long buyerId, long amount, Long purchaseId) {
+		if (amount <= 0) {
+			throw new InvalidWalletRequestException("구매 금액은 0보다 커야 합니다.");
+		}
+		return apply(buyerId, -amount, WalletLedgerType.PURCHASE, "상품 구매 결제");
+	}
+
 	public WalletLedgerListResponse getMyLedgers(Long memberId, int page, int size) {
 		validateActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);

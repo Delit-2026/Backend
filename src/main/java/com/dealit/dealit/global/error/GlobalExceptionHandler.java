@@ -14,6 +14,7 @@ import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.exception.MemberException;
 import com.dealit.dealit.domain.notification.exception.NotificationException;
 import com.dealit.dealit.domain.product.exception.ProductException;
+import com.dealit.dealit.domain.purchase.exception.PurchaseException;
 import com.dealit.dealit.domain.wallet.exception.WalletException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -134,6 +135,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(WalletException.class)
 	public ResponseEntity<ErrorResponse> handleWalletException(WalletException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(PurchaseException.class)
+	public ResponseEntity<ErrorResponse> handlePurchaseException(PurchaseException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}

@@ -1,0 +1,96 @@
+package com.dealit.dealit.domain.purchase.entity;
+
+import com.dealit.dealit.global.entity.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(
+	name = "purchase",
+	uniqueConstraints = @UniqueConstraint(
+		name = "uk_purchase_buyer_idempotency",
+		columnNames = {"buyer_id", "idempotency_key"}
+	)
+)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SequenceGenerator(
+	name = "purchase_seq_generator",
+	sequenceName = "purchase_seq",
+	allocationSize = 1
+)
+public class Purchase extends BaseEntity {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "purchase_seq_generator")
+	@Column(name = "purchase_id")
+	private Long purchaseId;
+
+	@Column(name = "product_id", nullable = false)
+	private Long productId;
+
+	@Column(name = "buyer_id", nullable = false)
+	private Long buyerId;
+
+	@Column(name = "seller_id", nullable = false)
+	private Long sellerId;
+
+	@Column(name = "price_snapshot", nullable = false, precision = 15, scale = 2)
+	private BigDecimal priceSnapshot;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "status", nullable = false, length = 30)
+	private PurchaseStatus status;
+
+	@Column(name = "idempotency_key", nullable = false, length = 100)
+	private String idempotencyKey;
+
+	@Column(name = "chat_room_id")
+	private Long chatRoomId;
+
+	@Column(name = "purchased_at")
+	private LocalDateTime purchasedAt;
+
+	private Purchase(
+		Long productId,
+		Long buyerId,
+		Long sellerId,
+		BigDecimal priceSnapshot,
+		String idempotencyKey
+	) {
+		this.productId = productId;
+		this.buyerId = buyerId;
+		this.sellerId = sellerId;
+		this.priceSnapshot = priceSnapshot;
+		this.idempotencyKey = idempotencyKey;
+		this.status = PurchaseStatus.PAID;
+		this.purchasedAt = LocalDateTime.now();
+	}
+
+	public static Purchase paid(
+		Long productId,
+		Long buyerId,
+		Long sellerId,
+		BigDecimal priceSnapshot,
+		String idempotencyKey
+	) {
+		return new Purchase(productId, buyerId, sellerId, priceSnapshot, idempotencyKey);
+	}
+
+	public void linkChatRoom(Long chatRoomId) {
+		this.chatRoomId = chatRoomId;
+	}
+}
