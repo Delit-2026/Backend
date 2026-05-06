@@ -354,6 +354,131 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.code").value("PURCHASE_NOT_FOUND"));
 	}
 
+	@Test
+	@DisplayName("구매자가 완료 버튼을 누르면 구매자 완료 상태가 저장된다")
+	void buyerCompletePurchase() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.status").value("PAID"))
+			.andExpect(jsonPath("$.buyerCompleted").value(true))
+			.andExpect(jsonPath("$.sellerCompleted").value(false))
+			.andExpect(jsonPath("$.buyerCompletedAt").exists())
+			.andExpect(jsonPath("$.sellerCompletedAt").doesNotExist())
+			.andExpect(jsonPath("$.completedAt").doesNotExist())
+			.andExpect(jsonPath("$.settledAt").doesNotExist());
+
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElseThrow();
+		assertThat(purchase.getBuyerCompletedAt()).isNotNull();
+		assertThat(purchase.getSellerCompletedAt()).isNull();
+		assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.PAID);
+	}
+
+	@Test
+	@DisplayName("판매자가 완료 버튼을 누르면 판매자 완료 상태가 저장된다")
+	void sellerCompletePurchase() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.status").value("PAID"))
+			.andExpect(jsonPath("$.buyerCompleted").value(false))
+			.andExpect(jsonPath("$.sellerCompleted").value(true))
+			.andExpect(jsonPath("$.buyerCompletedAt").doesNotExist())
+			.andExpect(jsonPath("$.sellerCompletedAt").exists())
+			.andExpect(jsonPath("$.completedAt").doesNotExist())
+			.andExpect(jsonPath("$.settledAt").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("구매자와 판매자가 모두 완료하면 구매 상태가 COMPLETED가 된다")
+	void bothCompletePurchase() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.status").value("COMPLETED"))
+			.andExpect(jsonPath("$.buyerCompleted").value(true))
+			.andExpect(jsonPath("$.sellerCompleted").value(true))
+			.andExpect(jsonPath("$.buyerCompletedAt").exists())
+			.andExpect(jsonPath("$.sellerCompletedAt").exists())
+			.andExpect(jsonPath("$.completedAt").exists())
+			.andExpect(jsonPath("$.settledAt").exists());
+
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElseThrow();
+		assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.COMPLETED);
+		assertThat(purchase.getCompletedAt()).isNotNull();
+		assertThat(purchase.getSettledAt()).isNotNull();
+		assertThat(walletRepository.findByMemberId(seller.getMemberId()).orElseThrow().getBalance()).isEqualTo(30000);
+		assertThat(countSettlementLedgers(seller.getMemberId())).isEqualTo(1);
+		assertThat(walletRepository.findByMemberId(buyer.getMemberId()).orElseThrow().getBalance()).isEqualTo(20000);
+	}
+
+	@Test
+	@DisplayName("구매자와 판매자가 아닌 사용자는 완료 처리할 수 없다")
+	void strangerCannotCompletePurchase() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(otherBuyer))))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("PURCHASE_FORBIDDEN"));
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
+				.with(authentication(authenticatedMember(otherBuyer))))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("PURCHASE_FORBIDDEN"));
+	}
+
+	@Test
+	@DisplayName("완료 API를 중복 호출해도 판매자 정산은 한 번만 수행된다")
+	void duplicateCompleteDoesNotDuplicateSettlement() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk());
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("COMPLETED"))
+			.andExpect(jsonPath("$.settledAt").exists());
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("COMPLETED"))
+			.andExpect(jsonPath("$.settledAt").exists());
+
+		assertThat(walletRepository.findByMemberId(seller.getMemberId()).orElseThrow().getBalance()).isEqualTo(30000);
+		assertThat(countSettlementLedgers(seller.getMemberId())).isEqualTo(1);
+		assertThat(purchaseRepository.findById(purchaseId).orElseThrow().isSettled()).isTrue();
+	}
+
 	private Member saveMember(String loginId, String email, String name, boolean verified) {
 		Member member = memberRepository.save(Member.create(loginId, "password", email, name, verified));
 		member.assignDefaultNickname();
@@ -381,6 +506,15 @@ class PurchaseIntegrationTest {
 				org.springframework.data.domain.Pageable.unpaged()
 			).getContent().stream()
 			.filter(ledger -> ledger.getType() == WalletLedgerType.PURCHASE)
+			.count();
+	}
+
+	private long countSettlementLedgers(Long memberId) {
+		return walletLedgerRepository.findAllByMemberId(
+				memberId,
+				org.springframework.data.domain.Pageable.unpaged()
+			).getContent().stream()
+			.filter(ledger -> ledger.getType() == WalletLedgerType.SETTLEMENT)
 			.count();
 	}
 

@@ -4,5 +4,6 @@ public enum WalletLedgerType {
 	TEMP_CHARGE,
 	REFUND,
 	WITHDRAWAL,
-	PURCHASE
+	PURCHASE,
+	SETTLEMENT
 }

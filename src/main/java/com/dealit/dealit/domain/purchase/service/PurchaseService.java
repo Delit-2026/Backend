@@ -9,14 +9,17 @@ import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.purchase.dto.PurchaseCompletionResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseReceiptResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseResponse;
 import com.dealit.dealit.domain.purchase.entity.Purchase;
+import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.exception.IdempotencyConflictException;
 import com.dealit.dealit.domain.purchase.exception.InsufficientBalanceException;
 import com.dealit.dealit.domain.purchase.exception.ProductNotPurchasableException;
 import com.dealit.dealit.domain.purchase.exception.PurchaseForbiddenException;
 import com.dealit.dealit.domain.purchase.exception.PurchaseNotFoundException;
+import com.dealit.dealit.domain.purchase.exception.PurchaseNotCompletableException;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.domain.wallet.exception.InvalidWalletRequestException;
 import com.dealit.dealit.domain.wallet.service.WalletService;
@@ -110,6 +113,34 @@ public class PurchaseService {
 		);
 	}
 
+	@Transactional
+	public PurchaseCompletionResponse completeByBuyer(Long purchaseId, Long buyerId) {
+		Purchase purchase = purchaseRepository.findById(purchaseId)
+			.orElseThrow(PurchaseNotFoundException::new);
+		if (!purchase.getBuyerId().equals(buyerId)) {
+			throw new PurchaseForbiddenException();
+		}
+		validateCompletable(purchase);
+
+		purchase.markBuyerCompleted();
+		completeAndSettleIfReady(purchase);
+		return toCompletionResponse(purchase);
+	}
+
+	@Transactional
+	public PurchaseCompletionResponse completeBySeller(Long purchaseId, Long sellerId) {
+		Purchase purchase = purchaseRepository.findById(purchaseId)
+			.orElseThrow(PurchaseNotFoundException::new);
+		if (!purchase.getSellerId().equals(sellerId)) {
+			throw new PurchaseForbiddenException();
+		}
+		validateCompletable(purchase);
+
+		purchase.markSellerCompleted();
+		completeAndSettleIfReady(purchase);
+		return toCompletionResponse(purchase);
+	}
+
 	private void validateIdempotencyKey(String idempotencyKey) {
 		if (idempotencyKey == null || idempotencyKey.isBlank()) {
 			throw new IllegalArgumentException("idempotencyKey는 필수입니다.");
@@ -153,6 +184,44 @@ public class PurchaseService {
 			toWalletAmount(purchase.getPriceSnapshot()),
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt())
+		);
+	}
+
+	private void validateCompletable(Purchase purchase) {
+		if (purchase.getStatus() != PurchaseStatus.PAID && purchase.getStatus() != PurchaseStatus.COMPLETED) {
+			throw new PurchaseNotCompletableException();
+		}
+	}
+
+	private void completeAndSettleIfReady(Purchase purchase) {
+		if (purchase.isBothCompleted()) {
+			purchase.complete();
+			settleIfNeeded(purchase);
+		}
+	}
+
+	private void settleIfNeeded(Purchase purchase) {
+		if (purchase.isSettled()) {
+			return;
+		}
+		walletService.settlePurchase(
+			purchase.getSellerId(),
+			toWalletAmount(purchase.getPriceSnapshot()),
+			purchase.getPurchaseId()
+		);
+		purchase.settle();
+	}
+
+	private PurchaseCompletionResponse toCompletionResponse(Purchase purchase) {
+		return new PurchaseCompletionResponse(
+			purchase.getPurchaseId(),
+			purchase.getStatus(),
+			purchase.getBuyerCompletedAt() != null,
+			purchase.getSellerCompletedAt() != null,
+			toSeoulOffsetDateTime(purchase.getBuyerCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getSellerCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getSettledAt())
 		);
 	}
 

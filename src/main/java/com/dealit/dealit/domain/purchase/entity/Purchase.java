@@ -64,6 +64,18 @@ public class Purchase extends BaseEntity {
 	@Column(name = "purchased_at")
 	private LocalDateTime purchasedAt;
 
+	@Column(name = "buyer_completed_at")
+	private LocalDateTime buyerCompletedAt;
+
+	@Column(name = "seller_completed_at")
+	private LocalDateTime sellerCompletedAt;
+
+	@Column(name = "completed_at")
+	private LocalDateTime completedAt;
+
+	@Column(name = "settled_at")
+	private LocalDateTime settledAt;
+
 	private Purchase(
 		Long productId,
 		Long buyerId,
@@ -92,5 +104,39 @@ public class Purchase extends BaseEntity {
 
 	public void linkChatRoom(Long chatRoomId) {
 		this.chatRoomId = chatRoomId;
+	}
+
+	public void markBuyerCompleted() {
+		if (buyerCompletedAt == null) {
+			buyerCompletedAt = LocalDateTime.now();
+		}
+	}
+
+	public void markSellerCompleted() {
+		if (sellerCompletedAt == null) {
+			sellerCompletedAt = LocalDateTime.now();
+		}
+	}
+
+	public boolean isBothCompleted() {
+		return buyerCompletedAt != null && sellerCompletedAt != null;
+	}
+
+	public void complete() {
+		if (status == PurchaseStatus.COMPLETED) {
+			return;
+		}
+		status = PurchaseStatus.COMPLETED;
+		completedAt = LocalDateTime.now();
+	}
+
+	public boolean isSettled() {
+		return settledAt != null;
+	}
+
+	public void settle() {
+		if (settledAt == null) {
+			settledAt = LocalDateTime.now();
+		}
 	}
 }

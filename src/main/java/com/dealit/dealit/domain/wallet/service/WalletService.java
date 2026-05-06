@@ -61,6 +61,14 @@ public class WalletService {
 		return apply(buyerId, -amount, WalletLedgerType.PURCHASE, "상품 구매 결제");
 	}
 
+	@Transactional
+	public WalletResponse settlePurchase(Long sellerId, long amount, Long purchaseId) {
+		if (amount <= 0) {
+			throw new InvalidWalletRequestException("정산 금액은 0보다 커야 합니다.");
+		}
+		return apply(sellerId, amount, WalletLedgerType.SETTLEMENT, "상품 판매 정산");
+	}
+
 	public WalletLedgerListResponse getMyLedgers(Long memberId, int page, int size) {
 		validateActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);
