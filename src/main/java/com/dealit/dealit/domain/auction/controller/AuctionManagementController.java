@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auction.controller;
 
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.BidRequest;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
@@ -39,6 +40,22 @@ public class AuctionManagementController {
 
 	private final AuctionService auctionService;
 	private final AuctionBidService auctionBidService;
+
+	@Operation(summary = "실시간 인기 경매 목록 조회", description = "입찰 수를 등록 후 경과 시간으로 나눈 점수 기준으로 진행 중인 경매를 조회한다.")
+	@ApiResponse(responseCode = "200", description = "실시간 인기 경매 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = AuctionListResponse.class)))
+	@GetMapping("/auctions/popular")
+	public AuctionListResponse getPopularAuctions(@RequestParam(defaultValue = "4") int limit) {
+		return auctionService.getPopularAuctions(limit);
+	}
+
+	@Operation(summary = "마감임박 경매 목록 조회", description = "현재 서버 시간 기준 종료 시각이 가까운 진행 중 경매를 조회한다.")
+	@ApiResponse(responseCode = "200", description = "마감임박 경매 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = AuctionListResponse.class)))
+	@GetMapping("/auctions/closing-soon")
+	public AuctionListResponse getClosingSoonAuctions(@RequestParam(defaultValue = "3") int limit) {
+		return auctionService.getClosingSoonAuctions(limit);
+	}
 
 	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
 	@GetMapping("/auctions/{auctionId}")
