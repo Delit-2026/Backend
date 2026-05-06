@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.member;
 
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,9 @@ class MemberSignUpIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private MemberInterestCategoryRepository memberInterestCategoryRepository;
+
+	@Autowired
 	private FcmTokenRepository fcmTokenRepository;
 
 	@Autowired
@@ -38,6 +42,7 @@ class MemberSignUpIntegrationTest {
 	@BeforeEach
 	void setUp() {
 		fcmTokenRepository.deleteAll();
+		memberInterestCategoryRepository.deleteAll();
 		memberRepository.deleteAll();
 	}
 
@@ -65,6 +70,55 @@ class MemberSignUpIntegrationTest {
 		assertThat(passwordEncoder.matches("Password123!", savedMember.getPassword())).isTrue();
 		assertThat(savedMember.getNickname()).isEqualTo("Dealit#" + savedMember.getMemberId());
 		assertThat(savedMember.isVerified()).isFalse();
+	}
+
+	@Test
+	@DisplayName("관심 카테고리를 선택하면 회원가입 시 저장된다")
+	void signUpSavesInterestCategories() throws Exception {
+		mockMvc.perform(post("/api/v1/members/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "loginId": "interest-user",
+					  "password": "Password123!",
+					  "email": "interest@dealit.com",
+					  "interestCategoryIds": [1, 2]
+					}
+					"""))
+			.andExpect(status().isCreated());
+
+		Member savedMember = memberRepository.findAll().getFirst();
+		assertThat(memberInterestCategoryRepository.findAllByMemberIdOrderByCategoryIdAsc(savedMember.getMemberId()))
+			.extracting("categoryId")
+			.containsExactly(1L, 2L);
+	}
+
+	@Test
+	@DisplayName("소분류나 중분류를 관심 카테고리로 보내면 실패한다")
+	void signUpFailsWhenInterestCategoryIsNotTopLevel() throws Exception {
+		mockMvc.perform(post("/api/v1/members/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "loginId": "invalid-interest-user",
+					  "password": "Password123!",
+					  "email": "invalid-interest@dealit.com",
+					  "interestCategoryIds": [4]
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_INTEREST_CATEGORY_REQUEST"));
+	}
+
+	@Test
+	@DisplayName("회원가입 관심 카테고리 조회는 대분류만 반환한다")
+	void getInterestCategoriesReturnsTopLevelOnly() throws Exception {
+		mockMvc.perform(get("/api/v1/members/interest-categories"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(3))
+			.andExpect(jsonPath("$[0].categoryId").value(1))
+			.andExpect(jsonPath("$[1].categoryId").value(2))
+			.andExpect(jsonPath("$[2].categoryId").value(3));
 	}
 
 	@Test
