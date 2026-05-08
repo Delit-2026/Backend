@@ -55,8 +55,17 @@ public class AuctionPayment extends BaseEntity {
 	@Column(name = "reserved_at", nullable = false)
 	private OffsetDateTime reservedAt;
 
+	@Column(name = "refund_requested_at")
+	private OffsetDateTime refundRequestedAt;
+
 	@Column(name = "refunded_at")
 	private OffsetDateTime refundedAt;
+
+	@Column(name = "settled_at")
+	private OffsetDateTime settledAt;
+
+	@Column(name = "disputed_at")
+	private OffsetDateTime disputedAt;
 
 	private AuctionPayment(Auction auction, Long bidderId, Long sellerId, Long amount, OffsetDateTime reservedAt) {
 		this.auction = auction;
@@ -71,11 +80,23 @@ public class AuctionPayment extends BaseEntity {
 		return new AuctionPayment(auction, bidderId, sellerId, amount, reservedAt);
 	}
 
-	public boolean refund(OffsetDateTime refundedAt) {
-		if (status == AuctionPaymentStatus.REFUNDED) {
+	public boolean requestRefund(OffsetDateTime refundRequestedAt) {
+		if (status == AuctionPaymentStatus.REFUND_PENDING || status == AuctionPaymentStatus.REFUNDED) {
 			return false;
 		}
 		if (status != AuctionPaymentStatus.RESERVED) {
+			return false;
+		}
+		this.status = AuctionPaymentStatus.REFUND_PENDING;
+		this.refundRequestedAt = refundRequestedAt;
+		return true;
+	}
+
+	public boolean completeRefund(OffsetDateTime refundedAt) {
+		if (status == AuctionPaymentStatus.REFUNDED) {
+			return false;
+		}
+		if (status != AuctionPaymentStatus.REFUND_PENDING) {
 			return false;
 		}
 		this.status = AuctionPaymentStatus.REFUNDED;
