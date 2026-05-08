@@ -11,6 +11,12 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
 	Optional<Purchase> findByBuyerIdAndIdempotencyKey(Long buyerId, String idempotencyKey);
 
+	Optional<Purchase> findFirstByProductIdAndSellerIdAndBuyerIdOrderByPurchaseIdDesc(
+		Long productId,
+		Long sellerId,
+		Long buyerId
+	);
+
 	List<Purchase> findTop100ByStatusAndShippingDeadlineAtLessThanEqualOrderByShippingDeadlineAtAsc(
 		PurchaseStatus status,
 		LocalDateTime now
