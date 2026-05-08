@@ -4,6 +4,8 @@ import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.ProductSaleType;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse.AuctionEditImageResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionListItemResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
@@ -31,6 +33,7 @@ import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionRankProjection;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
@@ -85,6 +88,34 @@ public class AuctionService {
 	private final ObjectMapper objectMapper;
 	private final AuctionRedisService auctionRedisService;
 	private final Clock clock;
+
+	public AuctionListResponse getPopularAuctions(int limit) {
+		int normalizedLimit = normalizeLimit(limit);
+		OffsetDateTime now = OffsetDateTime.now(clock);
+		List<AuctionRankProjection> rankedAuctions = auctionRepository.findOngoingAuctionRanks(
+			AuctionStatus.ONGOING.name(),
+			now,
+			PageRequest.of(0, normalizedLimit)
+		);
+
+		List<Auction> auctions = loadRankedAuctions(rankedAuctions);
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctions);
+		return new AuctionListResponse(toAuctionListItems(rankedAuctions, auctions, categoryNamesById));
+	}
+
+	public AuctionListResponse getClosingSoonAuctions(int limit) {
+		int normalizedLimit = normalizeLimit(limit);
+		OffsetDateTime now = OffsetDateTime.now(clock);
+		List<AuctionRankProjection> rankedAuctions = auctionRepository.findClosingSoonAuctionRanks(
+			AuctionStatus.ONGOING.name(),
+			now,
+			PageRequest.of(0, normalizedLimit)
+		);
+
+		List<Auction> auctions = loadRankedAuctions(rankedAuctions);
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctions);
+		return new AuctionListResponse(toAuctionListItems(rankedAuctions, auctions, categoryNamesById));
+	}
 
 	public MySellingAuctionListResponse getMySellingAuctionProducts(Long memberId, int page, int size) {
 		loadActiveMember(memberId);
@@ -303,6 +334,75 @@ public class AuctionService {
 		categoryRepository.findAllById(categoryIds)
 			.forEach(category -> categoryNamesById.put(category.getId(), category.getNameKo()));
 		return categoryNamesById;
+	}
+
+	private List<AuctionListItemResponse> toAuctionListItems(
+		List<AuctionRankProjection> rankedAuctions,
+		List<Auction> auctions,
+		Map<Long, String> categoryNamesById
+	) {
+		Map<Long, Auction> auctionsById = new LinkedHashMap<>();
+		for (Auction auction : auctions) {
+			auctionsById.put(auction.getAuctionId(), auction);
+		}
+
+		List<AuctionListItemResponse> content = new ArrayList<>();
+		for (int index = 0; index < rankedAuctions.size(); index++) {
+			AuctionRankProjection rank = rankedAuctions.get(index);
+			Auction auction = auctionsById.get(rank.getAuctionId());
+			if (auction != null) {
+				content.add(toAuctionListItemResponse(rank, auction, categoryNamesById, index + 1));
+			}
+		}
+		return content;
+	}
+
+	private AuctionListItemResponse toAuctionListItemResponse(
+		AuctionRankProjection rank,
+		Auction auction,
+		Map<Long, String> categoryNamesById,
+		int displayRank
+	) {
+		Product product = auction.getProduct();
+		return new AuctionListItemResponse(
+			auction.getAuctionId(),
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			auction.getStartPrice(),
+			resolveCurrentPrice(auction),
+			toLong(rank.getBidCount()),
+			toSeoulOffsetDateTime(auction.getAuctionEndAt()),
+			auction.getStatus(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getMemberId(),
+			toDouble(rank.getPopularScore()),
+			displayRank,
+			toSeoulOffsetDateTime(product.getCreatedAt())
+		);
+	}
+
+	private List<Auction> loadRankedAuctions(List<AuctionRankProjection> ranks) {
+		List<Long> auctionIds = ranks.stream()
+			.map(AuctionRankProjection::getAuctionId)
+			.toList();
+		if (auctionIds.isEmpty()) {
+			return List.of();
+		}
+		return auctionRepository.findAllByAuctionIdInAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionIds);
+	}
+
+	private long toLong(Number value) {
+		return value == null ? 0L : value.longValue();
+	}
+
+	private double toDouble(Number value) {
+		return value == null ? 0.0 : value.doubleValue();
+	}
+
+	private int normalizeLimit(int limit) {
+		return Math.min(Math.max(limit, 1), 100);
 	}
 
 	private String resolveThumbnailUrl(Product product) {
