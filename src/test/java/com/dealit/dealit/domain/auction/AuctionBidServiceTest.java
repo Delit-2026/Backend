@@ -48,6 +48,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +65,7 @@ class AuctionBidServiceTest {
 	private final WalletService walletService = mock(WalletService.class);
 	private final AuctionRedisService auctionRedisService = mock(AuctionRedisService.class);
 	private final AuctionEventPublisher auctionEventPublisher = mock(AuctionEventPublisher.class);
+	private final ApplicationEventPublisher applicationEventPublisher = mock(ApplicationEventPublisher.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
 
 	private final AuctionBidService auctionBidService = new AuctionBidService(
@@ -74,6 +77,7 @@ class AuctionBidServiceTest {
 		walletService,
 		auctionRedisService,
 		auctionEventPublisher,
+		applicationEventPublisher,
 		imageUrlService,
 		FIXED_CLOCK
 	);
@@ -217,6 +221,51 @@ class AuctionBidServiceTest {
 		assertThat(((InvalidAuctionRequestException) result).getMessage()).isEqualTo("이미 종료된 경매입니다.");
 		verify(auctionRedisService, never()).bid(anyLong(), any(BigDecimal.class), anyLong());
 		verify(bidRepository, never()).save(any(Bid.class));
+	}
+
+	@Test
+	@DisplayName("추월 입찰은 이전 최고 입찰자의 예치금을 환불 대기로 바꾸고 커밋 이후 환불 이벤트를 발행한다")
+	void bidRequestsPreviousHighestBidderRefundWithoutDirectWalletRefund() {
+		Long auctionId = 1L;
+		Long sellerId = 10L;
+		Long bidderId = 30L;
+		Long previousBidderId = 20L;
+		Auction auction = auction(sellerId);
+		AuctionPayment previousPayment = AuctionPayment.reserve(
+			auction,
+			previousBidderId,
+			sellerId,
+			101000L,
+			OffsetDateTime.now(FIXED_CLOCK).minusMinutes(1)
+		);
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+			.thenReturn(Optional.of(auction));
+		when(memberRepository.findByMemberIdAndDeletedAtIsNull(bidderId))
+			.thenReturn(Optional.of(verifiedMember("bidder30")));
+		when(walletService.reserveAuctionBid(bidderId, 102000L, auctionId)).thenReturn(0L);
+		when(auctionRedisService.bid(auctionId, new BigDecimal("102000"), bidderId))
+			.thenReturn(new BidScriptResult(
+				BidScriptStatus.SUCCESS,
+				previousBidderId,
+				new BigDecimal("101000")
+			));
+		when(auctionPaymentRepository.save(any(AuctionPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(auctionPaymentRepository.findFirstByAuctionAuctionIdAndBidderIdAndStatusAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
+			auctionId,
+			previousBidderId,
+			AuctionPaymentStatus.RESERVED
+		)).thenReturn(Optional.of(previousPayment));
+		when(bidRepository.save(any(Bid.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		auctionBidService.bid(auctionId, bidderId, new BigDecimal("102000"));
+
+		assertThat(previousPayment.getStatus()).isEqualTo(AuctionPaymentStatus.REFUND_PENDING);
+		assertThat(previousPayment.getRefundRequestedAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
+		verify(walletService, never()).refundAuctionPayment(anyLong(), anyLong(), anyLong());
+		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+		verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue())
+			.isInstanceOf(com.dealit.dealit.domain.auction.event.AuctionRefundRequestedEvent.class);
 	}
 
 	@Test

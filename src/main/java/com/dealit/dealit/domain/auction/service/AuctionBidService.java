@@ -14,6 +14,7 @@ import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.entity.Bid;
 import com.dealit.dealit.domain.auction.event.AuctionEventPublisher;
+import com.dealit.dealit.domain.auction.event.AuctionRefundRequestedEvent;
 import com.dealit.dealit.domain.auction.exception.AuctionNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,7 @@ public class AuctionBidService {
 	private final WalletService walletService;
 	private final AuctionRedisService auctionRedisService;
 	private final AuctionEventPublisher auctionEventPublisher;
+	private final ApplicationEventPublisher applicationEventPublisher;
 	private final ImageUrlService imageUrlService;
 	private final Clock clock;
 
@@ -164,7 +167,7 @@ public class AuctionBidService {
 				try {
 					OffsetDateTime serverTime = serverTime();
 					auctionPaymentRepository.save(AuctionPayment.reserve(auction, bidderId, sellerId, bidAmount, serverTime));
-					refundPreviousHighestBidder(auctionId, result.previousBidderId(), serverTime);
+					requestPreviousHighestBidderRefund(auctionId, result.previousBidderId(), serverTime);
 					bidRepository.save(Bid.create(auction, bidderId, bidPrice));
 					auction.updateCurrentPrice(bidPrice);
 					long bidCount = bidRepository.countByAuctionAuctionId(auction.getAuctionId());
@@ -269,7 +272,7 @@ public class AuctionBidService {
 			.orElseThrow(() -> new InvalidAuctionRequestException("존재하지 않는 회원입니다."));
 	}
 
-	private void refundPreviousHighestBidder(Long auctionId, Long previousBidderId, OffsetDateTime refundedAt) {
+	private void requestPreviousHighestBidderRefund(Long auctionId, Long previousBidderId, OffsetDateTime refundRequestedAt) {
 		if (previousBidderId == null) {
 			return;
 		}
@@ -280,8 +283,13 @@ public class AuctionBidService {
 				AuctionPaymentStatus.RESERVED
 			)
 			.orElseThrow(() -> new InvalidAuctionRequestException("이전 최고 입찰자의 예치금을 찾을 수 없습니다."));
-		if (previousPayment.refund(refundedAt)) {
-			walletService.refundAuctionPayment(previousPayment.getBidderId(), previousPayment.getAmount(), auctionId);
+		if (previousPayment.requestRefund(refundRequestedAt)) {
+			applicationEventPublisher.publishEvent(new AuctionRefundRequestedEvent(
+				auctionId,
+				previousPayment.getBidderId(),
+				previousPayment.getAuctionPaymentId(),
+				previousPayment.getAmount()
+			));
 		}
 	}
 

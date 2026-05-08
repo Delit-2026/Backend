@@ -1180,7 +1180,7 @@ paths:
       tags:
       - Auction
       summary: 경매 입찰
-      description: 서버 도착 시간 기준으로 입찰을 처리한다. 입찰 금액은 Dealit Pay에서 즉시 예치되고, 추월당한 기존 최고 입찰자의 예치금은 자동 환불된다.
+      description: 서버 도착 시간 기준으로 입찰을 처리한다. 입찰 금액은 Dealit Pay에서 즉시 예치되고, 추월당한 기존 최고 입찰자의 예치금은 커밋 이후 자동 환불 처리된다.
       operationId: bid
       parameters:
       - name: auctionId
