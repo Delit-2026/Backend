@@ -54,6 +54,19 @@ public class PurchaseController {
 		return purchaseService.completeByBuyer(purchaseId, member.memberId());
 	}
 
+	@Operation(summary = "구매자 수령확정 처리", description = "판매자가 발송 완료 처리한 뒤 구매자가 물건을 받았어요 버튼을 눌렀을 때 거래를 완료하고 판매자 정산을 수행합니다.")
+	@ApiResponse(responseCode = "200", description = "구매자 수령확정 처리 성공", content = @Content(schema = @Schema(implementation = PurchaseCompletionResponse.class)))
+	@ApiResponse(responseCode = "403", description = "구매자가 아닌 사용자", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "구매 내역 없음", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "수령확정 처리할 수 없는 구매 상태", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@PostMapping("/{purchaseId}/receive")
+	public PurchaseCompletionResponse receiveByBuyer(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long purchaseId
+	) {
+		return purchaseService.receiveByBuyer(purchaseId, member.memberId());
+	}
+
 	@Operation(
 		summary = "판매자 거래 완료 처리",
 		description = "판매자가 거래 완료 버튼을 눌렀을 때 sellerCompletedAt을 저장합니다. 구매자도 완료한 상태라면 구매 상태가 COMPLETED가 되고 판매자 정산이 수행됩니다."
@@ -68,5 +81,18 @@ public class PurchaseController {
 		@PathVariable Long purchaseId
 	) {
 		return purchaseService.completeBySeller(purchaseId, member.memberId());
+	}
+
+	@Operation(summary = "판매자 발송 완료 처리", description = "판매자가 물건을 보냈어요 버튼을 눌렀을 때 거래 상태를 SHIPPED로 변경하고 구매자 수령확정 버튼을 활성화할 수 있게 합니다.")
+	@ApiResponse(responseCode = "200", description = "판매자 발송 완료 처리 성공", content = @Content(schema = @Schema(implementation = PurchaseCompletionResponse.class)))
+	@ApiResponse(responseCode = "403", description = "판매자가 아닌 사용자", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "구매 내역 없음", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "발송 처리할 수 없는 구매 상태", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@PostMapping("/{purchaseId}/ship")
+	public PurchaseCompletionResponse shipBySeller(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long purchaseId
+	) {
+		return purchaseService.shipBySeller(purchaseId, member.memberId());
 	}
 }

@@ -64,6 +64,15 @@ public class Purchase extends BaseEntity {
 	@Column(name = "purchased_at")
 	private LocalDateTime purchasedAt;
 
+	@Column(name = "shipping_deadline_at")
+	private LocalDateTime shippingDeadlineAt;
+
+	@Column(name = "shipped_at")
+	private LocalDateTime shippedAt;
+
+	@Column(name = "auto_complete_at")
+	private LocalDateTime autoCompleteAt;
+
 	@Column(name = "buyer_completed_at")
 	private LocalDateTime buyerCompletedAt;
 
@@ -72,6 +81,9 @@ public class Purchase extends BaseEntity {
 
 	@Column(name = "completed_at")
 	private LocalDateTime completedAt;
+
+	@Column(name = "canceled_at")
+	private LocalDateTime canceledAt;
 
 	@Column(name = "settled_at")
 	private LocalDateTime settledAt;
@@ -90,6 +102,7 @@ public class Purchase extends BaseEntity {
 		this.idempotencyKey = idempotencyKey;
 		this.status = PurchaseStatus.PAID;
 		this.purchasedAt = LocalDateTime.now();
+		this.shippingDeadlineAt = this.purchasedAt.plusDays(3);
 	}
 
 	public static Purchase paid(
@@ -106,7 +119,23 @@ public class Purchase extends BaseEntity {
 		this.chatRoomId = chatRoomId;
 	}
 
+	public void markShipped() {
+		if ((status == PurchaseStatus.SHIPPED || status == PurchaseStatus.COMPLETED) && shippedAt != null) {
+			return;
+		}
+		if (status != PurchaseStatus.PAID) {
+			throw new IllegalStateException("발송 완료 처리할 수 없는 거래 상태입니다.");
+		}
+		status = PurchaseStatus.SHIPPED;
+		shippedAt = LocalDateTime.now();
+		sellerCompletedAt = shippedAt;
+		autoCompleteAt = shippedAt.plusDays(7);
+	}
+
 	public void markBuyerCompleted() {
+		if (status != PurchaseStatus.SHIPPED && status != PurchaseStatus.COMPLETED) {
+			throw new IllegalStateException("판매자 발송 완료 후 수령 확인할 수 있습니다.");
+		}
 		if (buyerCompletedAt == null) {
 			buyerCompletedAt = LocalDateTime.now();
 		}
@@ -128,6 +157,14 @@ public class Purchase extends BaseEntity {
 		}
 		status = PurchaseStatus.COMPLETED;
 		completedAt = LocalDateTime.now();
+	}
+
+	public void cancel() {
+		if (status != PurchaseStatus.PAID) {
+			throw new IllegalStateException("취소할 수 없는 거래 상태입니다.");
+		}
+		status = PurchaseStatus.CANCELED;
+		canceledAt = LocalDateTime.now();
 	}
 
 	public boolean isSettled() {

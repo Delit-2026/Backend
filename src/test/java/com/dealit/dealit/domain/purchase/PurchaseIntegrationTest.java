@@ -6,15 +6,19 @@ import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.payment.repository.ProductPaymentRepository;
+import com.dealit.dealit.domain.payment.entity.ProductPaymentStatus;
 import com.dealit.dealit.domain.purchase.entity.Purchase;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.entity.WalletLedgerType;
 import com.dealit.dealit.domain.wallet.repository.WalletLedgerRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletRepository;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -57,6 +61,9 @@ class PurchaseIntegrationTest {
 	private PurchaseRepository purchaseRepository;
 
 	@Autowired
+	private ProductPaymentRepository productPaymentRepository;
+
+	@Autowired
 	private WalletRepository walletRepository;
 
 	@Autowired
@@ -65,12 +72,16 @@ class PurchaseIntegrationTest {
 	@Autowired
 	private WalletService walletService;
 
+	@Autowired
+	private PurchaseService purchaseService;
+
 	private Member seller;
 	private Member buyer;
 	private Member otherBuyer;
 
 	@BeforeEach
 	void setUp() {
+		productPaymentRepository.deleteAll();
 		purchaseRepository.deleteAll();
 		walletLedgerRepository.deleteAll();
 		walletRepository.deleteAll();
@@ -363,18 +374,11 @@ class PurchaseIntegrationTest {
 
 		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
 				.with(authentication(authenticatedMember(buyer))))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
-			.andExpect(jsonPath("$.status").value("PAID"))
-			.andExpect(jsonPath("$.buyerCompleted").value(true))
-			.andExpect(jsonPath("$.sellerCompleted").value(false))
-			.andExpect(jsonPath("$.buyerCompletedAt").exists())
-			.andExpect(jsonPath("$.sellerCompletedAt").doesNotExist())
-			.andExpect(jsonPath("$.completedAt").doesNotExist())
-			.andExpect(jsonPath("$.settledAt").doesNotExist());
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PURCHASE_NOT_COMPLETABLE"));
 
 		Purchase purchase = purchaseRepository.findById(purchaseId).orElseThrow();
-		assertThat(purchase.getBuyerCompletedAt()).isNotNull();
+		assertThat(purchase.getBuyerCompletedAt()).isNull();
 		assertThat(purchase.getSellerCompletedAt()).isNull();
 		assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.PAID);
 	}
@@ -390,11 +394,13 @@ class PurchaseIntegrationTest {
 				.with(authentication(authenticatedMember(seller))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
-			.andExpect(jsonPath("$.status").value("PAID"))
+			.andExpect(jsonPath("$.status").value("SHIPPED"))
 			.andExpect(jsonPath("$.buyerCompleted").value(false))
 			.andExpect(jsonPath("$.sellerCompleted").value(true))
 			.andExpect(jsonPath("$.buyerCompletedAt").doesNotExist())
 			.andExpect(jsonPath("$.sellerCompletedAt").exists())
+			.andExpect(jsonPath("$.shippedAt").exists())
+			.andExpect(jsonPath("$.autoCompleteAt").exists())
 			.andExpect(jsonPath("$.completedAt").doesNotExist())
 			.andExpect(jsonPath("$.settledAt").doesNotExist());
 	}
@@ -406,12 +412,12 @@ class PurchaseIntegrationTest {
 		walletService.charge(buyer.getMemberId(), 50000);
 		Long purchaseId = purchaseProduct(product, buyer);
 
-		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
-				.with(authentication(authenticatedMember(buyer))))
-			.andExpect(status().isOk());
-
 		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
 				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
@@ -456,9 +462,6 @@ class PurchaseIntegrationTest {
 		walletService.charge(buyer.getMemberId(), 50000);
 		Long purchaseId = purchaseProduct(product, buyer);
 
-		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
-				.with(authentication(authenticatedMember(buyer))))
-			.andExpect(status().isOk());
 		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/seller-complete", purchaseId)
 				.with(authentication(authenticatedMember(seller))))
 			.andExpect(status().isOk());
@@ -477,6 +480,50 @@ class PurchaseIntegrationTest {
 		assertThat(walletRepository.findByMemberId(seller.getMemberId()).orElseThrow().getBalance()).isEqualTo(30000);
 		assertThat(countSettlementLedgers(seller.getMemberId())).isEqualTo(1);
 		assertThat(purchaseRepository.findById(purchaseId).orElseThrow().isSettled()).isTrue();
+	}
+
+	@Test
+	@DisplayName("판매자가 3일 내 발송하지 않으면 자동 취소되고 구매자에게 환불된다")
+	void expiredUnshippedPurchaseIsCanceledAndRefunded() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		int processed = purchaseService.cancelExpiredUnshippedPurchases(LocalDateTime.now().plusDays(4));
+
+		assertThat(processed).isEqualTo(1);
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElseThrow();
+		assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.CANCELED);
+		assertThat(purchase.getCanceledAt()).isNotNull();
+		assertThat(productPaymentRepository.findByPurchaseId(purchaseId).orElseThrow().getStatus())
+			.isEqualTo(ProductPaymentStatus.REFUNDED);
+		assertThat(walletRepository.findByMemberId(buyer.getMemberId()).orElseThrow().getBalance()).isEqualTo(50000);
+		assertThat(countRefundLedgers(buyer.getMemberId())).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("판매자 발송 후 7일이 지나면 자동 수령확정과 판매자 정산이 처리된다")
+	void shippedPurchaseIsAutoCompletedAfterSevenDays() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/ship", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("SHIPPED"));
+
+		int processed = purchaseService.autoCompleteShippedPurchases(LocalDateTime.now().plusDays(8));
+
+		assertThat(processed).isEqualTo(1);
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElseThrow();
+		assertThat(purchase.getStatus()).isEqualTo(PurchaseStatus.COMPLETED);
+		assertThat(purchase.getBuyerCompletedAt()).isNotNull();
+		assertThat(purchase.getSettledAt()).isNotNull();
+		assertThat(productPaymentRepository.findByPurchaseId(purchaseId).orElseThrow().getStatus())
+			.isEqualTo(ProductPaymentStatus.SETTLED);
+		assertThat(walletRepository.findByMemberId(seller.getMemberId()).orElseThrow().getBalance()).isEqualTo(30000);
+		assertThat(productRepository.findById(product.getProductId()).orElseThrow().getStatus()).isEqualTo(ProductStatus.ENDED);
 	}
 
 	private Member saveMember(String loginId, String email, String name, boolean verified) {
@@ -515,6 +562,15 @@ class PurchaseIntegrationTest {
 				org.springframework.data.domain.Pageable.unpaged()
 			).getContent().stream()
 			.filter(ledger -> ledger.getType() == WalletLedgerType.SETTLEMENT)
+			.count();
+	}
+
+	private long countRefundLedgers(Long memberId) {
+		return walletLedgerRepository.findAllByMemberId(
+				memberId,
+				org.springframework.data.domain.Pageable.unpaged()
+			).getContent().stream()
+			.filter(ledger -> ledger.getType() == WalletLedgerType.REFUND)
 			.count();
 	}
 

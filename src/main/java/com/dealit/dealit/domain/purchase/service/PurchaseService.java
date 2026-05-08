@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.payment.service.ProductPaymentService;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
@@ -45,6 +46,7 @@ public class PurchaseService {
 	private final ProductRepository productRepository;
 	private final MemberRepository memberRepository;
 	private final WalletService walletService;
+	private final ProductPaymentService productPaymentService;
 	private final ImageUrlService imageUrlService;
 
 	@Transactional
@@ -84,6 +86,13 @@ public class PurchaseService {
 		} catch (InvalidWalletRequestException exception) {
 			throw new InsufficientBalanceException();
 		}
+		productPaymentService.hold(
+			purchase.getPurchaseId(),
+			purchase.getProductId(),
+			purchase.getBuyerId(),
+			purchase.getSellerId(),
+			amount
+		);
 
 		product.markSold();
 		return toPurchaseResponse(purchase);
@@ -120,25 +129,51 @@ public class PurchaseService {
 		if (!purchase.getBuyerId().equals(buyerId)) {
 			throw new PurchaseForbiddenException();
 		}
-		validateCompletable(purchase);
-
-		purchase.markBuyerCompleted();
-		completeAndSettleIfReady(purchase);
+		receiveAndSettle(purchase, "구매자 수령확정");
 		return toCompletionResponse(purchase);
 	}
 
 	@Transactional
 	public PurchaseCompletionResponse completeBySeller(Long purchaseId, Long sellerId) {
+		return shipBySeller(purchaseId, sellerId);
+	}
+
+	@Transactional
+	public PurchaseCompletionResponse shipBySeller(Long purchaseId, Long sellerId) {
 		Purchase purchase = purchaseRepository.findById(purchaseId)
 			.orElseThrow(PurchaseNotFoundException::new);
 		if (!purchase.getSellerId().equals(sellerId)) {
 			throw new PurchaseForbiddenException();
 		}
-		validateCompletable(purchase);
-
-		purchase.markSellerCompleted();
-		completeAndSettleIfReady(purchase);
+		try {
+			purchase.markShipped();
+		} catch (IllegalStateException exception) {
+			throw new PurchaseNotCompletableException(exception.getMessage());
+		}
 		return toCompletionResponse(purchase);
+	}
+
+	@Transactional
+	public PurchaseCompletionResponse receiveByBuyer(Long purchaseId, Long buyerId) {
+		return completeByBuyer(purchaseId, buyerId);
+	}
+
+	@Transactional
+	public int cancelExpiredUnshippedPurchases(LocalDateTime now) {
+		return purchaseRepository
+			.findTop100ByStatusAndShippingDeadlineAtLessThanEqualOrderByShippingDeadlineAtAsc(PurchaseStatus.PAID, now)
+			.stream()
+			.mapToInt(this::cancelAndRefund)
+			.sum();
+	}
+
+	@Transactional
+	public int autoCompleteShippedPurchases(LocalDateTime now) {
+		return purchaseRepository
+			.findTop100ByStatusAndAutoCompleteAtLessThanEqualOrderByAutoCompleteAtAsc(PurchaseStatus.SHIPPED, now)
+			.stream()
+			.mapToInt(purchase -> autoCompleteAndSettle(purchase, "발송 후 7일 자동 수령확정"))
+			.sum();
 	}
 
 	private void validateIdempotencyKey(String idempotencyKey) {
@@ -187,29 +222,61 @@ public class PurchaseService {
 		);
 	}
 
-	private void validateCompletable(Purchase purchase) {
-		if (purchase.getStatus() != PurchaseStatus.PAID && purchase.getStatus() != PurchaseStatus.COMPLETED) {
-			throw new PurchaseNotCompletableException();
+	private void receiveAndSettle(Purchase purchase, String settlementReason) {
+		try {
+			purchase.markBuyerCompleted();
+		} catch (IllegalStateException exception) {
+			throw new PurchaseNotCompletableException(exception.getMessage());
 		}
+		purchase.complete();
+		markProductEnded(purchase);
+		settleIfNeeded(purchase, settlementReason);
 	}
 
-	private void completeAndSettleIfReady(Purchase purchase) {
-		if (purchase.isBothCompleted()) {
-			purchase.complete();
-			settleIfNeeded(purchase);
+	private int autoCompleteAndSettle(Purchase purchase, String settlementReason) {
+		if (purchase.getStatus() != PurchaseStatus.SHIPPED) {
+			return 0;
 		}
+		receiveAndSettle(purchase, settlementReason);
+		return 1;
 	}
 
-	private void settleIfNeeded(Purchase purchase) {
+	private int cancelAndRefund(Purchase purchase) {
+		if (purchase.getStatus() != PurchaseStatus.PAID) {
+			return 0;
+		}
+		try {
+			purchase.cancel();
+		} catch (IllegalStateException exception) {
+			return 0;
+		}
+		productPaymentService.findByPurchaseId(purchase.getPurchaseId())
+			.ifPresentOrElse(
+				payment -> productPaymentService.refund(payment, "판매자 3일 내 미발송 자동 취소"),
+				() -> walletService.refund(purchase.getBuyerId(), toWalletAmount(purchase.getPriceSnapshot()))
+			);
+		return 1;
+	}
+
+	private void settleIfNeeded(Purchase purchase, String settlementReason) {
 		if (purchase.isSettled()) {
 			return;
 		}
-		walletService.settlePurchase(
-			purchase.getSellerId(),
-			toWalletAmount(purchase.getPriceSnapshot()),
-			purchase.getPurchaseId()
-		);
+		productPaymentService.findByPurchaseId(purchase.getPurchaseId())
+			.ifPresentOrElse(
+				payment -> productPaymentService.settle(payment, settlementReason),
+				() -> walletService.settlePurchase(
+					purchase.getSellerId(),
+					toWalletAmount(purchase.getPriceSnapshot()),
+					purchase.getPurchaseId()
+				)
+			);
 		purchase.settle();
+	}
+
+	private void markProductEnded(Purchase purchase) {
+		productRepository.findByProductIdAndDeletedAtIsNull(purchase.getProductId())
+			.ifPresent(Product::markTradeCompleted);
 	}
 
 	private PurchaseCompletionResponse toCompletionResponse(Purchase purchase) {
@@ -220,7 +287,10 @@ public class PurchaseService {
 			purchase.getSellerCompletedAt() != null,
 			toSeoulOffsetDateTime(purchase.getBuyerCompletedAt()),
 			toSeoulOffsetDateTime(purchase.getSellerCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getShippedAt()),
+			toSeoulOffsetDateTime(purchase.getAutoCompleteAt()),
 			toSeoulOffsetDateTime(purchase.getCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getCanceledAt()),
 			toSeoulOffsetDateTime(purchase.getSettledAt())
 		);
 	}
