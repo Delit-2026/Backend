@@ -155,7 +155,7 @@ class AuctionBidServiceTest {
 		Long auctionId = 1L;
 		Auction auction = auction(10L);
 		AtomicReference<BigDecimal> currentPrice = new AtomicReference<>(new BigDecimal("100000"));
-		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
 		when(memberRepository.findByMemberIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(verifiedMember("bidder20")));
 		when(memberRepository.findByMemberIdAndDeletedAtIsNull(30L)).thenReturn(Optional.of(verifiedMember("bidder30")));
@@ -203,7 +203,7 @@ class AuctionBidServiceTest {
 	void bidFailsWhenAuctionEndTimeAlreadyPassed() {
 		Long auctionId = 1L;
 		Auction auction = endedByTimeAuction(10L);
-		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
 
 		Object result;
@@ -225,7 +225,7 @@ class AuctionBidServiceTest {
 		Long auctionId = 1L;
 		Long sellerId = 10L;
 		Auction auction = auction(sellerId);
-		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
 
 		Object result;
@@ -247,7 +247,7 @@ class AuctionBidServiceTest {
 		Long auctionId = 1L;
 		Long bidderId = 20L;
 		Auction auction = auction(10L);
-		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
 		when(memberRepository.findByMemberIdAndDeletedAtIsNull(bidderId))
 			.thenReturn(Optional.of(unverifiedMember("unverified-bidder")));

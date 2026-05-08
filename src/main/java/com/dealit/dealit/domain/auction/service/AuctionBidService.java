@@ -133,7 +133,7 @@ public class AuctionBidService {
 
 	@Transactional
 	public BidResponse bid(Long auctionId, Long bidderId, BigDecimal bidPrice) {
-		Auction auction = loadAuction(auctionId);
+		Auction auction = loadAuctionWithLock(auctionId);
 		Long sellerId = auction.getProduct().getMemberId();
 		if (sellerId.equals(bidderId)) {
 			throw new InvalidAuctionRequestException("자신이 등록한 경매에는 입찰할 수 없습니다.");
@@ -251,6 +251,11 @@ public class AuctionBidService {
 
 	private Auction loadAuction(Long auctionId) {
 		return auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId)
+			.orElseThrow(() -> new AuctionNotFoundException("존재하지 않는 경매입니다."));
+	}
+
+	private Auction loadAuctionWithLock(Long auctionId) {
+		return auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId)
 			.orElseThrow(() -> new AuctionNotFoundException("존재하지 않는 경매입니다."));
 	}
 
