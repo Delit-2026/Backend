@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.entity.Auction;
+import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.entity.Bid;
 import com.dealit.dealit.domain.auction.event.AuctionEventPublisher;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
@@ -20,13 +21,17 @@ import com.dealit.dealit.domain.auction.redis.AuctionRedisService.AuctionState;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService.BidScriptResult;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService.BidScriptStatus;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -52,8 +57,10 @@ class AuctionBidServiceTest {
 
 	private final AuctionRepository auctionRepository = mock(AuctionRepository.class);
 	private final BidRepository bidRepository = mock(BidRepository.class);
+	private final AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
 	private final CategoryRepository categoryRepository = mock(CategoryRepository.class);
 	private final MemberRepository memberRepository = mock(MemberRepository.class);
+	private final WalletService walletService = mock(WalletService.class);
 	private final AuctionRedisService auctionRedisService = mock(AuctionRedisService.class);
 	private final AuctionEventPublisher auctionEventPublisher = mock(AuctionEventPublisher.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
@@ -61,8 +68,10 @@ class AuctionBidServiceTest {
 	private final AuctionBidService auctionBidService = new AuctionBidService(
 		auctionRepository,
 		bidRepository,
+		auctionPaymentRepository,
 		categoryRepository,
 		memberRepository,
+		walletService,
 		auctionRedisService,
 		auctionEventPublisher,
 		imageUrlService,
@@ -148,17 +157,22 @@ class AuctionBidServiceTest {
 		AtomicReference<BigDecimal> currentPrice = new AtomicReference<>(new BigDecimal("100000"));
 		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
+		when(memberRepository.findByMemberIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(verifiedMember("bidder20")));
+		when(memberRepository.findByMemberIdAndDeletedAtIsNull(30L)).thenReturn(Optional.of(verifiedMember("bidder30")));
 		when(bidRepository.save(any(Bid.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(auctionPaymentRepository.save(any(AuctionPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(walletService.reserveAuctionBid(anyLong(), anyLong(), eq(auctionId))).thenReturn(0L);
 		when(auctionRedisService.bid(eq(auctionId), any(BigDecimal.class), anyLong()))
 			.thenAnswer(invocation -> {
 				BigDecimal bidPrice = invocation.getArgument(1);
 				synchronized (currentPrice) {
 					BigDecimal minimumNextPrice = currentPrice.get().add(new BigDecimal("1000"));
 					if (bidPrice.compareTo(minimumNextPrice) < 0) {
-						return new BidScriptResult(BidScriptStatus.BID_TOO_LOW, null);
+						return new BidScriptResult(BidScriptStatus.BID_TOO_LOW, null, null);
 					}
+					BigDecimal previousPrice = currentPrice.get();
 					currentPrice.set(bidPrice);
-					return new BidScriptResult(BidScriptStatus.SUCCESS, null);
+					return new BidScriptResult(BidScriptStatus.SUCCESS, null, previousPrice);
 				}
 			});
 
@@ -227,6 +241,30 @@ class AuctionBidServiceTest {
 		verify(bidRepository, never()).save(any(Bid.class));
 	}
 
+	@Test
+	@DisplayName("이메일 미인증 회원은 경매에 입찰할 수 없다")
+	void bidFailsWhenBidderEmailIsNotVerified() {
+		Long auctionId = 1L;
+		Long bidderId = 20L;
+		Auction auction = auction(10L);
+		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+			.thenReturn(Optional.of(auction));
+		when(memberRepository.findByMemberIdAndDeletedAtIsNull(bidderId))
+			.thenReturn(Optional.of(unverifiedMember("unverified-bidder")));
+
+		Object result;
+		try {
+			result = auctionBidService.bid(auctionId, bidderId, new BigDecimal("101000"));
+		} catch (EmailNotVerifiedException exception) {
+			result = exception;
+		}
+
+		assertThat(result).isInstanceOf(EmailNotVerifiedException.class);
+		verify(walletService, never()).reserveAuctionBid(anyLong(), anyLong(), anyLong());
+		verify(auctionRedisService, never()).bid(anyLong(), any(BigDecimal.class), anyLong());
+		verify(bidRepository, never()).save(any(Bid.class));
+	}
+
 	private Object bidAfterStart(CountDownLatch start, Long auctionId, Long bidderId, BigDecimal bidPrice)
 		throws InterruptedException {
 		start.await();
@@ -239,6 +277,14 @@ class AuctionBidServiceTest {
 
 	private Auction auction(Long sellerId) {
 		return auction(sellerId, OffsetDateTime.now(FIXED_CLOCK).plusDays(1));
+	}
+
+	private Member verifiedMember(String loginId) {
+		return Member.create(loginId, "password", loginId + "@example.com", "입찰자", true);
+	}
+
+	private Member unverifiedMember(String loginId) {
+		return Member.create(loginId, "password", loginId + "@example.com", "입찰자", false);
 	}
 
 	private Auction endedByTimeAuction(Long sellerId) {

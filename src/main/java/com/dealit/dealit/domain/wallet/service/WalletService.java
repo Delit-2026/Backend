@@ -53,6 +53,16 @@ public class WalletService {
 		return apply(memberId, -amount, WalletLedgerType.WITHDRAWAL, "내 계좌로 옮기기");
 	}
 
+	@Transactional
+	public long reserveAuctionBid(Long memberId, long amount, Long auctionId) {
+		return applyForAuction(memberId, -amount, WalletLedgerType.AUCTION_RESERVE, "경매 입찰 예치금 차감: auctionId=%d".formatted(auctionId));
+	}
+
+	@Transactional
+	public long refundAuctionPayment(Long memberId, long amount, Long auctionId) {
+		return applyForAuction(memberId, amount, WalletLedgerType.AUCTION_REFUND, "경매 예치금 환불: auctionId=%d".formatted(auctionId));
+	}
+
 	public WalletLedgerListResponse getMyLedgers(Long memberId, int page, int size) {
 		validateActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);
@@ -75,6 +85,13 @@ public class WalletService {
 	}
 
 	private WalletResponse apply(Long memberId, long signedAmount, WalletLedgerType type, String description) {
+		applyForAuction(memberId, signedAmount, type, description);
+		Wallet wallet = walletRepository.findByMemberId(memberId)
+			.orElseThrow(() -> new InvalidWalletRequestException("지갑을 찾을 수 없습니다."));
+		return toWalletResponse(wallet);
+	}
+
+	private long applyForAuction(Long memberId, long signedAmount, WalletLedgerType type, String description) {
 		validateActiveMember(memberId);
 		if (signedAmount == 0) {
 			throw new InvalidWalletRequestException("금액은 0원일 수 없습니다.");
@@ -93,7 +110,7 @@ public class WalletService {
 		walletLedgerRepository.save(
 			WalletLedger.create(wallet, type, signedAmount, nextBalance, description)
 		);
-		return toWalletResponse(wallet);
+		return nextBalance;
 	}
 
 	private Wallet findOrCreateWallet(Long memberId) {

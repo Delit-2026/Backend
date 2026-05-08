@@ -1,13 +1,16 @@
 package com.dealit.dealit.domain.auction.service;
 
 import com.dealit.dealit.domain.auction.AuctionStatus;
+import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse.ImageResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse.SellerResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse.BidHistoryItem;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
+import com.dealit.dealit.domain.auction.dto.BidResponse.BidMessages;
 import com.dealit.dealit.domain.auction.entity.Auction;
+import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.entity.Bid;
 import com.dealit.dealit.domain.auction.event.AuctionEventPublisher;
@@ -17,12 +20,15 @@ import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService.AuctionState;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService.BidScriptResult;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -46,8 +52,10 @@ public class AuctionBidService {
 
 	private final AuctionRepository auctionRepository;
 	private final BidRepository bidRepository;
+	private final AuctionPaymentRepository auctionPaymentRepository;
 	private final CategoryRepository categoryRepository;
 	private final MemberRepository memberRepository;
+	private final WalletService walletService;
 	private final AuctionRedisService auctionRedisService;
 	private final AuctionEventPublisher auctionEventPublisher;
 	private final ImageUrlService imageUrlService;
@@ -126,7 +134,8 @@ public class AuctionBidService {
 	@Transactional
 	public BidResponse bid(Long auctionId, Long bidderId, BigDecimal bidPrice) {
 		Auction auction = loadAuction(auctionId);
-		if (auction.getProduct().getMemberId().equals(bidderId)) {
+		Long sellerId = auction.getProduct().getMemberId();
+		if (sellerId.equals(bidderId)) {
 			throw new InvalidAuctionRequestException("자신이 등록한 경매에는 입찰할 수 없습니다.");
 		}
 		if (!auction.isOngoing()) {
@@ -138,40 +147,54 @@ public class AuctionBidService {
 		if (bidPrice.compareTo(auction.getCurrentPrice().add(auction.getMinimumBidAmount())) < 0) {
 			throw new InvalidAuctionRequestException("최소 입찰 금액을 충족해야 합니다.");
 		}
+		Member bidder = loadActiveMember(bidderId);
+		if (!bidder.isVerified()) {
+			throw new EmailNotVerifiedException();
+		}
+
+		long bidAmount = toWalletAmount(bidPrice);
+		walletService.reserveAuctionBid(bidderId, bidAmount, auctionId);
 
 		BidScriptResult result = auctionRedisService.bid(auctionId, bidPrice, bidderId);
 		switch (result.status()) {
 			case AUCTION_ENDED -> throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
 			case BID_TOO_LOW -> throw new InvalidAuctionRequestException("현재가보다 높은 금액만 입찰할 수 있습니다.");
+			case SAME_BIDDER -> throw new InvalidAuctionRequestException("현재 최고 입찰자는 다시 입찰할 수 없습니다.");
 			case SUCCESS -> {
-				bidRepository.save(Bid.create(auction, bidderId, bidPrice));
-				auction.updateCurrentPrice(bidPrice);
-				OffsetDateTime serverTime = serverTime();
-				long bidCount = bidRepository.countByAuctionAuctionId(auction.getAuctionId());
-				long bidderCount = bidRepository.countDistinctBidderIdByAuctionId(auction.getAuctionId());
-				BigDecimal minimumNextBidPrice = bidPrice.add(auction.getMinimumBidAmount());
-				Long sellerId = auction.getProduct().getMemberId();
-				auctionEventPublisher.publishBidUpdated(auctionId, bidPrice, bidderId, serverTime);
-				auctionEventPublisher.publishOutbid(auctionId, result.previousBidderId(), bidderId, bidPrice, serverTime);
-				auctionEventPublisher.publishBidReceived(
-					sellerId,
-					auctionId,
-					bidderId,
-					bidPrice,
-					bidCount,
-					result.previousBidderId() == null,
-					serverTime
-				);
-				auctionEventPublisher.publishAuctionBidUpdated(
-					Arrays.asList(sellerId, bidderId, result.previousBidderId()),
-					auctionId,
-					bidPrice,
-					minimumNextBidPrice,
-					bidCount,
-					bidderCount,
-					serverTime
-				);
-				return new BidResponse(auctionId, bidPrice, bidderId, serverTime);
+				try {
+					OffsetDateTime serverTime = serverTime();
+					auctionPaymentRepository.save(AuctionPayment.reserve(auction, bidderId, sellerId, bidAmount, serverTime));
+					refundPreviousHighestBidder(auctionId, result.previousBidderId(), serverTime);
+					bidRepository.save(Bid.create(auction, bidderId, bidPrice));
+					auction.updateCurrentPrice(bidPrice);
+					long bidCount = bidRepository.countByAuctionAuctionId(auction.getAuctionId());
+					long bidderCount = bidRepository.countDistinctBidderIdByAuctionId(auction.getAuctionId());
+					BigDecimal minimumNextBidPrice = bidPrice.add(auction.getMinimumBidAmount());
+					auctionEventPublisher.publishBidUpdated(auctionId, bidPrice, bidderId, serverTime);
+					auctionEventPublisher.publishOutbid(auctionId, result.previousBidderId(), bidderId, bidPrice, serverTime);
+					auctionEventPublisher.publishBidReceived(
+						sellerId,
+						auctionId,
+						bidderId,
+						bidPrice,
+						bidCount,
+						result.previousBidderId() == null,
+						serverTime
+					);
+					auctionEventPublisher.publishAuctionBidUpdated(
+						Arrays.asList(sellerId, bidderId, result.previousBidderId()),
+						auctionId,
+						bidPrice,
+						minimumNextBidPrice,
+						bidCount,
+						bidderCount,
+						serverTime
+					);
+					return new BidResponse(auctionId, bidPrice, bidderId, serverTime, BidMessages.defaults());
+				} catch (RuntimeException exception) {
+					auctionRedisService.restoreBidState(auctionId, bidPrice, bidderId, result.previousPrice(), result.previousBidderId());
+					throw exception;
+				}
 			}
 		}
 		throw new InvalidAuctionRequestException("입찰을 처리할 수 없습니다.");
@@ -236,6 +259,27 @@ public class AuctionBidService {
 			.orElseThrow(() -> new AuctionNotFoundException("존재하지 않는 경매입니다."));
 	}
 
+	private Member loadActiveMember(Long memberId) {
+		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
+			.orElseThrow(() -> new InvalidAuctionRequestException("존재하지 않는 회원입니다."));
+	}
+
+	private void refundPreviousHighestBidder(Long auctionId, Long previousBidderId, OffsetDateTime refundedAt) {
+		if (previousBidderId == null) {
+			return;
+		}
+		AuctionPayment previousPayment = auctionPaymentRepository
+			.findFirstByAuctionAuctionIdAndBidderIdAndStatusAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
+				auctionId,
+				previousBidderId,
+				AuctionPaymentStatus.RESERVED
+			)
+			.orElseThrow(() -> new InvalidAuctionRequestException("이전 최고 입찰자의 예치금을 찾을 수 없습니다."));
+		if (previousPayment.refund(refundedAt)) {
+			walletService.refundAuctionPayment(previousPayment.getBidderId(), previousPayment.getAmount(), auctionId);
+		}
+	}
+
 	private List<ImageResponse> toImageResponses(Product product) {
 		return product.getImages().stream()
 			.filter(image -> image.getDeletedAt() == null)
@@ -278,5 +322,13 @@ public class AuctionBidService {
 
 	private OffsetDateTime serverTime() {
 		return OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC);
+	}
+
+	private long toWalletAmount(BigDecimal amount) {
+		try {
+			return amount.stripTrailingZeros().longValueExact();
+		} catch (ArithmeticException exception) {
+			throw new InvalidAuctionRequestException("입찰가는 원 단위로 입력해주세요.");
+		}
 	}
 }
