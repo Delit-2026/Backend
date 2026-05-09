@@ -21,7 +21,9 @@ public record ChatRoomListItemResponse(
     public record ProductInfo(
             Long productId,
             String name,
-            String thumbnailUrl
+            String thumbnailUrl,
+            String saleType,
+            Long auctionId
     ) {}
 
     public record LastMessageInfo(

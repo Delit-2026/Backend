@@ -6,6 +6,12 @@ public interface ProductSummaryPort {
     record ProductSummary(
             Long productId,
             String name,
-            String thumbnailUrl
-    ) {}
+            String thumbnailUrl,
+            String saleType,
+            Long auctionId
+    ) {
+        public ProductSummary(Long productId, String name, String thumbnailUrl) {
+            this(productId, name, thumbnailUrl, "REGULAR", null);
+        }
+    }
 }

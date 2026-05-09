@@ -107,6 +107,7 @@ public class AuctionBidService {
 				bid.getBidId(),
 				bid.getBidderId(),
 				resolveBidderNickname(membersById.get(bid.getBidderId()), bid.getBidderId()),
+				resolveBidderProfileImageUrl(membersById.get(bid.getBidderId())),
 				bid.getBidPrice(),
 				bid.getCreatedAt(),
 				auction.getWinnerId() == null
@@ -267,6 +268,13 @@ public class AuctionBidService {
 			return "입찰자 #" + bidderId;
 		}
 		return bidder.getNickname();
+	}
+
+	private String resolveBidderProfileImageUrl(Member bidder) {
+		if (bidder == null || bidder.getProfileImage() == null || bidder.getProfileImage().isBlank()) {
+			return null;
+		}
+		return imageUrlService.toPublicUrl(bidder.getProfileImage());
 	}
 
 	private BigDecimal resolveDisplayCurrentPrice(Auction auction, BigDecimal currentPrice) {
