@@ -5,6 +5,10 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.dto.NotificationCreateRequest;
+import com.dealit.dealit.domain.notification.entity.InAppNotificationType;
+import com.dealit.dealit.domain.notification.service.FcmNotificationService;
+import com.dealit.dealit.domain.notification.service.NotificationCenterService;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
@@ -17,6 +21,7 @@ import com.dealit.dealit.domain.wishlist.entity.Wishlist;
 import com.dealit.dealit.domain.wishlist.repository.WishlistRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WishlistService {
@@ -44,10 +50,12 @@ public class WishlistService {
 	private final MemberRepository memberRepository;
 	private final CategoryRepository categoryRepository;
 	private final ImageUrlService imageUrlService;
+	private final NotificationCenterService notificationCenterService;
+	private final FcmNotificationService fcmNotificationService;
 
 	@Transactional
 	public WishlistToggleResponse addWishlist(Long memberId, Long productId) {
-		loadActiveMember(memberId);
+		Member member = loadActiveMember(memberId);
 		Product product = loadProduct(productId);
 		validateWishlistTarget(memberId, product);
 
@@ -63,6 +71,8 @@ public class WishlistService {
 
 		wishlistRepository.save(wishlist);
 		product.increaseFavoriteCount();
+		createWishlistNotification(member, product);
+		sendWishlistPushNotification(member, product);
 
 		return new WishlistToggleResponse(product.getProductId(), true, product.getFavoriteCount());
 	}
@@ -130,6 +140,41 @@ public class WishlistService {
 		}
 		if (product.getStatus() != ProductStatus.ON_SALE) {
 			throw new InvalidProductRequestException("판매 중인 상품만 찜할 수 있습니다.");
+		}
+	}
+
+	private void createWishlistNotification(Member actor, Product product) {
+		notificationCenterService.create(
+			product.getMemberId(),
+			new NotificationCreateRequest(
+				InAppNotificationType.PRODUCT,
+				"상품에 찜이 추가되었습니다.",
+				actor.getNickname() + "님이 '" + product.getName() + "' 상품을 찜했습니다.",
+				"PRODUCT",
+				product.getProductId(),
+				null
+			)
+		);
+	}
+
+	private void sendWishlistPushNotification(Member actor, Product product) {
+		try {
+			int sentCount = fcmNotificationService.sendToMember(
+				product.getMemberId(),
+				"상품에 찜이 추가되었습니다.",
+				actor.getNickname() + "님이 '" + product.getName() + "' 상품을 찜했습니다.",
+				Map.of(
+					"type", "WISHLIST_ADDED",
+					"productId", String.valueOf(product.getProductId()),
+					"actorId", String.valueOf(actor.getMemberId()),
+					"targetUrl", "/products/" + product.getProductId()
+				)
+			);
+			log.debug("Sent wishlist push notification. productId={}, receiverId={}, sentCount={}",
+				product.getProductId(), product.getMemberId(), sentCount);
+		} catch (RuntimeException exception) {
+			log.warn("Failed to send wishlist push notification. productId={}, receiverId={}",
+				product.getProductId(), product.getMemberId(), exception);
 		}
 	}
 

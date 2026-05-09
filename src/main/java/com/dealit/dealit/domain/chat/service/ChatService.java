@@ -411,7 +411,8 @@ public class ChatService {
                             "type", "CHAT_MESSAGE",
                             "roomId", String.valueOf(room.getRoomId()),
                             "messageId", String.valueOf(message.getMessageId()),
-                            "senderId", String.valueOf(senderId)
+                            "senderId", String.valueOf(senderId),
+                            "targetUrl", "/chats/" + room.getRoomId()
                     )
             );
             log.debug("Sent chat push notification. roomId={}, recipientId={}, sentCount={}",
