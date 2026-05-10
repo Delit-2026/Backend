@@ -18,7 +18,7 @@ public class AuctionEventPublisher {
 	private final EventStreamService eventStreamService;
 
 	public void publishBidUpdated(Long auctionId, BigDecimal currentPrice, Long bidderId, OffsetDateTime serverTime) {
-		eventStreamService.publishRemote(
+		eventStreamService.publish(
 			bidderId,
 			"BID_UPDATED",
 			new AuctionEventPayload.BidUpdated(auctionId, currentPrice, bidderId, serverTime)
@@ -35,7 +35,7 @@ public class AuctionEventPublisher {
 		if (previousBidderId == null || previousBidderId.equals(newBidderId)) {
 			return;
 		}
-		eventStreamService.publishRemote(
+		eventStreamService.publish(
 			previousBidderId,
 			"OUTBID",
 			new AuctionEventPayload.Outbid(auctionId, previousBidderId, newBidderId, currentPrice, serverTime)
@@ -53,7 +53,7 @@ public class AuctionEventPublisher {
 		if (receiverId == null) {
 			return;
 		}
-		eventStreamService.publishRemote(
+		eventStreamService.publish(
 			receiverId,
 			"AUCTION_ENDED",
 			new AuctionEventPayload.AuctionEnded(auctionId, winnerId, finalPrice, status, serverTime)
@@ -72,7 +72,7 @@ public class AuctionEventPublisher {
 		if (sellerId == null) {
 			return;
 		}
-		eventStreamService.publishRemote(
+		eventStreamService.publish(
 			sellerId,
 			"BID_RECEIVED",
 			new AuctionEventPayload.BidReceived(auctionId, bidderId, currentPrice, bidCount, firstBid, serverTime)
@@ -93,7 +93,7 @@ public class AuctionEventPublisher {
 			if (receiverId == null) {
 				continue;
 			}
-			eventStreamService.publishRemote(
+			eventStreamService.publish(
 				receiverId,
 				"AUCTION_BID_UPDATED",
 				new AuctionEventPayload.AuctionBidUpdated(

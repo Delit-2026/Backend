@@ -10,5 +10,6 @@ public record ChatMessageResponse(
         ChatMessageType messageType,
         String content,
         boolean isRead,
-        LocalDateTime sentAt
+        LocalDateTime sentAt,
+        String senderType
 ) {}
