@@ -1180,7 +1180,7 @@ paths:
       tags:
       - Auction
       summary: 경매 입찰
-      description: 서버 도착 시간 기준으로 입찰을 처리한다.
+      description: 서버 도착 시간 기준으로 입찰을 처리한다. 입찰 금액은 Dealit Pay에서 즉시 예치되고, 추월당한 기존 최고 입찰자의 예치금은 커밋 이후 자동 환불 처리된다.
       operationId: bid
       parameters:
       - name: auctionId
@@ -3635,6 +3635,17 @@ components:
         serverTime:
           type: string
           format: date-time
+        messages:
+          $ref: "#/components/schemas/BidMessages"
+    BidMessages:
+      type: object
+      properties:
+        reserveNotice:
+          type: string
+          example: 입찰 시 해당 금액은 Dealit Pay에서 즉시 예치됩니다.
+        refundNotice:
+          type: string
+          example: 경매에서 추월당할 경우 예치금은 자동 환불됩니다.
     CreateAuctionRequest:
       type: object
       description: 경매 상품 등록 요청
