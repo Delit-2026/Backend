@@ -7,6 +7,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -17,13 +18,15 @@ public class CorsConfig {
 	public CorsConfigurationSource corsConfigurationSource(
 		@Value("${app.cors.allowed-origins}") String allowedOriginsProperty
 	) {
-		List<String> allowedOrigins = Arrays.stream(allowedOriginsProperty.split(","))
+		List<String> allowedOriginPatterns = new ArrayList<>(Arrays.stream(allowedOriginsProperty.split(","))
 			.map(String::trim)
 			.filter(origin -> !origin.isEmpty())
-			.toList();
+			.toList());
+		allowedOriginPatterns.add("http://*:3000");
+		allowedOriginPatterns.add("http://*:80");
 
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(allowedOrigins);
+		configuration.setAllowedOriginPatterns(allowedOriginPatterns);
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
 		configuration.setExposedHeaders(List.of("Authorization", "Location"));

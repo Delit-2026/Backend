@@ -28,14 +28,14 @@ public class AuctionNotificationService {
 	public void notifyBidReceived(Auction auction, Long bidderId, BigDecimal bidPrice, long bidCount) {
 		Long sellerId = auction.getProduct().getMemberId();
 		String title = bidCount <= 1 ? "첫 입찰 발생" : "새로운 입찰가 알림";
-		String content = "'" + auction.getProduct().getName() + "' 경매에 " + formatPrice(bidPrice) + "원 입찰이 들어왔습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 경매에 " + formatPrice(bidPrice) + "원 입찰이 들어왔어요.";
 		createAuctionNotification(sellerId, title, content, auction.getAuctionId());
 		sendAuctionPush(sellerId, title, content, "AUCTION_BID_RECEIVED", auction.getAuctionId(), bidderId);
 	}
 
 	public void notifyBidPlaced(Auction auction, Long bidderId, BigDecimal bidPrice) {
 		String title = "새로운 입찰가 알림";
-		String content = "'" + auction.getProduct().getName() + "' 경매에 " + formatPrice(bidPrice) + "원 입찰이 등록되었습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 경매에 " + formatPrice(bidPrice) + "원 입찰이 등록되었어요.";
 		createAuctionNotification(bidderId, title, content, auction.getAuctionId());
 		sendAuctionPush(bidderId, title, content, "AUCTION_BID_PLACED", auction.getAuctionId(), bidderId);
 	}
@@ -46,14 +46,14 @@ public class AuctionNotificationService {
 		}
 
 		String title = "입찰 추월 알림";
-		String content = "'" + auction.getProduct().getName() + "' 경매에서 다른 입찰자가 " + formatPrice(bidPrice) + "원으로 입찰했습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 경매에서 다른 입찰자가 " + formatPrice(bidPrice) + "원으로 입찰했어요.";
 		createAuctionNotification(previousBidderId, title, content, auction.getAuctionId());
 		sendAuctionPush(previousBidderId, title, content, "AUCTION_OUTBID", auction.getAuctionId(), newBidderId);
 	}
 
 	public void notifyClosingSoon(Auction auction, Collection<Long> bidderIds) {
-		String title = "마감 임박 알림(10분전)";
-		String content = "'" + auction.getProduct().getName() + "' 경매가 10분 후 마감됩니다.";
+		String title = "경매 마감 임박";
+		String content = "'" + auction.getProduct().getName() + "' 경매가 10분 후 마감되어요!";
 		for (Long bidderId : bidderIds) {
 			createAuctionNotification(bidderId, title, content, auction.getAuctionId());
 			sendAuctionPush(bidderId, title, content, "AUCTION_CLOSING_SOON", auction.getAuctionId(), null);
@@ -67,7 +67,7 @@ public class AuctionNotificationService {
 
 		if (status == AuctionStatus.NO_BID) {
 			String title = "유찰 알림";
-			String content = "'" + auction.getProduct().getName() + "' 경매가 입찰 없이 종료되었습니다.";
+			String content = "'" + auction.getProduct().getName() + "' 경매가 입찰 없이 종료되었어요. 재등록 해볼까요?";
 			createAuctionNotification(receiverId, title, content, auction.getAuctionId());
 			sendAuctionPush(receiverId, title, content, "AUCTION_NO_BID", auction.getAuctionId(), null);
 			return;
@@ -75,7 +75,7 @@ public class AuctionNotificationService {
 
 		if (status == AuctionStatus.SUCCESSFUL_BID) {
 			String title = receiverId.equals(winnerId) ? "낙찰 성공 알림" : "최종 낙찰 알림";
-			String content = "'" + auction.getProduct().getName() + "' 경매가 " + formatPrice(finalPrice) + "원에 낙찰되었습니다.";
+			String content = "'" + auction.getProduct().getName() + "' 경매가 " + formatPrice(finalPrice) + "원에 낙찰되었어요.";
 			createAuctionNotification(receiverId, title, content, auction.getAuctionId());
 			sendAuctionPush(receiverId, title, content, "AUCTION_SUCCESSFUL_BID", auction.getAuctionId(), winnerId);
 		}
@@ -83,7 +83,7 @@ public class AuctionNotificationService {
 
 	public void notifyAuctionFailed(Auction auction, Long bidderId, Long winnerId, BigDecimal finalPrice) {
 		String title = "낙찰 실패 알림";
-		String content = "'" + auction.getProduct().getName() + "' 경매가 " + formatPrice(finalPrice) + "원에 마감되어 낙찰되지 않았습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 경매가 " + formatPrice(finalPrice) + "원에 마감되어 낙찰되지 않았어요.";
 		createAuctionNotification(bidderId, title, content, auction.getAuctionId());
 		sendAuctionPush(bidderId, title, content, "AUCTION_BID_FAILED", auction.getAuctionId(), winnerId);
 	}
