@@ -52,6 +52,10 @@ public class EventStreamService {
         sendToUser(userId, eventName, payload);
     }
 
+    public void publish(Long userId, String eventName, Object payload) {
+        publishToUser(userId, eventName, payload);
+    }
+
     private void publishToUser(Long userId, String eventName, Object payload) {
         sendToUser(userId, eventName, payload);
         redisEventPublisher.ifPresent(publisher -> publisher.publish(userId, eventName, payload));
@@ -69,7 +73,7 @@ public class EventStreamService {
                     .id(emitterId)
                     .name(eventName)
                     .data(payload));
-        } catch (IOException | IllegalStateException exception) {
+        } catch (IOException | RuntimeException exception) {
             emitterRepository.remove(userId, emitterId);
         }
     }

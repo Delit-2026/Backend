@@ -15,6 +15,7 @@ public record AuctionBidHistoryResponse(
 		Long bidId,
 		Long bidderId,
 		String bidderNickname,
+		String bidderProfileImageUrl,
 		BigDecimal bidPrice,
 		LocalDateTime bidAt,
 		boolean highest

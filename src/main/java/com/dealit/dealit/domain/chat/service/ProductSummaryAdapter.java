@@ -19,6 +19,8 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
                 SELECT
                     p.product_id,
                     p.name,
+                    p.sale_type,
+                    a.auction_id,
                     (
                         SELECT pi.image_url
                         FROM product_image pi
@@ -28,6 +30,9 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
                         LIMIT 1
                     ) AS thumbnail_url
                 FROM product p
+                LEFT JOIN auction a
+                  ON a.product_id = p.product_id
+                 AND a.deleted_at IS NULL
                 WHERE p.product_id = :productId
                   AND p.deleted_at IS NULL
                 """;
@@ -43,7 +48,9 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
                         return new ProductSummary(
                                 rs.getLong("product_id"),
                                 rs.getString("name"),
-                                rs.getString("thumbnail_url")
+                                rs.getString("thumbnail_url"),
+                                rs.getString("sale_type"),
+                                rs.getObject("auction_id", Long.class)
                         );
                     }
             );

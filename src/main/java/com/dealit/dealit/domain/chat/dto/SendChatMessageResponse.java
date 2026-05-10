@@ -7,6 +7,7 @@ public record SendChatMessageResponse(
         Long messageId,
         Long roomId,
         Long senderId,
+        String senderNickname,
         ChatMessageType messageType,
         String content,
         boolean isRead,

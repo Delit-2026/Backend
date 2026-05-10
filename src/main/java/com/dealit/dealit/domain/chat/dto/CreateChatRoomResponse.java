@@ -18,6 +18,7 @@ public record CreateChatRoomResponse(
             String name,
             String thumbnailUrl,
             String saleType,
+            Long auctionId,
             String status
     ) {}
 
