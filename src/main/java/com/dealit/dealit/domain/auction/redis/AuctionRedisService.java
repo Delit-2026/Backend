@@ -49,6 +49,11 @@ public class AuctionRedisService {
 		end
 
 		local previousBidderId = redis.call('HGET', KEYS[1], 'highestBidderId')
+		local previousPrice = currentPrice
+
+		if previousBidderId == bidderId then
+		    return 'SAME_BIDDER:' .. previousPrice
+		end
 
 		redis.call('HSET', KEYS[1],
 		    'currentPrice', bidPrice,
@@ -59,7 +64,26 @@ public class AuctionRedisService {
 		    previousBidderId = ''
 		end
 
-		return 'SUCCESS:' .. previousBidderId
+		return 'SUCCESS:' .. previousBidderId .. ':' .. previousPrice
+		""", String.class);
+
+	private static final DefaultRedisScript<String> RESTORE_BID_SCRIPT = new DefaultRedisScript<>("""
+		local currentPrice = redis.call('HGET', KEYS[1], 'currentPrice')
+		local highestBidderId = redis.call('HGET', KEYS[1], 'highestBidderId')
+		local failedBidPrice = ARGV[1]
+		local failedBidderId = ARGV[2]
+		local previousPrice = ARGV[3]
+		local previousBidderId = ARGV[4]
+
+		if currentPrice == failedBidPrice and highestBidderId == failedBidderId then
+		    redis.call('HSET', KEYS[1],
+		        'currentPrice', previousPrice,
+		        'highestBidderId', previousBidderId
+		    )
+		    return 'RESTORED'
+		end
+
+		return 'SKIPPED'
 		""", String.class);
 
 	private final StringRedisTemplate stringRedisTemplate;
@@ -94,16 +118,34 @@ public class AuctionRedisService {
 			Long.toString(clock.millis())
 		);
 		if (result == null) {
-			return new BidScriptResult(BidScriptStatus.AUCTION_ENDED, null);
+			return new BidScriptResult(BidScriptStatus.AUCTION_ENDED, null, null);
 		}
 		if (result.startsWith("SUCCESS:")) {
-			String previousBidderId = result.substring("SUCCESS:".length());
+			String[] parts = result.substring("SUCCESS:".length()).split(":", -1);
 			return new BidScriptResult(
 				BidScriptStatus.SUCCESS,
-				previousBidderId.isBlank() ? null : Long.valueOf(previousBidderId)
+				parts[0].isBlank() ? null : Long.valueOf(parts[0]),
+				parts.length < 2 || parts[1].isBlank() ? null : new BigDecimal(parts[1])
 			);
 		}
-		return new BidScriptResult(BidScriptStatus.valueOf(result), null);
+		if (result.startsWith("SAME_BIDDER:")) {
+			return new BidScriptResult(BidScriptStatus.SAME_BIDDER, null, new BigDecimal(result.substring("SAME_BIDDER:".length())));
+		}
+		return new BidScriptResult(BidScriptStatus.valueOf(result), null, null);
+	}
+
+	public void restoreBidState(Long auctionId, BigDecimal failedBidPrice, Long failedBidderId, BigDecimal previousPrice, Long previousBidderId) {
+		if (previousPrice == null) {
+			return;
+		}
+		stringRedisTemplate.execute(
+			RESTORE_BID_SCRIPT,
+			List.of(stateKey(auctionId)),
+			failedBidPrice.toPlainString(),
+			failedBidderId.toString(),
+			previousPrice.toPlainString(),
+			previousBidderId == null ? "" : previousBidderId.toString()
+		);
 	}
 
 	public Set<String> findEndingAuctionIds(long nowEpochMillis) {
@@ -155,7 +197,7 @@ public class AuctionRedisService {
 		return "auction:%d:state".formatted(auctionId);
 	}
 
-	public record BidScriptResult(BidScriptStatus status, Long previousBidderId) {
+	public record BidScriptResult(BidScriptStatus status, Long previousBidderId, BigDecimal previousPrice) {
 	}
 
 	public record AuctionState(BigDecimal currentPrice, BigDecimal minimumBidAmount, Long highestBidderId) {
@@ -164,6 +206,7 @@ public class AuctionRedisService {
 	public enum BidScriptStatus {
 		SUCCESS,
 		AUCTION_ENDED,
-		BID_TOO_LOW
+		BID_TOO_LOW,
+		SAME_BIDDER
 	}
 }
