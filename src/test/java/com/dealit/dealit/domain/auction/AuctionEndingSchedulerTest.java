@@ -7,8 +7,11 @@ import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.auction.exception.AuctionNotFoundException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.scheduler.AuctionEndingScheduler;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -20,10 +23,16 @@ class AuctionEndingSchedulerTest {
 
 	private final AuctionRedisService auctionRedisService = mock(AuctionRedisService.class);
 	private final AuctionBidService auctionBidService = mock(AuctionBidService.class);
+	private final AuctionRepository auctionRepository = mock(AuctionRepository.class);
+	private final BidRepository bidRepository = mock(BidRepository.class);
+	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final Clock clock = Clock.fixed(Instant.parse("2026-05-02T00:00:00Z"), ZoneOffset.UTC);
 	private final AuctionEndingScheduler scheduler = new AuctionEndingScheduler(
 		auctionRedisService,
 		auctionBidService,
+		auctionRepository,
+		bidRepository,
+		auctionNotificationService,
 		clock
 	);
 

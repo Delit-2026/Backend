@@ -23,6 +23,7 @@ import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -34,6 +35,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -56,6 +58,7 @@ class AuctionBidServiceTest {
 	private final MemberRepository memberRepository = mock(MemberRepository.class);
 	private final AuctionRedisService auctionRedisService = mock(AuctionRedisService.class);
 	private final AuctionEventPublisher auctionEventPublisher = mock(AuctionEventPublisher.class);
+	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
 
 	private final AuctionBidService auctionBidService = new AuctionBidService(
@@ -65,6 +68,7 @@ class AuctionBidServiceTest {
 		memberRepository,
 		auctionRedisService,
 		auctionEventPublisher,
+		auctionNotificationService,
 		imageUrlService,
 		FIXED_CLOCK
 	);
@@ -90,6 +94,13 @@ class AuctionBidServiceTest {
 		assertThat(auction.getFinalPrice()).isNull();
 		verify(auctionRedisService).removeEnding(auctionId);
 		verify(auctionRedisService).deleteState(auctionId);
+		verify(auctionNotificationService).notifyAuctionEnded(
+			eq(auction),
+			eq(sellerId),
+			eq(null),
+			eq(null),
+			eq(AuctionStatus.NO_BID)
+		);
 		verify(auctionEventPublisher).publishAuctionEnded(
 			eq(sellerId),
 			eq(auctionId),
@@ -112,6 +123,8 @@ class AuctionBidServiceTest {
 			.thenReturn(Optional.of(auction));
 		when(auctionRedisService.getState(auctionId))
 			.thenReturn(new AuctionState(finalPrice, new BigDecimal("1000"), winnerId));
+		when(bidRepository.findDistinctBidderIdsByAuctionIdAndBidderIdNot(auctionId, winnerId))
+			.thenReturn(Collections.emptyList());
 
 		auctionBidService.endAuction(auctionId);
 
@@ -122,6 +135,13 @@ class AuctionBidServiceTest {
 		assertThat(auction.getCurrentPrice()).isEqualByComparingTo(finalPrice);
 		verify(auctionRedisService).removeEnding(auctionId);
 		verify(auctionRedisService).deleteState(auctionId);
+		verify(auctionNotificationService).notifyAuctionEnded(
+			eq(auction),
+			eq(sellerId),
+			eq(winnerId),
+			eq(finalPrice),
+			eq(AuctionStatus.SUCCESSFUL_BID)
+		);
 		verify(auctionEventPublisher).publishAuctionEnded(
 			eq(sellerId),
 			eq(auctionId),
@@ -129,6 +149,13 @@ class AuctionBidServiceTest {
 			eq(finalPrice),
 			eq(AuctionStatus.SUCCESSFUL_BID),
 			any(OffsetDateTime.class)
+		);
+		verify(auctionNotificationService).notifyAuctionEnded(
+			eq(auction),
+			eq(winnerId),
+			eq(winnerId),
+			eq(finalPrice),
+			eq(AuctionStatus.SUCCESSFUL_BID)
 		);
 		verify(auctionEventPublisher).publishAuctionEnded(
 			eq(winnerId),
@@ -175,6 +202,12 @@ class AuctionBidServiceTest {
 			assertThat(results.stream().filter(InvalidAuctionRequestException.class::isInstance)).hasSize(1);
 			assertThat(auction.getCurrentPrice()).isIn(new BigDecimal("101000"), new BigDecimal("101500"));
 			verify(bidRepository, times(1)).save(any(Bid.class));
+			verify(auctionNotificationService, times(1)).notifyBidReceived(
+				eq(auction),
+				anyLong(),
+				any(BigDecimal.class),
+				anyLong()
+			);
 			verify(auctionEventPublisher, times(1)).publishBidUpdated(
 				eq(auctionId),
 				any(BigDecimal.class),

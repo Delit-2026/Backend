@@ -11,12 +11,14 @@ import com.dealit.dealit.domain.notification.dto.RegisterFcmTokenResponse;
 import com.dealit.dealit.domain.notification.dto.SendTestNotificationRequest;
 import com.dealit.dealit.domain.notification.dto.SendTestNotificationResponse;
 import com.dealit.dealit.domain.notification.dto.UnreadNotificationCountResponse;
+import com.dealit.dealit.domain.notification.dto.UnreadNotificationTypeCountResponse;
 import com.dealit.dealit.domain.notification.service.FcmNotificationService;
 import com.dealit.dealit.domain.notification.service.NotificationCenterService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -52,6 +54,14 @@ public class NotificationController {
 	@GetMapping("/unread-count")
 	public UnreadNotificationCountResponse getUnreadCount(@AuthenticationPrincipal AuthenticatedMember member) {
 		return notificationCenterService.getUnreadCount(member.memberId());
+	}
+
+	@Operation(summary = "타입별 안 읽은 알림 개수 조회", description = "로그인한 회원의 안 읽은 알림 개수를 타입별로 조회합니다.")
+	@GetMapping("/unread-counts-by-type")
+	public List<UnreadNotificationTypeCountResponse> getUnreadCountsByType(
+		@AuthenticationPrincipal AuthenticatedMember member
+	) {
+		return notificationCenterService.getUnreadCountsByType(member.memberId());
 	}
 
 	@Operation(summary = "개별 알림 읽음 처리", description = "로그인한 회원의 특정 알림을 읽음 처리합니다.")

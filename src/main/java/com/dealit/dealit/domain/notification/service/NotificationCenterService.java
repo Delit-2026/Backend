@@ -9,12 +9,14 @@ import com.dealit.dealit.domain.notification.dto.NotificationCreateRequest;
 import com.dealit.dealit.domain.notification.dto.NotificationListResponse;
 import com.dealit.dealit.domain.notification.dto.NotificationResponse;
 import com.dealit.dealit.domain.notification.dto.UnreadNotificationCountResponse;
+import com.dealit.dealit.domain.notification.dto.UnreadNotificationTypeCountResponse;
 import com.dealit.dealit.domain.notification.entity.InAppNotification;
 import com.dealit.dealit.domain.notification.exception.NotificationException;
 import com.dealit.dealit.domain.notification.repository.InAppNotificationRepository;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -59,6 +61,13 @@ public class NotificationCenterService {
 		return new UnreadNotificationCountResponse(
 			notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(memberId)
 		);
+	}
+
+	public List<UnreadNotificationTypeCountResponse> getUnreadCountsByType(Long memberId) {
+		validateActiveMember(memberId);
+		return notificationRepository.countUnreadByType(memberId).stream()
+			.map(count -> new UnreadNotificationTypeCountResponse(count.getType(), count.getCount()))
+			.toList();
 	}
 
 	@Transactional

@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auction.entity.Bid;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface BidRepository extends JpaRepository<Bid, Long> {
 
@@ -12,6 +13,26 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
 	long countByAuctionAuctionId(Long auctionId);
 
 	List<Bid> findAllByAuctionAuctionIdOrderByCreatedAtDescBidIdDesc(Long auctionId);
+
+	@Query("""
+		select distinct b.bidderId
+		from Bid b
+		where b.auction.auctionId = :auctionId
+		  and b.deletedAt is null
+		""")
+	List<Long> findDistinctBidderIdsByAuctionId(@Param("auctionId") Long auctionId);
+
+	@Query("""
+		select distinct b.bidderId
+		from Bid b
+		where b.auction.auctionId = :auctionId
+		  and b.bidderId <> :winnerId
+		  and b.deletedAt is null
+		""")
+	List<Long> findDistinctBidderIdsByAuctionIdAndBidderIdNot(
+		@Param("auctionId") Long auctionId,
+		@Param("winnerId") Long winnerId
+	);
 
 	@Query("select count(distinct b.bidderId) from Bid b where b.auction.auctionId = :auctionId")
 	long countDistinctBidderIdByAuctionId(Long auctionId);
