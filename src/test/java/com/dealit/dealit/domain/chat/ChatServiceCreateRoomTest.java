@@ -21,6 +21,7 @@ import com.dealit.dealit.domain.chat.service.ProductOwnershipPort;
 import com.dealit.dealit.domain.chat.service.ProductSummaryPort;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.service.FcmNotificationService;
+import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -51,6 +53,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService
         );
@@ -71,6 +74,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -88,6 +92,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService
         );
@@ -110,6 +115,7 @@ class ChatServiceCreateRoomTest {
         MemberRepository memberRepository = mock(MemberRepository.class);
         ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -123,6 +129,7 @@ class ChatServiceCreateRoomTest {
                 memberRepository,
                 productOwnershipPort,
                 productSummaryPort,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService
         );

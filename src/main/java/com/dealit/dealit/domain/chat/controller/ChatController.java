@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat.controller;
 
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomDetailResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
@@ -58,6 +59,15 @@ public class ChatController {
             @AuthenticationPrincipal(expression = "memberId") Long currentUserId
     ) {
         return ResponseEntity.ok(chatService.getChatRooms(currentUserId, page, size));
+    }
+
+    @Operation(summary = "채팅방 상세 조회")
+    @GetMapping("/rooms/{roomId}")
+    public ResponseEntity<ChatRoomDetailResponse> getChatRoomDetail(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal(expression = "memberId") Long currentUserId
+    ) {
+        return ResponseEntity.ok(chatService.getChatRoomDetail(roomId, currentUserId));
     }
 
     @Operation(summary = "채팅 메시지 목록 조회")

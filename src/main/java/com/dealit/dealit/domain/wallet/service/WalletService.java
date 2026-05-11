@@ -54,6 +54,19 @@ public class WalletService {
 	}
 
 	@Transactional
+	public WalletResponse payForPurchase(Long buyerId, long amount, Long purchaseId) {
+		if (amount <= 0) {
+			throw new InvalidWalletRequestException("구매 금액은 0보다 커야 합니다.");
+		}
+		return apply(buyerId, -amount, WalletLedgerType.PURCHASE, "상품 구매 결제");
+	}
+
+	@Transactional
+	public WalletResponse settlePurchase(Long sellerId, long amount, Long purchaseId) {
+		if (amount <= 0) {
+			throw new InvalidWalletRequestException("정산 금액은 0보다 커야 합니다.");
+		}
+		return apply(sellerId, amount, WalletLedgerType.SETTLEMENT, "상품 판매 정산");
 	public long reserveAuctionBid(Long memberId, long amount, Long auctionId) {
 		return applyForAuction(memberId, -amount, WalletLedgerType.AUCTION_RESERVE, "경매 입찰 예치금 차감: auctionId=%d".formatted(auctionId));
 	}
