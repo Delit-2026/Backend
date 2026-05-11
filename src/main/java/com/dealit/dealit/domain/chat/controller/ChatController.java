@@ -70,6 +70,15 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getChatRoom(roomId, currentUserId));
     }
 
+    @Operation(summary = "채팅방 거래 정보 조회")
+    @GetMapping("/rooms/{roomId}/trade-info")
+    public ResponseEntity<ChatRoomDetailResponse> getChatRoomTradeInfo(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal(expression = "memberId") Long currentUserId
+    ) {
+        return ResponseEntity.ok(chatService.getChatRoomDetail(roomId, currentUserId));
+    }
+
     @Operation(summary = "채팅 메시지 목록 조회")
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<ChatMessageListResponse> getChatMessages(

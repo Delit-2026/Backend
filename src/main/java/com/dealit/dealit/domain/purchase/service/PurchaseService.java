@@ -1,6 +1,9 @@
 package com.dealit.dealit.domain.purchase.service;
 
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.chat.entity.ChatRoom;
+import com.dealit.dealit.domain.chat.entity.ChatType;
+import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
@@ -48,6 +51,7 @@ public class PurchaseService {
 	private final WalletService walletService;
 	private final ProductPaymentService productPaymentService;
 	private final ImageUrlService imageUrlService;
+	private final ChatRoomRepository chatRoomRepository;
 
 	@Transactional
 	public PurchaseResponse purchase(Long productId, Long buyerId, String idempotencyKey) {
@@ -55,12 +59,13 @@ public class PurchaseService {
 
 		Purchase existingPurchase = purchaseRepository.findByBuyerIdAndIdempotencyKey(buyerId, idempotencyKey)
 			.orElse(null);
-		if (existingPurchase != null) {
-			if (!existingPurchase.getProductId().equals(productId)) {
-				throw new IdempotencyConflictException();
+			if (existingPurchase != null) {
+				if (!existingPurchase.getProductId().equals(productId)) {
+					throw new IdempotencyConflictException();
+				}
+				linkPurchaseChatRoomIfNeeded(existingPurchase);
+				return toPurchaseResponse(existingPurchase);
 			}
-			return toPurchaseResponse(existingPurchase);
-		}
 
 		Member buyer = memberRepository.findByMemberIdAndDeletedAtIsNull(buyerId)
 			.orElseThrow(() -> new InvalidCredentialsException("존재하지 않는 회원입니다."));
@@ -92,10 +97,33 @@ public class PurchaseService {
 			purchase.getBuyerId(),
 			purchase.getSellerId(),
 			amount
-		);
+			);
 
-		product.markSold();
-		return toPurchaseResponse(purchase);
+			product.markSold();
+			linkPurchaseChatRoomIfNeeded(purchase);
+			return toPurchaseResponse(purchase);
+		}
+
+	private void linkPurchaseChatRoomIfNeeded(Purchase purchase) {
+		if (purchase.getChatRoomId() != null) {
+			return;
+		}
+
+		ChatRoom chatRoom = chatRoomRepository
+			.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
+				purchase.getSellerId(),
+				purchase.getBuyerId(),
+				purchase.getProductId()
+			)
+			.orElseGet(() -> chatRoomRepository.save(
+				ChatRoom.create(
+					purchase.getSellerId(),
+					purchase.getBuyerId(),
+					purchase.getProductId(),
+					ChatType.GENERAL
+				)
+			));
+		purchase.linkChatRoom(chatRoom.getRoomId());
 	}
 
 	public PurchaseReceiptResponse getReceipt(Long purchaseId, Long memberId) {
