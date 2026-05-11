@@ -94,7 +94,7 @@ public class ChatService {
         ChatRoom saved = chatRoomRepository.save(
                 ChatRoom.create(sellerId, buyerId, request.productId(), resolveChatType(product))
         );
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         CreateChatRoomResponse response = buildCreateRoomResponse(saved, currentUserId, sellerId, buyerId, now);
 
@@ -166,14 +166,13 @@ public class ChatService {
         }
         OffsetDateTime now = OffsetDateTime.now(clock);
         if (payment.getReservedAt().plusDays(3).isBefore(now)) {
-            payment.requestRefund(now);
             throw new IllegalArgumentException("발송 처리 기한이 지나 자동 환불 대상입니다.");
         }
         if (!payment.markShipped(now)) {
             throw new IllegalArgumentException("현재 상태에서는 발송 처리를 할 수 없습니다.");
         }
 
-        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now());
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
         return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
     }
 
@@ -206,7 +205,7 @@ public class ChatService {
                 payment.getAuction().getAuctionId()
         );
 
-        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now());
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
         return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
     }
 
@@ -350,7 +349,7 @@ public class ChatService {
 
         long unreadAfter = chatMessageRepository.countUnreadByRoomId(roomId, currentUserId);
         int unreadCountAfter = unreadAfter > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadAfter;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         MarkChatRoomAsReadResponse response = new MarkChatRoomAsReadResponse(
                 roomId,
@@ -375,7 +374,7 @@ public class ChatService {
 
         return new UnreadCountResponse(
                 totalUnread,
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -397,7 +396,7 @@ public class ChatService {
         return new RoomUnreadCountResponse(
                 roomId,
                 unreadCount,
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -432,7 +431,7 @@ public class ChatService {
                 saved.getReportId(),
                 saved.getMessageId(),
                 saved.getReason(),
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -455,7 +454,7 @@ public class ChatService {
                 .orElseThrow(ChatRoomNotFoundException::new);
 
         message.softDelete();
-        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now());
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
     }
 
     private void publishRoomAndUnreadUpdates(ChatRoom room, Long sellerId, Long buyerId, LocalDateTime emittedAt) {
@@ -535,7 +534,7 @@ public class ChatService {
 
         LocalDateTime updatedAt = lastMessage != null
                 ? lastMessage.getSentAt()
-                : room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now();
+                : room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now(clock);
 
         return new ChatRoomListItemResponse(
                 room.getRoomId(),
