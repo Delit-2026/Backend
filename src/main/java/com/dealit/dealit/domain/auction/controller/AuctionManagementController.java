@@ -6,9 +6,11 @@ import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.BidRequest;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
+import com.dealit.dealit.domain.auction.dto.MyBuyingAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.auction.service.AuctionBuyingService;
 import com.dealit.dealit.domain.auction.service.AuctionService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +42,7 @@ public class AuctionManagementController {
 
 	private final AuctionService auctionService;
 	private final AuctionBidService auctionBidService;
+	private final AuctionBuyingService auctionBuyingService;
 
 	@Operation(summary = "실시간 인기 경매 목록 조회", description = "입찰 수를 등록 후 경과 시간으로 나눈 점수 기준으로 진행 중인 경매를 조회한다.")
 	@ApiResponse(responseCode = "200", description = "실시간 인기 경매 목록 조회 성공",
@@ -89,6 +92,30 @@ public class AuctionManagementController {
 		@RequestParam(defaultValue = "20") int size
 	) {
 		return auctionService.getMySellingAuctionProducts(member.memberId(), page, size);
+	}
+
+	@Operation(summary = "내 구매중 경매 목록", description = "마이페이지 구매중 화면에서 현재 사용자가 입찰한 경매 목록을 조회합니다.")
+	@ApiResponse(responseCode = "200", description = "내 구매중 경매 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = MyBuyingAuctionListResponse.class)))
+	@GetMapping("/mypage/auctions/buying")
+	public MyBuyingAuctionListResponse getMyBuyingAuctions(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestParam(defaultValue = "0") int page,
+		@RequestParam(defaultValue = "20") int size
+	) {
+		return auctionBuyingService.getMyBuyingAuctions(member.memberId(), page, size);
+	}
+
+	@Operation(summary = "내 구매중 종료 경매 숨김", description = "마이페이지 구매중 화면에서 종료된 경매 내역을 현재 사용자에게만 숨깁니다.")
+	@ApiResponse(responseCode = "204", description = "내 구매중 종료 경매 숨김 성공")
+	@ApiResponse(responseCode = "409", description = "진행 중인 경매는 숨김 불가")
+	@DeleteMapping("/mypage/auctions/buying/{auctionId:\\d+}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void hideEndedBuyingAuction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId
+	) {
+		auctionBuyingService.hideEndedBuyingAuction(member.memberId(), auctionId);
 	}
 
 	@Operation(summary = "경매 수정용 상세 조회", description = "현재 사용자가 등록한 경매의 수정 화면 데이터를 조회한다.")

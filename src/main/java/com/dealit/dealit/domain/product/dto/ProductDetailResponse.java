@@ -49,6 +49,9 @@ public record ProductDetailResponse(
 	@Schema(description = "구매 가능 여부", example = "true")
 	boolean canPurchase,
 
+	@Schema(description = "구매 불가 사유", example = "EMAIL_NOT_VERIFIED", nullable = true)
+	String purchaseBlockedReason,
+
 	@Schema(description = "찜 가능 여부", example = "true")
 	boolean canFavorite
 ) {

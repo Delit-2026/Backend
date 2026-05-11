@@ -1,7 +1,9 @@
 package com.dealit.dealit.domain.notification.repository;
 
 import com.dealit.dealit.domain.notification.entity.InAppNotification;
+import com.dealit.dealit.domain.notification.entity.InAppNotificationType;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +20,16 @@ public interface InAppNotificationRepository extends JpaRepository<InAppNotifica
 
 	long countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(Long memberId);
 
+	@Query("""
+		SELECT notification.type AS type, COUNT(notification) AS count
+		FROM InAppNotification notification
+		WHERE notification.member.memberId = :memberId
+		  AND notification.readAt IS NULL
+		  AND notification.deletedAt IS NULL
+		GROUP BY notification.type
+		""")
+	List<UnreadTypeCount> countUnreadByType(@Param("memberId") Long memberId);
+
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("""
 		UPDATE InAppNotification notification
@@ -27,4 +39,10 @@ public interface InAppNotificationRepository extends JpaRepository<InAppNotifica
 		  AND notification.deletedAt IS NULL
 		""")
 	int markAllAsReadByMemberId(@Param("memberId") Long memberId, @Param("readAt") LocalDateTime readAt);
+
+	interface UnreadTypeCount {
+		InAppNotificationType getType();
+
+		long getCount();
+	}
 }

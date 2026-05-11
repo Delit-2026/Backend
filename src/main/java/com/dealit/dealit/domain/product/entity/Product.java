@@ -177,6 +177,10 @@ public class Product extends BaseEntity {
 		softDelete();
 	}
 
+	public void markTradeCompleted() {
+		this.status = ProductStatus.ENDED;
+	}
+
 	public void replaceImages(Collection<ProductImage> nextImages) {
 		List<ProductImage> removedImages = images.stream()
 			.filter(image -> !nextImages.contains(image))

@@ -6,6 +6,7 @@ import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
 import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomDetailResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListItemResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomUpdatedEvent;
@@ -35,6 +36,9 @@ import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.service.FcmNotificationService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
+import com.dealit.dealit.domain.purchase.entity.Purchase;
+import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
+import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -64,6 +68,7 @@ public class ChatService {
     private final ProductSummaryPort productSummaryPort;
     private final AuctionPaymentRepository auctionPaymentRepository;
     private final WalletService walletService;
+    private final PurchaseRepository purchaseRepository;
     private final EventStreamService eventStreamService;
     private final FcmNotificationService fcmNotificationService;
     private final Clock clock;
@@ -246,6 +251,57 @@ public class ChatService {
                 roomPage.getTotalElements(),
                 roomPage.getTotalPages(),
                 roomPage.hasNext()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ChatRoomDetailResponse getChatRoomDetail(Long roomId, Long currentUserId) {
+        if (roomId == null) {
+            throw new IllegalArgumentException("roomId는 필수입니다.");
+        }
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
+        }
+
+        ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+                .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
+
+        String currentUserRole = room.getSellerId().equals(currentUserId) ? "SELLER" : "BUYER";
+        Long opponentId = room.getOpponentId(currentUserId);
+        MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+
+        Purchase purchase = null;
+        if (room.getChatType() == ChatType.GENERAL) {
+            purchase = purchaseRepository
+                    .findFirstByProductIdAndSellerIdAndBuyerIdOrderByPurchaseIdDesc(
+                            room.getProductId(),
+                            room.getSellerId(),
+                            room.getBuyerId()
+                    )
+                    .orElse(null);
+        }
+        PurchaseStatus tradeStatus = purchase == null ? null : purchase.getStatus();
+        ChatRoomDetailResponse.ActionButton actionButton = room.getChatType() == ChatType.GENERAL
+                ? buildActionButton(currentUserRole, tradeStatus)
+                : null;
+
+        return new ChatRoomDetailResponse(
+                room.getRoomId(),
+                purchase == null ? null : purchase.getPurchaseId(),
+                room.getChatType(),
+                currentUserRole,
+                tradeStatus,
+                new ChatRoomDetailResponse.ProductInfo(
+                        product.productId(),
+                        product.name(),
+                        product.thumbnailUrl()
+                ),
+                new ChatRoomDetailResponse.OpponentInfo(
+                        opponentId,
+                        opponent.nickname()
+                ),
+                actionButton
         );
     }
 
@@ -555,6 +611,48 @@ public class ChatService {
                 unreadCount,
                 updatedAt
         );
+    }
+
+    private ChatRoomDetailResponse.ActionButton buildActionButton(String currentUserRole, PurchaseStatus tradeStatus) {
+        if ("SELLER".equals(currentUserRole)) {
+            boolean enabled = tradeStatus == PurchaseStatus.PAID;
+            return new ChatRoomDetailResponse.ActionButton(
+                    "물건을 보냈어요",
+                    enabled,
+                    "SELLER_CONFIRM",
+                    enabled ? null : resolveSellerDisabledReason(tradeStatus)
+            );
+        }
+
+        boolean enabled = tradeStatus == PurchaseStatus.SHIPPED;
+        return new ChatRoomDetailResponse.ActionButton(
+                "물건을 받았어요",
+                enabled,
+                "BUYER_CONFIRM",
+                enabled ? null : resolveBuyerDisabledReason(tradeStatus)
+        );
+    }
+
+    private String resolveSellerDisabledReason(PurchaseStatus tradeStatus) {
+        if (tradeStatus == null) {
+            return "PURCHASE_NOT_FOUND";
+        }
+        return switch (tradeStatus) {
+            case PAID -> null;
+            case SHIPPED -> "ALREADY_SHIPPED";
+            case COMPLETED, CANCELED -> "TRADE_ALREADY_CLOSED";
+        };
+    }
+
+    private String resolveBuyerDisabledReason(PurchaseStatus tradeStatus) {
+        if (tradeStatus == null) {
+            return "PURCHASE_NOT_FOUND";
+        }
+        return switch (tradeStatus) {
+            case PAID -> "SELLER_NOT_SHIPPED_YET";
+            case SHIPPED -> null;
+            case COMPLETED, CANCELED -> "TRADE_ALREADY_CLOSED";
+        };
     }
 
     private Long resolveSellerIdFromProduct(Long productId) {

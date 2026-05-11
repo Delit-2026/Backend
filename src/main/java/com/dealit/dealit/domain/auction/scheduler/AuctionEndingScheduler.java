@@ -1,9 +1,15 @@
 package com.dealit.dealit.domain.auction.scheduler;
 
+import com.dealit.dealit.domain.auction.AuctionStatus;
+import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.exception.AuctionNotFoundException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -16,6 +22,9 @@ public class AuctionEndingScheduler {
 
 	private final AuctionRedisService auctionRedisService;
 	private final AuctionBidService auctionBidService;
+	private final AuctionRepository auctionRepository;
+	private final BidRepository bidRepository;
+	private final AuctionNotificationService auctionNotificationService;
 	private final Clock clock;
 
 	@Scheduled(fixedDelayString = "${app.auction.ending-scheduler-delay-ms:3000}")
@@ -46,6 +55,29 @@ public class AuctionEndingScheduler {
 			} finally {
 				auctionRedisService.removeEnding(parsedAuctionId);
 			}
+		}
+	}
+
+	@Scheduled(fixedDelayString = "${app.auction.closing-soon-scheduler-delay-ms:60000}")
+	public void notifyClosingSoonAuctions() {
+		OffsetDateTime now = OffsetDateTime.now(clock);
+		OffsetDateTime tenMinutesLater = now.plusMinutes(10);
+		for (Auction auction : auctionRepository.findAllByStatusAndEndsAtBetweenAndDeletedAtIsNullAndProductDeletedAtIsNull(
+			AuctionStatus.ONGOING,
+			now,
+			tenMinutesLater
+		)) {
+			try {
+				if (!auctionRedisService.markClosingSoonNotified(auction.getAuctionId())) {
+					continue;
+				}
+			} catch (RedisConnectionFailureException exception) {
+				return;
+			}
+			auctionNotificationService.notifyClosingSoon(
+				auction,
+				bidRepository.findDistinctBidderIdsByAuctionId(auction.getAuctionId())
+			);
 		}
 	}
 }

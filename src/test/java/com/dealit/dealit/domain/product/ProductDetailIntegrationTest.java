@@ -56,7 +56,8 @@ class ProductDetailIntegrationTest {
 			"password",
 			"seller@example.com",
 			null,
-			"Detail Seller"
+			"Detail Seller",
+			true
 		));
 		seller.assignDefaultNickname();
 		seller.updateLocation("Seoul Gangnam");
@@ -67,7 +68,8 @@ class ProductDetailIntegrationTest {
 			"password",
 			"viewer@example.com",
 			null,
-			"Detail Viewer"
+			"Detail Viewer",
+			true
 		));
 		viewer.assignDefaultNickname();
 		viewer.updateLocation("Seoul Mapo");
@@ -100,7 +102,65 @@ class ProductDetailIntegrationTest {
 			.andExpect(jsonPath("$.generalSale.status").value("ON_SALE"))
 			.andExpect(jsonPath("$.canChat").value(true))
 			.andExpect(jsonPath("$.canPurchase").value(true))
+			.andExpect(jsonPath("$.purchaseBlockedReason").doesNotExist())
 			.andExpect(jsonPath("$.canFavorite").value(true));
+	}
+
+	@Test
+	@DisplayName("이메일 미인증 사용자가 상품 상세를 조회하면 구매 불가 사유를 반환한다")
+	void getProductDetailReturnsEmailNotVerifiedReason() throws Exception {
+		Member unverifiedViewer = memberRepository.save(Member.create(
+			"detail-unverified-viewer",
+			"password",
+			"unverified-viewer@example.com",
+			null,
+			"Detail Unverified Viewer",
+			false
+		));
+		unverifiedViewer.assignDefaultNickname();
+		unverifiedViewer = memberRepository.save(unverifiedViewer);
+		Product product = saveRegularProduct();
+
+		mockMvc.perform(get("/api/v1/products/{productId}", product.getProductId())
+				.with(authentication(authenticatedMember(unverifiedViewer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.canPurchase").value(false))
+			.andExpect(jsonPath("$.purchaseBlockedReason").value("EMAIL_NOT_VERIFIED"));
+	}
+
+	@Test
+	@DisplayName("본인 상품 상세를 조회하면 구매 불가 사유를 반환한다")
+	void getProductDetailReturnsOwnProductReason() throws Exception {
+		Product product = saveRegularProduct();
+
+		mockMvc.perform(get("/api/v1/products/{productId}", product.getProductId())
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.canPurchase").value(false))
+			.andExpect(jsonPath("$.purchaseBlockedReason").value("OWN_PRODUCT"));
+	}
+
+	@Test
+	@DisplayName("판매 중이 아닌 상품 상세를 조회하면 구매 불가 사유를 반환한다")
+	void getProductDetailReturnsProductNotPurchasableReason() throws Exception {
+		Product product = productRepository.save(Product.create(
+			"Sold Product",
+			"Sold product description",
+			ProductSaleType.REGULAR,
+			19L,
+			seller.getMemberId(),
+			BigDecimal.valueOf(12000),
+			false,
+			"Seoul Gangnam",
+			null,
+			ProductStatus.SOLD
+		));
+
+		mockMvc.perform(get("/api/v1/products/{productId}", product.getProductId())
+				.with(authentication(authenticatedMember(viewer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.canPurchase").value(false))
+			.andExpect(jsonPath("$.purchaseBlockedReason").value("PRODUCT_NOT_PURCHASABLE"));
 	}
 
 	@Test

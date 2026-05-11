@@ -63,6 +63,7 @@ public class AuctionBidService {
 	private final WalletService walletService;
 	private final AuctionRedisService auctionRedisService;
 	private final AuctionEventPublisher auctionEventPublisher;
+	private final AuctionNotificationService auctionNotificationService;
 	private final ApplicationEventPublisher applicationEventPublisher;
 	private final ChatRoomRepository chatRoomRepository;
 	private final ImageUrlService imageUrlService;
@@ -178,6 +179,9 @@ public class AuctionBidService {
 					long bidCount = bidRepository.countByAuctionAuctionId(auction.getAuctionId());
 					long bidderCount = bidRepository.countDistinctBidderIdByAuctionId(auction.getAuctionId());
 					BigDecimal minimumNextBidPrice = bidPrice.add(auction.getMinimumBidAmount());
+					auctionNotificationService.notifyBidReceived(auction, bidderId, bidPrice, bidCount);
+					auctionNotificationService.notifyBidPlaced(auction, bidderId, bidPrice);
+					auctionNotificationService.notifyOutbid(auction, result.previousBidderId(), bidderId, bidPrice);
 					auctionEventPublisher.publishBidUpdated(auctionId, bidPrice, bidderId, serverTime);
 					auctionEventPublisher.publishOutbid(auctionId, result.previousBidderId(), bidderId, bidPrice, serverTime);
 					auctionEventPublisher.publishBidReceived(
@@ -222,6 +226,14 @@ public class AuctionBidService {
 			auction.softDelete();
 			auctionRedisService.removeEnding(auctionId);
 			auctionRedisService.deleteState(auctionId);
+			auctionRedisService.removeClosingSoonNotified(auctionId);
+			auctionNotificationService.notifyAuctionEnded(
+				auction,
+				auction.getProduct().getMemberId(),
+				null,
+				null,
+				AuctionStatus.NO_BID
+			);
 			auctionEventPublisher.publishAuctionEnded(
 				auction.getProduct().getMemberId(),
 				auctionId,
@@ -238,6 +250,14 @@ public class AuctionBidService {
 		ensureAuctionChatRoom(auction, state.highestBidderId());
 		auctionRedisService.removeEnding(auctionId);
 		auctionRedisService.deleteState(auctionId);
+		auctionRedisService.removeClosingSoonNotified(auctionId);
+		auctionNotificationService.notifyAuctionEnded(
+			auction,
+			auction.getProduct().getMemberId(),
+			state.highestBidderId(),
+			state.currentPrice(),
+			AuctionStatus.SUCCESSFUL_BID
+		);
 		auctionEventPublisher.publishAuctionEnded(
 			auction.getProduct().getMemberId(),
 			auctionId,
@@ -247,6 +267,14 @@ public class AuctionBidService {
 			serverTime()
 		);
 		if (!auction.getProduct().getMemberId().equals(state.highestBidderId())) {
+			auctionNotificationService.notifyAuctionEnded(
+				auction,
+				state.highestBidderId(),
+				state.highestBidderId(),
+				state.currentPrice(),
+				AuctionStatus.SUCCESSFUL_BID
+			);
+			auctionNotificationService.notifyReviewRequest(auction, state.highestBidderId());
 			auctionEventPublisher.publishAuctionEnded(
 				state.highestBidderId(),
 				auctionId,
@@ -256,6 +284,13 @@ public class AuctionBidService {
 				serverTime()
 			);
 		}
+		bidRepository.findDistinctBidderIdsByAuctionIdAndBidderIdNot(auctionId, state.highestBidderId())
+			.forEach(bidderId -> auctionNotificationService.notifyAuctionFailed(
+				auction,
+				bidderId,
+				state.highestBidderId(),
+				state.currentPrice()
+			));
 	}
 
 	private Auction loadAuction(Long auctionId) {

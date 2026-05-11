@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat.controller;
 
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
+import com.dealit.dealit.domain.chat.dto.ChatRoomDetailResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomListResponse;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;

@@ -29,6 +29,7 @@ import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.service.FcmNotificationService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
+import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -50,6 +51,7 @@ class ChatServiceCreateRoomTest {
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
         AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
         WalletService walletService = mock(WalletService.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -66,6 +68,7 @@ class ChatServiceCreateRoomTest {
                 productSummaryPort,
                 auctionPaymentRepository,
                 walletService,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
                 Clock.systemUTC()
@@ -89,6 +92,7 @@ class ChatServiceCreateRoomTest {
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
         AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
         WalletService walletService = mock(WalletService.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -108,6 +112,7 @@ class ChatServiceCreateRoomTest {
                 productSummaryPort,
                 auctionPaymentRepository,
                 walletService,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
                 Clock.systemUTC()
@@ -384,6 +389,7 @@ class ChatServiceCreateRoomTest {
         ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
         AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
         WalletService walletService = mock(WalletService.class);
+        PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
 
@@ -399,6 +405,7 @@ class ChatServiceCreateRoomTest {
                 productSummaryPort,
                 auctionPaymentRepository,
                 walletService,
+                purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
                 Clock.systemUTC()
