@@ -81,6 +81,50 @@ class AuctionRefundServiceTest {
 		verify(walletService, never()).refundAuctionPayment(anyLong(), anyLong(), anyLong());
 	}
 
+	@Test
+	@DisplayName("발송 기한이 지난 예치 결제는 환불 대기 상태로 변경한다")
+	void requestRefundForUnshippedPaymentChangesReservedToRefundPending() {
+		Long paymentId = 1L;
+		AuctionPayment payment = AuctionPayment.reserve(
+			auction(10L),
+			20L,
+			10L,
+			101000L,
+			OffsetDateTime.now(FIXED_CLOCK).minusDays(4)
+		);
+		when(auctionPaymentRepository.findByAuctionPaymentIdAndDeletedAtIsNull(paymentId))
+			.thenReturn(Optional.of(payment));
+
+		auctionRefundService.requestRefundForUnshippedPayment(paymentId);
+
+		assertThat(payment.getStatus()).isEqualTo(AuctionPaymentStatus.REFUND_PENDING);
+		assertThat(payment.getRefundRequestedAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
+	}
+
+	@Test
+	@DisplayName("수령확정 기한이 지난 발송 결제는 거래 완료 후 판매자에게 정산한다")
+	void autoConfirmReceivedChangesShippedToSettled() {
+		Long paymentId = 1L;
+		Long sellerId = 10L;
+		AuctionPayment payment = AuctionPayment.reserve(
+			auction(sellerId),
+			20L,
+			sellerId,
+			101000L,
+			OffsetDateTime.now(FIXED_CLOCK).minusDays(8)
+		);
+		payment.markShipped(OffsetDateTime.now(FIXED_CLOCK).minusDays(7).minusSeconds(1));
+		when(auctionPaymentRepository.findByAuctionPaymentIdAndDeletedAtIsNull(paymentId))
+			.thenReturn(Optional.of(payment));
+
+		auctionRefundService.autoConfirmReceived(paymentId);
+
+		assertThat(payment.getStatus()).isEqualTo(AuctionPaymentStatus.SETTLED);
+		assertThat(payment.getReceivedConfirmedAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
+		assertThat(payment.getSettledAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
+		verify(walletService).settleAuctionPayment(sellerId, 101000L, payment.getAuction().getAuctionId());
+	}
+
 	private Auction auction(Long sellerId) {
 		Product product = Product.create(
 			"auction product",

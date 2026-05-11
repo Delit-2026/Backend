@@ -24,4 +24,25 @@ public class AuctionRefundScheduler {
 				}
 			});
 	}
+
+	@Scheduled(fixedDelayString = "${app.auction.trade-scheduler-delay-ms:60000}")
+	public void processTradeDeadlines() {
+		auctionRefundService.findUnshippedPaymentIdsPastDeadline()
+			.forEach(paymentId -> {
+				try {
+					auctionRefundService.requestRefundForUnshippedPayment(paymentId);
+				} catch (RuntimeException exception) {
+					log.warn("Auction unshipped refund request failed. paymentId={}", paymentId, exception);
+				}
+			});
+
+		auctionRefundService.findShippedPaymentIdsPastReceiptDeadline()
+			.forEach(paymentId -> {
+				try {
+					auctionRefundService.autoConfirmReceived(paymentId);
+				} catch (RuntimeException exception) {
+					log.warn("Auction auto receipt confirmation failed. paymentId={}", paymentId, exception);
+				}
+			});
+	}
 }

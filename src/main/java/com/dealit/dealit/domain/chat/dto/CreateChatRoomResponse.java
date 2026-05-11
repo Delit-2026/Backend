@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat.dto;
 
 import com.dealit.dealit.domain.chat.entity.ChatType;
+import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,6 +33,14 @@ public record CreateChatRoomResponse(
             Boolean canPay,
             Boolean canCompleteTrade,
             String payButtonType,
-            String completeTradeButtonType
+            String completeTradeButtonType,
+            Boolean canShip,
+            Boolean canConfirmReceipt,
+            String shipButtonType,
+            String confirmReceiptButtonType,
+            String status,
+            String notice,
+            OffsetDateTime shipDeadline,
+            OffsetDateTime receiptDeadline
     ) {}
 }

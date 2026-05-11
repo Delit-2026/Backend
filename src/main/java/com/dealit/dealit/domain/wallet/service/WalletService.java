@@ -63,6 +63,11 @@ public class WalletService {
 		return applyForAuction(memberId, amount, WalletLedgerType.AUCTION_REFUND, "경매 예치금 환불: auctionId=%d".formatted(auctionId));
 	}
 
+	@Transactional
+	public long settleAuctionPayment(Long memberId, long amount, Long auctionId) {
+		return applyForAuction(memberId, amount, WalletLedgerType.AUCTION_SETTLEMENT, "경매 판매대금 정산: auctionId=%d".formatted(auctionId));
+	}
+
 	public WalletLedgerListResponse getMyLedgers(Long memberId, int page, int size) {
 		validateActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);

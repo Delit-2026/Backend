@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuctionRefundService {
 
 	private static final int REFUND_BATCH_SIZE = 100;
+	private static final int TRADE_BATCH_SIZE = 100;
 
 	private final AuctionPaymentRepository auctionPaymentRepository;
 	private final WalletService walletService;
@@ -54,5 +55,49 @@ public class AuctionRefundService {
 			.stream()
 			.map(AuctionPayment::getAuctionPaymentId)
 			.toList();
+	}
+
+	public List<Long> findUnshippedPaymentIdsPastDeadline() {
+		OffsetDateTime threshold = OffsetDateTime.now(clock).minusDays(3);
+		return auctionPaymentRepository.findReservedPaymentIdsBefore(
+			AuctionPaymentStatus.RESERVED,
+			threshold,
+			PageRequest.of(0, TRADE_BATCH_SIZE)
+		);
+	}
+
+	public List<Long> findShippedPaymentIdsPastReceiptDeadline() {
+		OffsetDateTime threshold = OffsetDateTime.now(clock).minusDays(7);
+		return auctionPaymentRepository.findShippedPaymentIdsBefore(
+			AuctionPaymentStatus.SHIPPED,
+			threshold,
+			PageRequest.of(0, TRADE_BATCH_SIZE)
+		);
+	}
+
+	@Transactional
+	public void requestRefundForUnshippedPayment(Long paymentId) {
+		AuctionPayment payment = auctionPaymentRepository.findByAuctionPaymentIdAndDeletedAtIsNull(paymentId)
+			.orElse(null);
+		if (payment == null || payment.getStatus() != AuctionPaymentStatus.RESERVED) {
+			return;
+		}
+		payment.requestRefund(OffsetDateTime.now(clock));
+	}
+
+	@Transactional
+	public void autoConfirmReceived(Long paymentId) {
+		AuctionPayment payment = auctionPaymentRepository.findByAuctionPaymentIdAndDeletedAtIsNull(paymentId)
+			.orElse(null);
+		if (payment == null || payment.getStatus() != AuctionPaymentStatus.SHIPPED) {
+			return;
+		}
+		if (payment.confirmReceived(OffsetDateTime.now(clock))) {
+			walletService.settleAuctionPayment(
+				payment.getSellerId(),
+				payment.getAmount(),
+				payment.getAuction().getAuctionId()
+			);
+		}
 	}
 }

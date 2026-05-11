@@ -58,6 +58,12 @@ public class AuctionPayment extends BaseEntity {
 	@Column(name = "refund_requested_at")
 	private OffsetDateTime refundRequestedAt;
 
+	@Column(name = "shipped_at")
+	private OffsetDateTime shippedAt;
+
+	@Column(name = "received_confirmed_at")
+	private OffsetDateTime receivedConfirmedAt;
+
 	@Column(name = "refunded_at")
 	private OffsetDateTime refundedAt;
 
@@ -101,6 +107,28 @@ public class AuctionPayment extends BaseEntity {
 		}
 		this.status = AuctionPaymentStatus.REFUNDED;
 		this.refundedAt = refundedAt;
+		return true;
+	}
+
+	public boolean markShipped(OffsetDateTime shippedAt) {
+		if (status != AuctionPaymentStatus.RESERVED) {
+			return false;
+		}
+		this.status = AuctionPaymentStatus.SHIPPED;
+		this.shippedAt = shippedAt;
+		return true;
+	}
+
+	public boolean confirmReceived(OffsetDateTime receivedConfirmedAt) {
+		if (status == AuctionPaymentStatus.SETTLED) {
+			return false;
+		}
+		if (status != AuctionPaymentStatus.SHIPPED) {
+			return false;
+		}
+		this.status = AuctionPaymentStatus.SETTLED;
+		this.receivedConfirmedAt = receivedConfirmedAt;
+		this.settledAt = receivedConfirmedAt;
 		return true;
 	}
 }
