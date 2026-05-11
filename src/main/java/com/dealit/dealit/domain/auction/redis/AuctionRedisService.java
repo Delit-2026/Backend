@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class AuctionRedisService {
 
 	public static final String ENDING_KEY = "auction:ending";
+	private static final String CLOSING_SOON_NOTIFIED_KEY = "auction:closing-soon:notified";
 
 	private static final DefaultRedisScript<String> BID_SCRIPT = new DefaultRedisScript<>("""
 		local currentPrice = tonumber(redis.call('HGET', KEYS[1], 'currentPrice'))
@@ -173,6 +174,15 @@ public class AuctionRedisService {
 
 	public void deleteState(Long auctionId) {
 		stringRedisTemplate.delete(stateKey(auctionId));
+	}
+
+	public boolean markClosingSoonNotified(Long auctionId) {
+		Long added = stringRedisTemplate.opsForSet().add(CLOSING_SOON_NOTIFIED_KEY, auctionId.toString());
+		return added != null && added == 1;
+	}
+
+	public void removeClosingSoonNotified(Long auctionId) {
+		stringRedisTemplate.opsForSet().remove(CLOSING_SOON_NOTIFIED_KEY, auctionId.toString());
 	}
 
 	public void refreshEnding(Auction auction) {

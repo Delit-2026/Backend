@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -114,6 +115,20 @@ class NotificationCenterIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("타입별 안 읽은 알림 개수를 조회한다")
+	void getUnreadCountsByType() throws Exception {
+		createNotification(InAppNotificationType.PRODUCT, "상품 찜", "상품에 찜이 추가되었습니다.", "PRODUCT", 20L);
+		createNotification(InAppNotificationType.PRODUCT, "상품 찜", "상품에 찜이 추가되었습니다.", "PRODUCT", 21L);
+		createNotification(InAppNotificationType.AUCTION, "첫 입찰 발생", "새 입찰이 들어왔습니다.", "AUCTION", 30L);
+
+		mockMvc.perform(get("/api/v1/notifications/unread-counts-by-type")
+				.header("Authorization", "Bearer " + accessToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[*].type", containsInAnyOrder("PRODUCT", "AUCTION")))
+			.andExpect(jsonPath("$[*].count", containsInAnyOrder(2, 1)));
+	}
+
+	@Test
 	@DisplayName("알림을 삭제하면 목록과 안 읽은 개수에서 제외된다")
 	void deleteNotification() throws Exception {
 		Long notificationId = createNotification("거래 요청", "새 거래 요청이 도착했습니다.", "DEAL", 10L);
@@ -139,10 +154,20 @@ class NotificationCenterIntegrationTest {
 	}
 
 	private Long createNotification(String title, String content, String targetType, Long targetId) {
+		return createNotification(InAppNotificationType.TRADE, title, content, targetType, targetId);
+	}
+
+	private Long createNotification(
+		InAppNotificationType type,
+		String title,
+		String content,
+		String targetType,
+		Long targetId
+	) {
 		return notificationCenterService.create(
 			member.getMemberId(),
 			new NotificationCreateRequest(
-				InAppNotificationType.TRADE,
+				type,
 				title,
 				content,
 				targetType,
