@@ -61,13 +61,13 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getChatRooms(currentUserId, page, size));
     }
 
-    @Operation(summary = "채팅방 상세 조회")
+    @Operation(summary = "채팅방 단건 조회")
     @GetMapping("/rooms/{roomId}")
-    public ResponseEntity<ChatRoomDetailResponse> getChatRoomDetail(
+    public ResponseEntity<CreateChatRoomResponse> getChatRoom(
             @PathVariable Long roomId,
             @AuthenticationPrincipal(expression = "memberId") Long currentUserId
     ) {
-        return ResponseEntity.ok(chatService.getChatRoomDetail(roomId, currentUserId));
+        return ResponseEntity.ok(chatService.getChatRoom(roomId, currentUserId));
     }
 
     @Operation(summary = "채팅 메시지 목록 조회")
@@ -79,6 +79,24 @@ public class ChatController {
             @AuthenticationPrincipal(expression = "memberId") Long currentUserId
     ) {
         return ResponseEntity.ok(chatService.getChatMessages(roomId, currentUserId, page, size));
+    }
+
+    @Operation(summary = "경매 채팅방 판매자 발송 처리")
+    @PostMapping("/rooms/{roomId}/shipment")
+    public ResponseEntity<CreateChatRoomResponse> markShipment(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal(expression = "memberId") Long currentUserId
+    ) {
+        return ResponseEntity.ok(chatService.markShipment(roomId, currentUserId));
+    }
+
+    @Operation(summary = "경매 채팅방 구매자 수령확정")
+    @PostMapping("/rooms/{roomId}/receipt")
+    public ResponseEntity<CreateChatRoomResponse> confirmReceipt(
+            @PathVariable Long roomId,
+            @AuthenticationPrincipal(expression = "memberId") Long currentUserId
+    ) {
+        return ResponseEntity.ok(chatService.confirmReceipt(roomId, currentUserId));
     }
 
     @Operation(summary = "채팅 메시지 전송")

@@ -25,6 +25,7 @@ import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
+import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
@@ -69,6 +70,7 @@ class AuctionBidServiceTest {
 	private final AuctionEventPublisher auctionEventPublisher = mock(AuctionEventPublisher.class);
 	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final ApplicationEventPublisher applicationEventPublisher = mock(ApplicationEventPublisher.class);
+	private final ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
 
 	private final AuctionBidService auctionBidService = new AuctionBidService(
@@ -82,6 +84,7 @@ class AuctionBidServiceTest {
 		auctionEventPublisher,
 		auctionNotificationService,
 		applicationEventPublisher,
+		chatRoomRepository,
 		imageUrlService,
 		FIXED_CLOCK
 	);

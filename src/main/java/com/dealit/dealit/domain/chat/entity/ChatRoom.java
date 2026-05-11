@@ -67,4 +67,8 @@ public class ChatRoom extends BaseEntity {
     public Long getOpponentId(Long currentUserId) {
         return sellerId.equals(currentUserId) ? buyerId : sellerId;
     }
+
+    public void markAuction() {
+        this.chatType = ChatType.AUCTION;
+    }
 }

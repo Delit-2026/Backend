@@ -24,6 +24,9 @@ import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.chat.entity.ChatRoom;
+import com.dealit.dealit.domain.chat.entity.ChatType;
+import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
@@ -62,6 +65,7 @@ public class AuctionBidService {
 	private final AuctionEventPublisher auctionEventPublisher;
 	private final AuctionNotificationService auctionNotificationService;
 	private final ApplicationEventPublisher applicationEventPublisher;
+	private final ChatRoomRepository chatRoomRepository;
 	private final ImageUrlService imageUrlService;
 	private final Clock clock;
 
@@ -243,6 +247,7 @@ public class AuctionBidService {
 
 		auction.completeWithWinner(state.highestBidderId(), state.currentPrice());
 		auction.getProduct().markSold();
+		ensureAuctionChatRoom(auction, state.highestBidderId());
 		auctionRedisService.removeEnding(auctionId);
 		auctionRedisService.deleteState(auctionId);
 		auctionRedisService.removeClosingSoonNotified(auctionId);
@@ -327,6 +332,16 @@ public class AuctionBidService {
 				previousPayment.getAmount()
 			));
 		}
+	}
+
+	private void ensureAuctionChatRoom(Auction auction, Long buyerId) {
+		Long sellerId = auction.getProduct().getMemberId();
+		Long productId = auction.getProduct().getProductId();
+		chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(sellerId, buyerId, productId)
+			.ifPresentOrElse(
+				ChatRoom::markAuction,
+				() -> chatRoomRepository.save(ChatRoom.create(sellerId, buyerId, productId, ChatType.AUCTION))
+			);
 	}
 
 	private List<ImageResponse> toImageResponses(Product product) {

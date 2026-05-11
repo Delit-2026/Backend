@@ -1,5 +1,9 @@
 package com.dealit.dealit.domain.chat.service;
 
+import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
+import com.dealit.dealit.domain.auction.AuctionStatus;
+import com.dealit.dealit.domain.auction.entity.AuctionPayment;
+import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
 import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomDetailResponse;
@@ -31,11 +35,14 @@ import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.service.FcmNotificationService;
+import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.domain.purchase.entity.Purchase;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,9 +66,12 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final ProductOwnershipPort productOwnershipPort;
     private final ProductSummaryPort productSummaryPort;
+    private final AuctionPaymentRepository auctionPaymentRepository;
+    private final WalletService walletService;
     private final PurchaseRepository purchaseRepository;
     private final EventStreamService eventStreamService;
     private final FcmNotificationService fcmNotificationService;
+    private final Clock clock;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
         if (currentUserId == null) {
@@ -89,7 +99,7 @@ public class ChatService {
         ChatRoom saved = chatRoomRepository.save(
                 ChatRoom.create(sellerId, buyerId, request.productId(), resolveChatType(product))
         );
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         CreateChatRoomResponse response = buildCreateRoomResponse(saved, currentUserId, sellerId, buyerId, now);
 
@@ -108,6 +118,7 @@ public class ChatService {
         MemberSnapshot currentUser = resolveMemberSnapshot(currentUserId);
         MemberSnapshot opponent = resolveMemberSnapshot(opponentId);
         ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+        Optional<AuctionPayment> auctionPayment = resolveAuctionPayment(room, product);
 
         return new CreateChatRoomResponse(
                 room.getRoomId(),
@@ -132,15 +143,89 @@ public class ChatService {
                                 sellerId.equals(opponentId) ? "SELLER" : "BUYER"
                         )
                 ),
-                false,
-                new CreateChatRoomResponse.ActionButtons(
-                        false,
-                        false,
-                        null,
-                        null
-                ),
+                isWinner(currentUserId, auctionPayment),
+                buildActionButtons(room, currentUserId, auctionPayment),
                 createdAt
         );
+    }
+
+    public CreateChatRoomResponse markShipment(Long roomId, Long currentUserId) {
+        if (roomId == null) {
+            throw new IllegalArgumentException("roomId는 필수입니다.");
+        }
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
+        }
+
+        ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+                .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
+        if (!room.getSellerId().equals(currentUserId)) {
+            throw new ChatForbiddenException("판매자만 발송 처리를 할 수 있습니다.");
+        }
+
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+        AuctionPayment payment = resolveAuctionPayment(room, product, true)
+                .orElseThrow(() -> new IllegalArgumentException("발송 처리할 경매 결제를 찾을 수 없습니다."));
+        if (!isAuctionTradeReady(payment)) {
+            throw new IllegalArgumentException("낙찰 완료 후 발송 처리할 수 있습니다.");
+        }
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        if (payment.getReservedAt().plusDays(3).isBefore(now)) {
+            throw new IllegalArgumentException("발송 처리 기한이 지나 자동 환불 대상입니다.");
+        }
+        if (!payment.markShipped(now)) {
+            throw new IllegalArgumentException("현재 상태에서는 발송 처리를 할 수 없습니다.");
+        }
+
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
+        return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
+    }
+
+    public CreateChatRoomResponse confirmReceipt(Long roomId, Long currentUserId) {
+        if (roomId == null) {
+            throw new IllegalArgumentException("roomId는 필수입니다.");
+        }
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
+        }
+
+        ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+                .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
+        if (!room.getBuyerId().equals(currentUserId)) {
+            throw new ChatForbiddenException("구매자만 수령확정을 할 수 있습니다.");
+        }
+
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
+        AuctionPayment payment = resolveAuctionPayment(room, product, true)
+                .orElseThrow(() -> new IllegalArgumentException("수령확정할 경매 결제를 찾을 수 없습니다."));
+        if (!isAuctionTradeReady(payment)) {
+            throw new IllegalArgumentException("낙찰 완료 후 수령확정할 수 있습니다.");
+        }
+        if (!payment.confirmReceived(OffsetDateTime.now(clock))) {
+            throw new IllegalArgumentException("현재 상태에서는 수령확정을 할 수 없습니다.");
+        }
+        walletService.settleAuctionPayment(
+                payment.getSellerId(),
+                payment.getAmount(),
+                payment.getAuction().getAuctionId()
+        );
+
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
+        return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public CreateChatRoomResponse getChatRoom(Long roomId, Long currentUserId) {
+        if (roomId == null) {
+            throw new IllegalArgumentException("roomId는 필수입니다.");
+        }
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("인증 사용자 정보가 없습니다.");
+        }
+
+        ChatRoom room = chatRoomRepository.findAccessibleRoom(roomId, currentUserId)
+                .orElseThrow(() -> new ChatRoomNotFoundException("접근 가능한 채팅방이 없습니다."));
+        return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
     }
 
     @Transactional(readOnly = true)
@@ -320,7 +405,7 @@ public class ChatService {
 
         long unreadAfter = chatMessageRepository.countUnreadByRoomId(roomId, currentUserId);
         int unreadCountAfter = unreadAfter > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) unreadAfter;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         MarkChatRoomAsReadResponse response = new MarkChatRoomAsReadResponse(
                 roomId,
@@ -345,7 +430,7 @@ public class ChatService {
 
         return new UnreadCountResponse(
                 totalUnread,
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -367,7 +452,7 @@ public class ChatService {
         return new RoomUnreadCountResponse(
                 roomId,
                 unreadCount,
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -402,7 +487,7 @@ public class ChatService {
                 saved.getReportId(),
                 saved.getMessageId(),
                 saved.getReason(),
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
@@ -425,7 +510,7 @@ public class ChatService {
                 .orElseThrow(ChatRoomNotFoundException::new);
 
         message.softDelete();
-        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now());
+        publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
     }
 
     private void publishRoomAndUnreadUpdates(ChatRoom room, Long sellerId, Long buyerId, LocalDateTime emittedAt) {
@@ -505,7 +590,7 @@ public class ChatService {
 
         LocalDateTime updatedAt = lastMessage != null
                 ? lastMessage.getSentAt()
-                : room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now();
+                : room.getUpdatedAt() != null ? room.getUpdatedAt() : LocalDateTime.now(clock);
 
         return new ChatRoomListItemResponse(
                 room.getRoomId(),
@@ -584,6 +669,151 @@ public class ChatService {
 
     private ChatType resolveChatType(ProductSummaryPort.ProductSummary product) {
         return "AUCTION".equals(product.saleType()) ? ChatType.AUCTION : ChatType.GENERAL;
+    }
+
+    private CreateChatRoomResponse.ActionButtons buildActionButtons(
+            ChatRoom room,
+            Long currentUserId,
+            Optional<AuctionPayment> optionalPayment
+    ) {
+        if (optionalPayment.isEmpty()) {
+            return inactiveActionButtons(null, null, null);
+        }
+
+        AuctionPayment payment = optionalPayment.get();
+        if (!isAuctionTradeReady(payment)) {
+            return inactiveActionButtons(payment.getStatus().name(), null, null);
+        }
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        OffsetDateTime shipDeadline = payment.getReservedAt().plusDays(3);
+        OffsetDateTime receiptDeadline = payment.getShippedAt() == null ? null : payment.getShippedAt().plusDays(7);
+        boolean seller = room.getSellerId().equals(currentUserId);
+        boolean buyer = room.getBuyerId().equals(currentUserId);
+        boolean showShipButton = seller && payment.getStatus() == AuctionPaymentStatus.RESERVED;
+        boolean showConfirmReceiptButton = buyer
+                && (payment.getStatus() == AuctionPaymentStatus.RESERVED
+                || payment.getStatus() == AuctionPaymentStatus.SHIPPED);
+        boolean canShip = seller
+                && payment.getStatus() == AuctionPaymentStatus.RESERVED
+                && !shipDeadline.isBefore(now);
+        boolean canConfirmReceipt = buyer && payment.getStatus() == AuctionPaymentStatus.SHIPPED;
+
+        return new CreateChatRoomResponse.ActionButtons(
+                false,
+                canConfirmReceipt,
+                null,
+                showConfirmReceiptButton ? "CONFIRM_RECEIPT" : null,
+                canShip,
+                canConfirmReceipt,
+                showShipButton ? "SHIP" : null,
+                showConfirmReceiptButton ? "CONFIRM_RECEIPT" : null,
+                payment.getStatus().name(),
+                resolveActionNotice(payment, seller, buyer),
+                shipDeadline,
+                receiptDeadline
+        );
+    }
+
+    private boolean isWinner(Long currentUserId, Optional<AuctionPayment> optionalPayment) {
+        return optionalPayment
+                .filter(this::isAuctionTradeReady)
+                .map(payment -> payment.getBidderId().equals(currentUserId))
+                .orElse(false);
+    }
+
+    private boolean isAuctionTradeReady(AuctionPayment payment) {
+        return payment.getAuction().getStatus() == AuctionStatus.SUCCESSFUL_BID
+                && payment.getBidderId().equals(payment.getAuction().getWinnerId());
+    }
+
+    private CreateChatRoomResponse.ActionButtons inactiveActionButtons(
+            String status,
+            OffsetDateTime shipDeadline,
+            OffsetDateTime receiptDeadline
+    ) {
+        return new CreateChatRoomResponse.ActionButtons(
+                false,
+                false,
+                null,
+                null,
+                false,
+                false,
+                null,
+                null,
+                status,
+                null,
+                shipDeadline,
+                receiptDeadline
+        );
+    }
+
+    private Optional<AuctionPayment> resolveAuctionPayment(
+            ChatRoom room,
+            ProductSummaryPort.ProductSummary product
+    ) {
+        if (product.auctionId() == null || resolveChatType(product) != ChatType.AUCTION) {
+            return Optional.empty();
+        }
+        return resolveAuctionPayment(room, product, false);
+    }
+
+    private Optional<AuctionPayment> resolveAuctionPayment(
+            ChatRoom room,
+            ProductSummaryPort.ProductSummary product,
+            boolean lock
+    ) {
+        if (product.auctionId() == null || resolveChatType(product) != ChatType.AUCTION) {
+            return Optional.empty();
+        }
+
+        List<AuctionPaymentStatus> statuses = List.of(
+                AuctionPaymentStatus.RESERVED,
+                AuctionPaymentStatus.SHIPPED,
+                AuctionPaymentStatus.SETTLED,
+                AuctionPaymentStatus.REFUND_PENDING,
+                AuctionPaymentStatus.REFUNDED,
+                AuctionPaymentStatus.DISPUTED
+        );
+
+        if (lock) {
+            return auctionPaymentRepository
+                    .findFirstByAuctionAuctionIdAndBidderIdAndSellerIdAndStatusInAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
+                            product.auctionId(),
+                            room.getBuyerId(),
+                            room.getSellerId(),
+                            statuses
+                    );
+        }
+
+        return auctionPaymentRepository
+                .findLatestByAuctionAndParticipantsAndStatuses(
+                        product.auctionId(),
+                        room.getBuyerId(),
+                        room.getSellerId(),
+                        statuses,
+                        PageRequest.of(0, 1)
+                )
+                .stream()
+                .findFirst();
+    }
+
+    private String resolveActionNotice(AuctionPayment payment, boolean seller, boolean buyer) {
+        return switch (payment.getStatus()) {
+            case RESERVED -> seller
+                    ? "3일 안에 상품을 보내고 '보냈어요' 버튼을 눌러주세요. 기한 내 발송 처리가 되지 않으면 구매자에게 자동 환불됩니다."
+                    : buyer
+                    ? "판매자의 발송 처리를 기다리는 중입니다. 판매자가 3일 안에 발송 처리를 하지 않으면 자동으로 환불됩니다."
+                    : null;
+            case SHIPPED -> buyer
+                    ? "판매자가 발송 처리를 완료했습니다. 7일 안에 상품 수령 후 '받았어요' 버튼을 눌러주세요. 기한 내 수령확정을 하지 않으면 자동으로 수령확정됩니다. 상품을 받지 못했다면 신고하기를 이용해주세요."
+                    : seller
+                    ? "발송 처리가 완료되었습니다. 구매자가 7일 안에 수령확정을 하지 않으면 자동으로 수령확정됩니다."
+                    : null;
+            case SETTLED -> "거래가 완료되었습니다.";
+            case REFUND_PENDING -> "발송 처리 기한이 지나 환불 처리가 진행 중입니다.";
+            case REFUNDED -> "구매자 환불이 완료되었습니다.";
+            case DISPUTED -> "신고가 접수되어 거래 처리가 보류되었습니다.";
+        };
     }
 
     private MemberSnapshot resolveMemberSnapshot(Long memberId) {
