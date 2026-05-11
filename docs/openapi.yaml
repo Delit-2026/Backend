@@ -19,6 +19,8 @@ tags:
   description: 애플리케이션 상태 확인 API
 - name: Location
   description: 위치 보조 API
+- name: Wallet
+  description: 딜릿머니 API
 - name: Auction
   description: 경매 상품 관리 API
 - name: Profile
@@ -39,6 +41,8 @@ tags:
   description: 회원 API
 - name: Chats
   description: 채팅 API
+- name: Notification
+  description: 알림 API
 paths:
   /api/v1/wishlist/{productId}:
     post:
@@ -127,6 +131,135 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/WishlistToggleResponse"
+  /api/v1/wallet/withdraw:
+    post:
+      tags:
+      - Wallet
+      summary: 딜릿머니 출금 신청
+      operationId: withdraw
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletAmountRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 딜릿머니 출금 신청 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WalletResponse"
+  /api/v1/wallet/refund:
+    post:
+      tags:
+      - Wallet
+      summary: 딜릿머니 환불
+      operationId: refund
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletAmountRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 딜릿머니 환불 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WalletResponse"
+  /api/v1/wallet/charge:
+    post:
+      tags:
+      - Wallet
+      summary: 딜릿머니 임시 충전
+      operationId: charge
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletAmountRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 딜릿머니 임시 충전 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WalletResponse"
   /api/v1/users/me/profile-image:
     post:
       tags:
@@ -396,6 +529,137 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/RecommendCategoryResponse"
+  /api/v1/notifications/test:
+    post:
+      tags:
+      - Notification
+      summary: 테스트 푸시 발송
+      description: 로그인한 회원의 등록된 FCM 토큰으로 테스트 알림을 발송합니다.
+      operationId: sendTestNotification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendTestNotificationRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SendTestNotificationResponse"
+  /api/v1/notifications/fcm-token:
+    post:
+      tags:
+      - Notification
+      summary: FCM 토큰 등록
+      description: 로그인한 회원의 브라우저/기기 FCM 토큰을 저장합니다.
+      operationId: registerFcmToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterFcmTokenRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RegisterFcmTokenResponse"
+    delete:
+      tags:
+      - Notification
+      summary: FCM 토큰 삭제
+      description: 로그아웃 또는 알림 해제 시 저장된 FCM 토큰을 삭제합니다.
+      operationId: deleteFcmToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteFcmTokenRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeleteFcmTokenResponse"
   /api/v1/members/signup:
     post:
       tags:
@@ -867,12 +1131,56 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+  /api/v1/auctions/popular:
+    get:
+      tags:
+      - Auction
+      summary: 실시간 인기 경매 목록 조회
+      description: 입찰 수를 등록 후 경과 시간으로 나눈 점수 기준으로 진행 중인 경매를 조회한다.
+      operationId: getPopularAuctions
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 4
+      responses:
+        "200":
+          description: 실시간 인기 경매 목록 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuctionListResponse"
+  /api/v1/auctions/closing-soon:
+    get:
+      tags:
+      - Auction
+      summary: 마감임박 경매 목록 조회
+      description: 현재 서버 시간 기준 종료 시각이 가까운 진행 중 경매를 조회한다.
+      operationId: getClosingSoonAuctions
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 3
+      responses:
+        "200":
+          description: 마감임박 경매 목록 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuctionListResponse"
   /api/v1/auctions/{auctionId}/bids:
     post:
       tags:
       - Auction
       summary: 경매 입찰
-      description: 서버 도착 시간 기준으로 입찰을 처리한다.
+      description: 서버 도착 시간 기준으로 입찰을 처리한다. 입찰 금액은 Dealit Pay에서 즉시 예치되고, 추월당한 기존 최고 입찰자의 예치금은 커밋 이후 자동 환불 처리된다.
       operationId: bid
       parameters:
       - name: auctionId
@@ -1263,6 +1571,91 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UpdateMyLocationResponse"
+  /api/v1/users/me/interest-categories:
+    get:
+      tags:
+      - Profile
+      summary: 내 관심 카테고리 조회
+      description: 현재 로그인한 사용자가 설정한 관심 카테고리 목록을 조회합니다.
+      operationId: getMyInterestCategories
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
+    patch:
+      tags:
+      - Profile
+      summary: 내 관심 카테고리 수정
+      description: 현재 로그인한 사용자의 관심 카테고리 목록을 수정합니다.
+      operationId: updateMyInterestCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyInterestCategoriesRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
   /api/v1/products/{productId}:
     get:
       tags:
@@ -1583,6 +1976,95 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuctionEditDetailResponse"
+  /api/v1/wallet:
+    get:
+      tags:
+      - Wallet
+      summary: 내 딜릿머니 지갑 조회
+      operationId: getMyWallet
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 내 딜릿머니 지갑 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WalletResponse"
+  /api/v1/wallet/ledgers:
+    get:
+      tags:
+      - Wallet
+      summary: 딜릿머니 내역 조회
+      operationId: getMyLedgers
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 딜릿머니 내역 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WalletLedgerListResponse"
   /api/v1/users/me/mypage:
     get:
       tags:
@@ -1666,51 +2148,6 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProductEditDetailResponse"
-  /api/v1/products/popular:
-    get:
-      tags:
-      - Product
-      summary: 실시간 인기 일반 상품 목록 조회
-      operationId: getPopularProducts
-      parameters:
-      - name: size
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 10
-      responses:
-        "400":
-          description: Bad Request
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Not Found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: Forbidden
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Conflict
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "200":
-          description: 실시간 인기 일반 상품 목록 조회 성공
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PopularProductListResponse"
   /api/v1/products/categories:
     get:
       tags:
@@ -1998,6 +2435,46 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/LoginIdCheckResponse"
+  /api/v1/members/interest-categories:
+    get:
+      tags:
+      - Member
+      summary: 회원가입 관심 카테고리 조회
+      description: 회원가입 화면에서 사용할 대분류 카테고리 목록을 조회합니다.
+      operationId: getInterestCategories
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterestCategoryOptionResponse"
   /api/v1/health:
     get:
       tags:
@@ -2441,6 +2918,28 @@ components:
         favoriteCount:
           type: integer
           format: int64
+    WalletAmountRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          format: int64
+          maximum: 10000000
+          minimum: 1
+      required:
+      - amount
+    WalletResponse:
+      type: object
+      properties:
+        walletId:
+          type: integer
+          format: int64
+        memberId:
+          type: integer
+          format: int64
+        balance:
+          type: integer
+          format: int64
     UploadProfileImageResponse:
       type: object
       properties:
@@ -2742,6 +3241,55 @@ components:
           type: string
           description: 추천 카테고리명
           example: 디지털/가전
+    SendTestNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          minLength: 0
+        body:
+          type: string
+          maxLength: 500
+          minLength: 0
+        data:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - body
+      - title
+    SendTestNotificationResponse:
+      type: object
+      properties:
+        sentCount:
+          type: integer
+          format: int32
+    RegisterFcmTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+          minLength: 0
+        deviceId:
+          type: string
+          maxLength: 100
+          minLength: 0
+        platform:
+          type: string
+          maxLength: 30
+          minLength: 0
+      required:
+      - token
+    RegisterFcmTokenResponse:
+      type: object
+      properties:
+        fcmTokenId:
+          type: integer
+          format: int64
+        registered:
+          type: boolean
     SignUpRequest:
       type: object
       description: 회원가입 요청
@@ -2771,6 +3319,15 @@ components:
           example: 홍길동
           maxLength: 30
           minLength: 0
+        interestCategoryIds:
+          type: array
+          description: 관심 카테고리 ID 목록(대분류만 허용)
+          example:
+          - 1
+          - 2
+          items:
+            type: integer
+            format: int64
       required:
       - loginId
       - password
@@ -3078,6 +3635,17 @@ components:
         serverTime:
           type: string
           format: date-time
+        messages:
+          $ref: "#/components/schemas/BidMessages"
+    BidMessages:
+      type: object
+      properties:
+        reserveNotice:
+          type: string
+          example: 입찰 시 해당 금액은 Dealit Pay에서 즉시 예치됩니다.
+        refundNotice:
+          type: string
+          example: 경매에서 추월당할 경우 예치금은 자동 환불됩니다.
     CreateAuctionRequest:
       type: object
       description: 경매 상품 등록 요청
@@ -3412,6 +3980,36 @@ components:
           - MANUAL
           - POSTCODE
           - GPS
+    UpdateMyInterestCategoriesRequest:
+      type: object
+      description: 내 관심 카테고리 수정 요청
+      properties:
+        interestCategoryIds:
+          type: array
+          description: 관심 카테고리 ID 목록(대분류만 허용)
+          example:
+          - 1
+          - 2
+          items:
+            type: integer
+            format: int64
+    InterestCategoryOptionResponse:
+      type: object
+      description: 관심 카테고리 선택지
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+          description: 카테고리 ID
+          example: 1
+        nameKo:
+          type: string
+          description: 카테고리명(한글)
+          example: 전자기기
+        nameEn:
+          type: string
+          description: 카테고리명(영문)
+          example: electronics
     UpdateProductRequest:
       type: object
       properties:
@@ -3684,6 +4282,47 @@ components:
           format: int32
           description: 정렬 순서
           example: 1
+    WalletLedgerListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletLedgerResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        hasNext:
+          type: boolean
+    WalletLedgerResponse:
+      type: object
+      properties:
+        ledgerId:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - TEMP_CHARGE
+          - REFUND
+          - WITHDRAWAL
+        amount:
+          type: integer
+          format: int64
+        balanceAfter:
+          type: integer
+          format: int64
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     MyLocationResponse:
       type: object
       properties:
@@ -3807,59 +4446,6 @@ components:
           type: string
           description: 거래 위치
           example: 서울 강남구
-    PopularProductItemResponse:
-      type: object
-      description: 실시간 인기 일반 상품 항목
-      properties:
-        productId:
-          type: integer
-          format: int64
-          description: 상품 ID
-          example: 1
-        name:
-          type: string
-          description: 상품명
-          example: 맥북에어입니다.
-        thumbnailUrl:
-          type: string
-          description: 대표 이미지 URL
-          example: http://localhost:8080/uploads/product/images/1.jpg
-        price:
-          type: number
-          description: 가격
-          example: 30000
-        location:
-          type: string
-          description: 거래 위치
-          example: 서울 강남구
-        categoryName:
-          type: string
-          description: 카테고리명
-          example: 디지털기기
-        viewCount:
-          type: integer
-          format: int64
-          description: 조회수
-          example: 120
-        createdAt:
-          type: string
-          format: date-time
-          description: 등록 시각
-          example: 2026-05-03T12:00:00+09:00
-        popularScore:
-          type: number
-          format: double
-          description: 실시간 인기 점수
-          example: "30.0"
-    PopularProductListResponse:
-      type: object
-      description: 실시간 인기 일반 상품 목록 응답
-      properties:
-        content:
-          type: array
-          description: 실시간 인기 일반 상품 목록
-          items:
-            $ref: "#/components/schemas/PopularProductItemResponse"
     CategoryOptionResponse:
       type: object
       description: 카테고리 선택 옵션
@@ -4364,6 +4950,93 @@ components:
           type: boolean
           description: 이메일 인증 여부
           example: false
+    AuctionListResponse:
+      type: object
+      description: 경매 상품 목록 응답
+      properties:
+        content:
+          type: array
+          description: 경매 상품 목록
+          items:
+            $ref: "#/components/schemas/AuctionListItemResponse"
+    AuctionListItemResponse:
+      type: object
+      description: 경매 상품 목록 항목
+      properties:
+        auctionId:
+          type: integer
+          format: int64
+          description: 경매 ID
+          example: 1
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 1
+        title:
+          type: string
+          description: 상품명
+          example: 맥북 에어 경매
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL
+          example: http://localhost:8080/uploads/auction/images/1.jpg
+        startPrice:
+          type: number
+          description: 시작가
+          example: 10000
+        currentPrice:
+          type: number
+          description: 현재 입찰가
+          example: 35000
+        bidCount:
+          type: integer
+          format: int64
+          description: 입찰 수
+          example: 12
+        endAt:
+          type: string
+          format: date-time
+          description: 경매 종료 시각
+          example: 2026-05-06T18:00:00+09:00
+        auctionStatus:
+          type: string
+          description: 경매 상태
+          enum:
+          - DRAFT
+          - ONGOING
+          - ENDED
+          - NO_BID
+          - SUCCESSFUL_BID
+          example: ONGOING
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 디지털기기
+        sellerId:
+          type: integer
+          format: int64
+          description: 판매자 회원 ID
+          example: 10
+        popularScore:
+          type: number
+          format: double
+          description: 경매 인기 점수
+          example: 4.5
+        rank:
+          type: integer
+          format: int32
+          description: 순위
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: 등록 시각
+          example: 2026-05-03T12:00:00+09:00
     AuctionDetailResponse:
       type: object
       properties:
@@ -4445,6 +5118,20 @@ components:
           type: boolean
           description: 삭제 여부
           example: true
+    DeleteFcmTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+          minLength: 0
+      required:
+      - token
+    DeleteFcmTokenResponse:
+      type: object
+      properties:
+        deleted:
+          type: boolean
     DeleteAuctionImageResponse:
       type: object
       description: 상품 이미지 삭제 응답

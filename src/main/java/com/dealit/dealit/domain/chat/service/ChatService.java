@@ -85,8 +85,9 @@ public class ChatService {
             return buildCreateRoomResponse(existingRoom.get(), currentUserId, sellerId, buyerId, existingRoom.get().getCreatedAt());
         }
 
+        ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(request.productId());
         ChatRoom saved = chatRoomRepository.save(
-                ChatRoom.create(sellerId, buyerId, request.productId(), ChatType.GENERAL)
+                ChatRoom.create(sellerId, buyerId, request.productId(), resolveChatType(product))
         );
         LocalDateTime now = LocalDateTime.now();
 
@@ -110,12 +111,13 @@ public class ChatService {
 
         return new CreateChatRoomResponse(
                 room.getRoomId(),
-                room.getChatType(),
+                resolveChatType(product),
                 new CreateChatRoomResponse.ProductInfo(
                         product.productId(),
                         product.name(),
                         product.thumbnailUrl(),
-                        "GENERAL",
+                        product.saleType(),
+                        product.auctionId(),
                         "ACTIVE"
                 ),
                 List.of(
@@ -244,7 +246,10 @@ public class ChatService {
                         message.getMessageType(),
                         message.getContent(),
                         message.isRead(),
-                        message.getSentAt()
+                        message.getSentAt(),
+                        message.getMessageType().name().equals("SYSTEM")
+                                ? "SYSTEM"
+                                : message.getSenderId().equals(currentUserId) ? "ME" : "OTHER"
                 ))
                 .toList();
 
@@ -288,6 +293,7 @@ public class ChatService {
                 saved.getMessageId(),
                 saved.getRoomId(),
                 saved.getSenderId(),
+                saved.getSenderNickname(),
                 saved.getMessageType(),
                 saved.getContent(),
                 saved.isRead(),
@@ -467,7 +473,8 @@ public class ChatService {
                             "type", "CHAT_MESSAGE",
                             "roomId", String.valueOf(room.getRoomId()),
                             "messageId", String.valueOf(message.getMessageId()),
-                            "senderId", String.valueOf(senderId)
+                            "senderId", String.valueOf(senderId),
+                            "targetUrl", "/chats/" + room.getRoomId()
                     )
             );
             log.debug("Sent chat push notification. roomId={}, recipientId={}, sentCount={}",
@@ -510,9 +517,11 @@ public class ChatService {
                 new ChatRoomListItemResponse.ProductInfo(
                         product.productId(),
                         product.name(),
-                        product.thumbnailUrl()
+                        product.thumbnailUrl(),
+                        product.saleType(),
+                        product.auctionId()
                 ),
-                room.getChatType(),
+                resolveChatType(product),
                 lastMessageInfo,
                 unreadCount,
                 updatedAt
@@ -569,8 +578,12 @@ public class ChatService {
         try {
             return productSummaryPort.getSummaryByProductId(productId);
         } catch (ProductNotFoundException exception) {
-            return new ProductSummaryPort.ProductSummary(productId, null, null);
+            return new ProductSummaryPort.ProductSummary(productId, null, null, "REGULAR", null);
         }
+    }
+
+    private ChatType resolveChatType(ProductSummaryPort.ProductSummary product) {
+        return "AUCTION".equals(product.saleType()) ? ChatType.AUCTION : ChatType.GENERAL;
     }
 
     private MemberSnapshot resolveMemberSnapshot(Long memberId) {

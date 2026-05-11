@@ -50,6 +50,7 @@ public class SecurityConfig {
 					"/profile/images/**",
 					"/api/v1/health",
 					"/api/v1/members/signup",
+					"/api/v1/members/interest-categories",
 					"/api/v1/members/login-id/check",
 						"/api/v1/members/nickname/check",
 						"/api/v1/auth/login",

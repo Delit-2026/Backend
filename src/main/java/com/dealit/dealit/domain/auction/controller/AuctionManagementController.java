@@ -1,6 +1,8 @@
 package com.dealit.dealit.domain.auction.controller;
 
 import com.dealit.dealit.domain.auction.dto.AuctionDetailResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionBidHistoryResponse;
+import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.BidRequest;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
@@ -39,20 +41,42 @@ public class AuctionManagementController {
 	private final AuctionService auctionService;
 	private final AuctionBidService auctionBidService;
 
+	@Operation(summary = "실시간 인기 경매 목록 조회", description = "입찰 수를 등록 후 경과 시간으로 나눈 점수 기준으로 진행 중인 경매를 조회한다.")
+	@ApiResponse(responseCode = "200", description = "실시간 인기 경매 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = AuctionListResponse.class)))
+	@GetMapping("/auctions/popular")
+	public AuctionListResponse getPopularAuctions(@RequestParam(defaultValue = "4") int limit) {
+		return auctionService.getPopularAuctions(limit);
+	}
+
+	@Operation(summary = "마감임박 경매 목록 조회", description = "현재 서버 시간 기준 종료 시각이 가까운 진행 중 경매를 조회한다.")
+	@ApiResponse(responseCode = "200", description = "마감임박 경매 목록 조회 성공",
+		content = @Content(schema = @Schema(implementation = AuctionListResponse.class)))
+	@GetMapping("/auctions/closing-soon")
+	public AuctionListResponse getClosingSoonAuctions(@RequestParam(defaultValue = "3") int limit) {
+		return auctionService.getClosingSoonAuctions(limit);
+	}
+
 	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
-	@GetMapping("/auctions/{auctionId}")
+	@GetMapping("/auctions/{auctionId:\\d+}")
 	public AuctionDetailResponse getAuction(@PathVariable Long auctionId) {
 		return auctionBidService.getAuction(auctionId);
 	}
 
 	@Operation(summary = "경매 입찰", description = "서버 도착 시간 기준으로 입찰을 처리한다.")
-	@PostMapping("/auctions/{auctionId}/bids")
+	@PostMapping("/auctions/{auctionId:\\d+}/bids")
 	public BidResponse bid(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId,
 		@Valid @RequestBody BidRequest request
 	) {
 		return auctionBidService.bid(auctionId, member.memberId(), request.bidPrice());
+	}
+
+	@Operation(summary = "경매 입찰 현황 조회", description = "경매 현재가와 입찰 내역을 최신순으로 조회한다.")
+	@GetMapping("/auctions/{auctionId:\\d+}/bids")
+	public AuctionBidHistoryResponse getBidHistory(@PathVariable Long auctionId) {
+		return auctionBidService.getBidHistory(auctionId);
 	}
 
 	@Operation(summary = "내 판매중 경매 목록", description = "마이페이지 판매중 화면에서 현재 사용자의 진행중 경매 목록을 페이징 조회한다.")
@@ -70,7 +94,7 @@ public class AuctionManagementController {
 	@Operation(summary = "경매 수정용 상세 조회", description = "현재 사용자가 등록한 경매의 수정 화면 데이터를 조회한다.")
 	@ApiResponse(responseCode = "200", description = "경매 수정용 상세 조회 성공",
 		content = @Content(schema = @Schema(implementation = AuctionEditDetailResponse.class)))
-	@GetMapping("/auctions/{auctionId}/edit")
+	@GetMapping("/auctions/{auctionId:\\d+}/edit")
 	public AuctionEditDetailResponse getAuctionEditDetail(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId
@@ -82,7 +106,7 @@ public class AuctionManagementController {
 	@ApiResponse(responseCode = "200", description = "경매 수정 성공",
 		content = @Content(schema = @Schema(implementation = AuctionEditDetailResponse.class)))
 	@ApiResponse(responseCode = "409", description = "입찰자가 있는 경매는 수정 불가")
-	@PatchMapping("/auctions/{auctionId}")
+	@PatchMapping("/auctions/{auctionId:\\d+}")
 	public AuctionEditDetailResponse updateAuction(
 		@AuthenticationPrincipal AuthenticatedMember member,
 		@PathVariable Long auctionId,
@@ -94,7 +118,7 @@ public class AuctionManagementController {
 	@Operation(summary = "경매 삭제", description = "입찰이 없는 현재 사용자의 경매를 삭제한다.")
 	@ApiResponse(responseCode = "204", description = "경매 삭제 성공")
 	@ApiResponse(responseCode = "409", description = "입찰자가 있는 경매는 삭제 불가")
-	@DeleteMapping("/auctions/{auctionId}")
+	@DeleteMapping("/auctions/{auctionId:\\d+}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteAuction(
 		@AuthenticationPrincipal AuthenticatedMember member,

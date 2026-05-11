@@ -6,4 +6,6 @@ public enum WalletLedgerType {
 	WITHDRAWAL,
 	PURCHASE,
 	SETTLEMENT
+	AUCTION_RESERVE,
+	AUCTION_REFUND
 }

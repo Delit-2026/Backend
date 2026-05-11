@@ -64,7 +64,7 @@ public class FcmNotificationService {
 			.orElseGet(() -> new DeleteFcmTokenResponse(false));
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = NotificationException.class)
 	public int sendToMember(Long memberId, String title, String body, Map<String, String> data) {
 		FirebaseMessaging firebaseMessaging = firebaseMessagingProvider.getIfAvailable();
 

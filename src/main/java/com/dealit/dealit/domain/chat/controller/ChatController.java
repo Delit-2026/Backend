@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
     private final ChatService chatService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Operation(summary = "채팅방 생성")
     @PostMapping("/rooms")
@@ -86,9 +88,12 @@ public class ChatController {
             @Valid @RequestBody SendChatMessageRequest request,
             @AuthenticationPrincipal(expression = "memberId") Long currentUserId
     ) {
+        SendChatMessageResponse response = chatService.sendMessage(roomId, request, currentUserId);
+        messagingTemplate.convertAndSend("/topic/chats/rooms/" + roomId, response);
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(chatService.sendMessage(roomId, request, currentUserId));
+                .body(response);
     }
 
     @Operation(summary = "채팅방 읽음 처리")
