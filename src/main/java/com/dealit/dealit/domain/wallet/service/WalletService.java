@@ -67,6 +67,9 @@ public class WalletService {
 			throw new InvalidWalletRequestException("정산 금액은 0보다 커야 합니다.");
 		}
 		return apply(sellerId, amount, WalletLedgerType.SETTLEMENT, "상품 판매 정산");
+	}
+
+	@Transactional
 	public long reserveAuctionBid(Long memberId, long amount, Long auctionId) {
 		return applyForAuction(memberId, -amount, WalletLedgerType.AUCTION_RESERVE, "경매 입찰 예치금 차감: auctionId=%d".formatted(auctionId));
 	}
