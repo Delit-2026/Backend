@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
+import com.dealit.dealit.domain.auction.AuctionStatus;
+import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
@@ -142,6 +144,7 @@ class ChatServiceCreateRoomTest {
         Member seller = member("seller");
         OffsetDateTime reservedAt = OffsetDateTime.parse("2026-05-10T10:00:00Z");
         OffsetDateTime shippedAt = OffsetDateTime.parse("2026-05-10T12:00:00Z");
+        Auction auction = successfulAuction(20L);
 
         when(chatRoomRepository.findAccessibleRoom(1L, 20L)).thenReturn(Optional.of(room));
         when(productSummaryPort.getSummaryByProductId(100L)).thenReturn(product);
@@ -151,6 +154,7 @@ class ChatServiceCreateRoomTest {
         when(payment.getStatus()).thenReturn(AuctionPaymentStatus.SHIPPED);
         when(payment.getReservedAt()).thenReturn(reservedAt);
         when(payment.getShippedAt()).thenReturn(shippedAt);
+        when(payment.getAuction()).thenReturn(auction);
         when(auctionPaymentRepository
                 .findLatestByAuctionAndParticipantsAndStatuses(
                         eq(300L),
@@ -203,6 +207,7 @@ class ChatServiceCreateRoomTest {
         AuctionPayment payment = mock(AuctionPayment.class);
         Member seller = member("seller");
         Member buyer = member("buyer");
+        Auction auction = successfulAuction(20L);
 
         when(chatRoomRepository.findAccessibleRoom(1L, 10L)).thenReturn(Optional.of(room));
         when(productSummaryPort.getSummaryByProductId(100L)).thenReturn(product);
@@ -211,6 +216,7 @@ class ChatServiceCreateRoomTest {
         when(payment.getBidderId()).thenReturn(20L);
         when(payment.getStatus()).thenReturn(AuctionPaymentStatus.RESERVED);
         when(payment.getReservedAt()).thenReturn(OffsetDateTime.parse("2026-05-10T10:00:00Z"));
+        when(payment.getAuction()).thenReturn(auction);
         when(auctionPaymentRepository
                 .findLatestByAuctionAndParticipantsAndStatuses(
                         eq(300L),
@@ -263,6 +269,7 @@ class ChatServiceCreateRoomTest {
         AuctionPayment payment = mock(AuctionPayment.class);
         Member seller = member("seller");
         Member buyer = member("buyer");
+        Auction auction = successfulAuction(20L);
 
         when(chatRoomRepository.findAccessibleRoom(1L, 10L)).thenReturn(Optional.of(room));
         when(productSummaryPort.getSummaryByProductId(100L)).thenReturn(product);
@@ -271,6 +278,7 @@ class ChatServiceCreateRoomTest {
         when(payment.getBidderId()).thenReturn(20L);
         when(payment.getStatus()).thenReturn(AuctionPaymentStatus.RESERVED);
         when(payment.getReservedAt()).thenReturn(OffsetDateTime.parse("2026-05-10T10:00:00Z"));
+        when(payment.getAuction()).thenReturn(auction);
         when(auctionPaymentRepository
                 .findLatestByAuctionAndParticipantsAndStatuses(
                         eq(300L),
@@ -300,6 +308,69 @@ class ChatServiceCreateRoomTest {
         assertThat(response.chatType()).isEqualTo(ChatType.AUCTION);
         assertThat(response.actionButtons().canShip()).isTrue();
         assertThat(response.actionButtons().shipButtonType()).isEqualTo("SHIP");
+    }
+
+    @Test
+    @DisplayName("낙찰 완료 전 경매 채팅방에는 거래 진행 버튼을 노출하지 않는다")
+    void getChatRoom_hidesAuctionActions_beforeSuccessfulBid() {
+        ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+        ChatMessageRepository chatMessageRepository = mock(ChatMessageRepository.class);
+        ChatMessageReportRepository chatMessageReportRepository = mock(ChatMessageReportRepository.class);
+        MemberRepository memberRepository = mock(MemberRepository.class);
+        ProductOwnershipPort productOwnershipPort = mock(ProductOwnershipPort.class);
+        ProductSummaryPort productSummaryPort = mock(ProductSummaryPort.class);
+        AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
+        WalletService walletService = mock(WalletService.class);
+        EventStreamService eventStreamService = mock(EventStreamService.class);
+        FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+
+        ChatRoom room = ChatRoom.create(10L, 20L, 100L, ChatType.AUCTION);
+        ProductSummaryPort.ProductSummary product =
+                new ProductSummaryPort.ProductSummary(100L, "auction-product", null, "AUCTION", 300L);
+        AuctionPayment payment = mock(AuctionPayment.class);
+        Member seller = member("seller");
+        Member buyer = member("buyer");
+        Auction ongoingAuction = mock(Auction.class);
+
+        when(chatRoomRepository.findAccessibleRoom(1L, 10L)).thenReturn(Optional.of(room));
+        when(productSummaryPort.getSummaryByProductId(100L)).thenReturn(product);
+        when(memberRepository.findByMemberIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(seller));
+        when(memberRepository.findByMemberIdAndDeletedAtIsNull(20L)).thenReturn(Optional.of(buyer));
+        when(payment.getBidderId()).thenReturn(20L);
+        when(payment.getStatus()).thenReturn(AuctionPaymentStatus.RESERVED);
+        when(payment.getAuction()).thenReturn(ongoingAuction);
+        when(ongoingAuction.getStatus()).thenReturn(AuctionStatus.ONGOING);
+        when(auctionPaymentRepository
+                .findLatestByAuctionAndParticipantsAndStatuses(
+                        eq(300L),
+                        eq(20L),
+                        eq(10L),
+                        org.mockito.ArgumentMatchers.anyCollection(),
+                        org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)
+                ))
+                .thenReturn(List.of(payment));
+
+        ChatService chatService = new ChatService(
+                chatRoomRepository,
+                chatMessageRepository,
+                chatMessageReportRepository,
+                memberRepository,
+                productOwnershipPort,
+                productSummaryPort,
+                auctionPaymentRepository,
+                walletService,
+                eventStreamService,
+                fcmNotificationService,
+                Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
+        );
+
+        CreateChatRoomResponse response = chatService.getChatRoom(1L, 10L);
+
+        assertThat(response.isWinner()).isFalse();
+        assertThat(response.actionButtons().canShip()).isFalse();
+        assertThat(response.actionButtons().shipButtonType()).isNull();
+        assertThat(response.actionButtons().canConfirmReceipt()).isFalse();
+        assertThat(response.actionButtons().confirmReceiptButtonType()).isNull();
     }
 
     @Test
@@ -344,5 +415,12 @@ class ChatServiceCreateRoomTest {
         Member member = mock(Member.class);
         when(member.getNickname()).thenReturn(nickname);
         return member;
+    }
+
+    private Auction successfulAuction(Long winnerId) {
+        Auction auction = mock(Auction.class);
+        when(auction.getStatus()).thenReturn(AuctionStatus.SUCCESSFUL_BID);
+        when(auction.getWinnerId()).thenReturn(winnerId);
+        return auction;
     }
 }

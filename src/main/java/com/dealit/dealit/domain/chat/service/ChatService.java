@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat.service;
 
 import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
+import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
@@ -160,6 +161,9 @@ public class ChatService {
         ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
         AuctionPayment payment = resolveAuctionPayment(room, product, true)
                 .orElseThrow(() -> new IllegalArgumentException("발송 처리할 경매 결제를 찾을 수 없습니다."));
+        if (!isAuctionTradeReady(payment)) {
+            throw new IllegalArgumentException("낙찰 완료 후 발송 처리할 수 있습니다.");
+        }
         OffsetDateTime now = OffsetDateTime.now(clock);
         if (payment.getReservedAt().plusDays(3).isBefore(now)) {
             payment.requestRefund(now);
@@ -190,6 +194,9 @@ public class ChatService {
         ProductSummaryPort.ProductSummary product = resolveProductSummaryOrFallback(room.getProductId());
         AuctionPayment payment = resolveAuctionPayment(room, product, true)
                 .orElseThrow(() -> new IllegalArgumentException("수령확정할 경매 결제를 찾을 수 없습니다."));
+        if (!isAuctionTradeReady(payment)) {
+            throw new IllegalArgumentException("낙찰 완료 후 수령확정할 수 있습니다.");
+        }
         if (!payment.confirmReceived(OffsetDateTime.now(clock))) {
             throw new IllegalArgumentException("현재 상태에서는 수령확정을 할 수 없습니다.");
         }
@@ -577,6 +584,9 @@ public class ChatService {
         }
 
         AuctionPayment payment = optionalPayment.get();
+        if (!isAuctionTradeReady(payment)) {
+            return inactiveActionButtons(payment.getStatus().name(), null, null);
+        }
         OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime shipDeadline = payment.getReservedAt().plusDays(3);
         OffsetDateTime receiptDeadline = payment.getShippedAt() == null ? null : payment.getShippedAt().plusDays(7);
@@ -609,8 +619,14 @@ public class ChatService {
 
     private boolean isWinner(Long currentUserId, Optional<AuctionPayment> optionalPayment) {
         return optionalPayment
+                .filter(this::isAuctionTradeReady)
                 .map(payment -> payment.getBidderId().equals(currentUserId))
                 .orElse(false);
+    }
+
+    private boolean isAuctionTradeReady(AuctionPayment payment) {
+        return payment.getAuction().getStatus() == AuctionStatus.SUCCESSFUL_BID
+                && payment.getBidderId().equals(payment.getAuction().getWinnerId());
     }
 
     private CreateChatRoomResponse.ActionButtons inactiveActionButtons(
