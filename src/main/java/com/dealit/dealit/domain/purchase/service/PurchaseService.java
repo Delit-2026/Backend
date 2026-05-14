@@ -7,6 +7,10 @@ import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.dto.NotificationCreateRequest;
+import com.dealit.dealit.domain.notification.entity.InAppNotificationType;
+import com.dealit.dealit.domain.notification.service.FcmNotificationService;
+import com.dealit.dealit.domain.notification.service.NotificationCenterService;
 import com.dealit.dealit.domain.payment.service.ProductPaymentService;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -33,12 +37,15 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PurchaseService {
@@ -52,6 +59,8 @@ public class PurchaseService {
 	private final ProductPaymentService productPaymentService;
 	private final ImageUrlService imageUrlService;
 	private final ChatRoomRepository chatRoomRepository;
+	private final NotificationCenterService notificationCenterService;
+	private final FcmNotificationService fcmNotificationService;
 
 	@Transactional
 	public PurchaseResponse purchase(Long productId, Long buyerId, String idempotencyKey) {
@@ -101,6 +110,7 @@ public class PurchaseService {
 
 			product.markSold();
 			linkPurchaseChatRoomIfNeeded(purchase);
+			notifyPurchasePaid(purchase, product);
 			return toPurchaseResponse(purchase);
 		}
 
@@ -178,6 +188,7 @@ public class PurchaseService {
 		} catch (IllegalStateException exception) {
 			throw new PurchaseNotCompletableException(exception.getMessage());
 		}
+		notifyPurchaseShipped(purchase);
 		return toCompletionResponse(purchase);
 	}
 
@@ -259,6 +270,7 @@ public class PurchaseService {
 		purchase.complete();
 		markProductEnded(purchase);
 		settleIfNeeded(purchase, settlementReason);
+		notifyPurchaseReceived(purchase);
 	}
 
 	private int autoCompleteAndSettle(Purchase purchase, String settlementReason) {
@@ -305,6 +317,102 @@ public class PurchaseService {
 	private void markProductEnded(Purchase purchase) {
 		productRepository.findByProductIdAndDeletedAtIsNull(purchase.getProductId())
 			.ifPresent(Product::markTradeCompleted);
+	}
+
+	private void notifyPurchasePaid(Purchase purchase, Product product) {
+		String sellerTitle = "상품이 판매되었습니다.";
+		String sellerContent = "'" + product.getName() + "' 상품 결제가 완료되었어요. 물건을 보내주세요.";
+		sendTradeNotification(
+			purchase.getSellerId(),
+			sellerTitle,
+			sellerContent,
+			"PURCHASE_PAID",
+			purchase
+		);
+
+		String buyerTitle = "구매가 완료되었습니다.";
+		String buyerContent = "'" + product.getName() + "' 상품 구매가 완료되었어요. 판매자의 발송을 기다려주세요.";
+		sendTradeNotification(
+			purchase.getBuyerId(),
+			buyerTitle,
+			buyerContent,
+			"PURCHASE_COMPLETED",
+			purchase
+		);
+	}
+
+	private void notifyPurchaseShipped(Purchase purchase) {
+		String productName = resolveProductName(purchase);
+		String title = "상품이 발송되었습니다.";
+		String content = "'" + productName + "' 상품이 발송되었어요. 물건을 받으면 수령확정을 눌러주세요.";
+		sendTradeNotification(
+			purchase.getBuyerId(),
+			title,
+			content,
+			"PURCHASE_SHIPPED",
+			purchase
+		);
+	}
+
+	private void notifyPurchaseReceived(Purchase purchase) {
+		String productName = resolveProductName(purchase);
+		String title = "수령확정이 완료되었습니다.";
+		String content = "'" + productName + "' 상품 구매자가 수령확정을 완료했어요.";
+		sendTradeNotification(
+			purchase.getSellerId(),
+			title,
+			content,
+			"PURCHASE_RECEIVED",
+			purchase
+		);
+	}
+
+	private void sendTradeNotification(
+		Long receiverId,
+		String title,
+		String content,
+		String type,
+		Purchase purchase
+	) {
+		String targetUrl = "/products/" + purchase.getProductId()
+			+ "/receipt?purchaseId=" + purchase.getPurchaseId();
+
+		notificationCenterService.create(
+			receiverId,
+			new NotificationCreateRequest(
+				InAppNotificationType.TRADE,
+				title,
+				content,
+				"RECEIPT",
+				purchase.getPurchaseId(),
+				targetUrl
+			)
+		);
+
+		try {
+			int sentCount = fcmNotificationService.sendToMember(
+				receiverId,
+				title,
+				content,
+				Map.of(
+					"type", type,
+					"purchaseId", String.valueOf(purchase.getPurchaseId()),
+					"productId", String.valueOf(purchase.getProductId()),
+					"targetUrl", targetUrl
+				)
+			);
+			log.debug("Sent purchase push notification. type={}, purchaseId={}, receiverId={}, sentCount={}",
+				type, purchase.getPurchaseId(), receiverId, sentCount);
+		} catch (RuntimeException exception) {
+			log.warn("Failed to send purchase push notification. type={}, purchaseId={}, receiverId={}",
+				type, purchase.getPurchaseId(), receiverId, exception);
+		}
+	}
+
+	private String resolveProductName(Purchase purchase) {
+		return productRepository.findByProductIdAndDeletedAtIsNull(purchase.getProductId())
+			.map(Product::getName)
+			.orElse("구매한");
 	}
 
 	private PurchaseCompletionResponse toCompletionResponse(Purchase purchase) {

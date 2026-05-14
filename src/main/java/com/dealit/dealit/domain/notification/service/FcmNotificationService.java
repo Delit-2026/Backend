@@ -13,12 +13,16 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
+import com.google.firebase.messaging.WebpushConfig;
+import com.google.firebase.messaging.WebpushFcmOptions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.util.Map;
 
 @Service
@@ -29,6 +33,9 @@ public class FcmNotificationService {
 	private final FcmTokenRepository fcmTokenRepository;
 	private final MemberRepository memberRepository;
 	private final ObjectProvider<FirebaseMessaging> firebaseMessagingProvider;
+
+	@Value("${app.web.public-base-url:http://localhost:3000}")
+	private String webPublicBaseUrl;
 
 	@Transactional
 	public RegisterFcmTokenResponse registerToken(Long memberId, RegisterFcmTokenRequest request) {
@@ -102,6 +109,13 @@ public class FcmNotificationService {
 
 		if (data != null && !data.isEmpty()) {
 			messageBuilder.putAllData(data);
+			resolveTargetUrl(data).ifPresent(targetUrl ->
+				messageBuilder.setWebpushConfig(WebpushConfig.builder()
+					.setFcmOptions(WebpushFcmOptions.builder()
+						.setLink(targetUrl)
+						.build())
+					.build())
+			);
 		}
 
 		try {
@@ -122,5 +136,22 @@ public class FcmNotificationService {
 
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private java.util.Optional<String> resolveTargetUrl(Map<String, String> data) {
+		String targetUrl = normalizeBlank(data.get("targetUrl"));
+		if (targetUrl == null) {
+			return java.util.Optional.empty();
+		}
+		if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+			return java.util.Optional.of(targetUrl);
+		}
+
+		String baseUrl = normalizeBlank(webPublicBaseUrl);
+		if (baseUrl == null) {
+			return java.util.Optional.empty();
+		}
+
+		return java.util.Optional.of(URI.create(baseUrl).resolve(targetUrl).toString());
 	}
 }

@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.wallet;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.notification.repository.FcmTokenRepository;
+import com.dealit.dealit.domain.notification.repository.InAppNotificationRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletLedgerRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
@@ -36,6 +37,9 @@ class WalletIntegrationTest {
 	private FcmTokenRepository fcmTokenRepository;
 
 	@Autowired
+	private InAppNotificationRepository notificationRepository;
+
+	@Autowired
 	private WalletRepository walletRepository;
 
 	@Autowired
@@ -51,6 +55,7 @@ class WalletIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		notificationRepository.deleteAll();
 		walletLedgerRepository.deleteAll();
 		walletRepository.deleteAll();
 		fcmTokenRepository.deleteAll();
@@ -100,6 +105,10 @@ class WalletIntegrationTest {
 			.andExpect(jsonPath("$.content[0].type").value("TEMP_CHARGE"))
 			.andExpect(jsonPath("$.content[0].amount").value(30000))
 			.andExpect(jsonPath("$.content[0].balanceAfter").value(30000));
+
+		Member member = memberRepository.findAll().getFirst();
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(member.getMemberId()))
+			.isEqualTo(1);
 	}
 
 	@Test
@@ -124,6 +133,10 @@ class WalletIntegrationTest {
 			.andExpect(jsonPath("$.content[0].amount").value(-25000))
 			.andExpect(jsonPath("$.content[1].type").value("REFUND"))
 			.andExpect(jsonPath("$.content[1].amount").value(10000));
+
+		Member member = memberRepository.findAll().getFirst();
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(member.getMemberId()))
+			.isEqualTo(3);
 	}
 
 	@Test

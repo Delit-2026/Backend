@@ -77,7 +77,7 @@ class ChatRoomIntegrationTest {
         ChatRoom room = saveChatRoom(product);
         Purchase purchase = savePaidPurchase(product);
 
-        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}", room.getRoomId())
+        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}/trade-info", room.getRoomId())
                         .with(authentication(authenticatedMember(seller))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.roomId").value(room.getRoomId()))
@@ -100,7 +100,7 @@ class ChatRoomIntegrationTest {
         ChatRoom room = saveChatRoom(product);
         savePaidPurchase(product);
 
-        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}", room.getRoomId())
+        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}/trade-info", room.getRoomId())
                         .with(authentication(authenticatedMember(buyer))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentUserRole").value("BUYER"))
@@ -127,7 +127,7 @@ class ChatRoomIntegrationTest {
         purchase.markShipped();
         purchaseRepository.save(purchase);
 
-        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}", room.getRoomId())
+        mockMvc.perform(get("/api/v1/chats/rooms/{roomId}/trade-info", room.getRoomId())
                         .with(authentication(authenticatedMember(buyer))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.purchaseId").value(purchase.getPurchaseId()))
