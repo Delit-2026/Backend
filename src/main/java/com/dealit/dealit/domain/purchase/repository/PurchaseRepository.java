@@ -19,7 +19,7 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 		Long buyerId
 	);
 
-	Page<Purchase> findByBuyerIdOrderByPurchaseIdDesc(Long buyerId, Pageable pageable);
+Page<Purchase> findByBuyerIdOrderByPurchaseIdDesc(Long buyerId, Pageable pageable);
 
 	Page<Purchase> findByBuyerIdAndStatusInOrderByPurchaseIdDesc(
 		Long buyerId,
@@ -33,6 +33,13 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 		Long sellerId,
 		List<PurchaseStatus> statuses,
 		Pageable pageable
+	);
+
+	boolean existsByProductIdAndSellerIdAndBuyerIdAndStatusAndDeletedAtIsNull(
+		Long productId,
+		Long sellerId,
+		Long buyerId,
+		PurchaseStatus status
 	);
 
 	List<Purchase> findTop100ByStatusAndShippingDeadlineAtLessThanEqualOrderByShippingDeadlineAtAsc(
