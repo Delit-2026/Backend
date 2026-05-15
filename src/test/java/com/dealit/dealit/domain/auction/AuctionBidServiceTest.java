@@ -15,6 +15,8 @@ import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.entity.Bid;
 import com.dealit.dealit.domain.auction.event.AuctionEventPublisher;
+import com.dealit.dealit.domain.auction.exception.AuctionBidException;
+import com.dealit.dealit.domain.auction.exception.AuctionException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService.AuctionState;
@@ -220,7 +222,12 @@ class AuctionBidServiceTest {
 			List<Object> results = List.of(futures.get(0).get(), futures.get(1).get());
 
 			assertThat(results.stream().filter(BidResponse.class::isInstance)).hasSize(1);
-			assertThat(results.stream().filter(InvalidAuctionRequestException.class::isInstance)).hasSize(1);
+			assertThat(results.stream().filter(AuctionBidException.class::isInstance)).hasSize(1);
+			assertThat(results.stream()
+				.filter(AuctionBidException.class::isInstance)
+				.map(AuctionBidException.class::cast)
+				.map(AuctionBidException::getCode))
+				.containsExactly("BID_PRICE_CHANGED");
 			assertThat(auction.getCurrentPrice()).isIn(new BigDecimal("101000"), new BigDecimal("101500"));
 			verify(bidRepository, times(1)).save(any(Bid.class));
 			verify(auctionNotificationService, times(1)).notifyBidReceived(
@@ -249,12 +256,37 @@ class AuctionBidServiceTest {
 		Object result;
 		try {
 			result = auctionBidService.bid(auctionId, 20L, new BigDecimal("101000"));
-		} catch (InvalidAuctionRequestException exception) {
+		} catch (AuctionBidException exception) {
 			result = exception;
 		}
 
-		assertThat(result).isInstanceOf(InvalidAuctionRequestException.class);
-		assertThat(((InvalidAuctionRequestException) result).getMessage()).isEqualTo("이미 종료된 경매입니다.");
+		assertThat(result).isInstanceOf(AuctionBidException.class);
+		assertThat(((AuctionBidException) result).getCode()).isEqualTo("AUCTION_ENDED");
+		assertThat(((AuctionBidException) result).getMessage()).isEqualTo("이미 종료된 경매입니다.");
+		verify(auctionRedisService, never()).bid(anyLong(), any(BigDecimal.class), anyLong());
+		verify(bidRepository, never()).save(any(Bid.class));
+	}
+
+	@Test
+	@DisplayName("최소 입찰가보다 낮으면 입찰을 거절한다")
+	void bidFailsWhenBidPriceIsBelowMinimum() {
+		Long auctionId = 1L;
+		Auction auction = auction(10L);
+		when(auctionRepository.findWithLockByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
+			.thenReturn(Optional.of(auction));
+
+		Object result;
+		try {
+			result = auctionBidService.bid(auctionId, 20L, new BigDecimal("100999"));
+		} catch (AuctionBidException exception) {
+			result = exception;
+		}
+
+		assertThat(result).isInstanceOf(AuctionBidException.class);
+		assertThat(((AuctionBidException) result).getCode()).isEqualTo("BID_PRICE_BELOW_MINIMUM");
+		assertThat(((AuctionBidException) result).getMessage()).isEqualTo("최소 입찰 금액을 충족해야 합니다.");
+		verify(memberRepository, never()).findByMemberIdAndDeletedAtIsNull(anyLong());
+		verify(walletService, never()).reserveAuctionBid(anyLong(), anyLong(), anyLong());
 		verify(auctionRedisService, never()).bid(anyLong(), any(BigDecimal.class), anyLong());
 		verify(bidRepository, never()).save(any(Bid.class));
 	}
@@ -355,7 +387,7 @@ class AuctionBidServiceTest {
 		start.await();
 		try {
 			return auctionBidService.bid(auctionId, bidderId, bidPrice);
-		} catch (InvalidAuctionRequestException exception) {
+		} catch (AuctionException exception) {
 			return exception;
 		}
 	}

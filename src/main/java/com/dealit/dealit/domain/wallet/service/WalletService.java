@@ -12,6 +12,7 @@ import com.dealit.dealit.domain.wallet.dto.WalletResponse;
 import com.dealit.dealit.domain.wallet.entity.Wallet;
 import com.dealit.dealit.domain.wallet.entity.WalletLedger;
 import com.dealit.dealit.domain.wallet.entity.WalletLedgerType;
+import com.dealit.dealit.domain.wallet.exception.InsufficientWalletBalanceException;
 import com.dealit.dealit.domain.wallet.exception.InvalidWalletRequestException;
 import com.dealit.dealit.domain.wallet.repository.WalletLedgerRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletRepository;
@@ -83,7 +84,19 @@ public class WalletService {
 
 	@Transactional
 	public long reserveAuctionBid(Long memberId, long amount, Long auctionId) {
-		return applyForAuction(memberId, -amount, WalletLedgerType.AUCTION_RESERVE, "경매 입찰 예치금 차감: auctionId=%d".formatted(auctionId));
+		try {
+			return applyForAuction(
+				memberId,
+				-amount,
+				WalletLedgerType.AUCTION_RESERVE,
+				"경매 입찰 예치금 차감: auctionId=%d".formatted(auctionId)
+			);
+		} catch (InvalidWalletRequestException exception) {
+			if ("잔액이 부족합니다.".equals(exception.getMessage())) {
+				throw new InsufficientWalletBalanceException();
+			}
+			throw exception;
+		}
 	}
 
 	@Transactional
