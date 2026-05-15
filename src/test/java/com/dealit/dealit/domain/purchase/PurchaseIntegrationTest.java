@@ -6,6 +6,7 @@ import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.notification.repository.InAppNotificationRepository;
 import com.dealit.dealit.domain.payment.repository.ProductPaymentRepository;
 import com.dealit.dealit.domain.payment.entity.ProductPaymentStatus;
 import com.dealit.dealit.domain.purchase.entity.Purchase;
@@ -64,6 +65,9 @@ class PurchaseIntegrationTest {
 	private ProductPaymentRepository productPaymentRepository;
 
 	@Autowired
+	private InAppNotificationRepository notificationRepository;
+
+	@Autowired
 	private WalletRepository walletRepository;
 
 	@Autowired
@@ -81,6 +85,7 @@ class PurchaseIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		notificationRepository.deleteAll();
 		productPaymentRepository.deleteAll();
 		purchaseRepository.deleteAll();
 		walletLedgerRepository.deleteAll();
@@ -121,6 +126,10 @@ class PurchaseIntegrationTest {
 				assertThat(ledger.getBalanceAfter()).isEqualTo(20000);
 			});
 		assertThat(productRepository.findById(product.getProductId()).orElseThrow().getStatus()).isEqualTo(ProductStatus.SOLD);
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(seller.getMemberId()))
+			.isEqualTo(1);
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(buyer.getMemberId()))
+			.isEqualTo(3);
 		assertThat(purchaseRepository.findAll())
 			.singleElement()
 			.satisfies(purchase -> {
@@ -327,7 +336,7 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.amount").value(30000))
 			.andExpect(jsonPath("$.status").value("PAID"))
 			.andExpect(jsonPath("$.purchasedAt").exists())
-			.andExpect(jsonPath("$.chatRoomId").doesNotExist());
+			.andExpect(jsonPath("$.chatRoomId").isNumber());
 	}
 
 	@Test
@@ -403,6 +412,9 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.autoCompleteAt").exists())
 			.andExpect(jsonPath("$.completedAt").doesNotExist())
 			.andExpect(jsonPath("$.settledAt").doesNotExist());
+
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(buyer.getMemberId()))
+			.isEqualTo(4);
 	}
 
 	@Test
@@ -435,6 +447,10 @@ class PurchaseIntegrationTest {
 		assertThat(walletRepository.findByMemberId(seller.getMemberId()).orElseThrow().getBalance()).isEqualTo(30000);
 		assertThat(countSettlementLedgers(seller.getMemberId())).isEqualTo(1);
 		assertThat(walletRepository.findByMemberId(buyer.getMemberId()).orElseThrow().getBalance()).isEqualTo(20000);
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(seller.getMemberId()))
+			.isEqualTo(3);
+		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(buyer.getMemberId()))
+			.isEqualTo(4);
 	}
 
 	@Test

@@ -2,6 +2,10 @@ package com.dealit.dealit.domain.wallet.service;
 
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.notification.dto.NotificationCreateRequest;
+import com.dealit.dealit.domain.notification.entity.InAppNotificationType;
+import com.dealit.dealit.domain.notification.service.FcmNotificationService;
+import com.dealit.dealit.domain.notification.service.NotificationCenterService;
 import com.dealit.dealit.domain.wallet.dto.WalletLedgerListResponse;
 import com.dealit.dealit.domain.wallet.dto.WalletLedgerResponse;
 import com.dealit.dealit.domain.wallet.dto.WalletResponse;
@@ -11,10 +15,14 @@ import com.dealit.dealit.domain.wallet.entity.WalletLedgerType;
 import com.dealit.dealit.domain.wallet.exception.InvalidWalletRequestException;
 import com.dealit.dealit.domain.wallet.repository.WalletLedgerRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletRepository;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,15 +30,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WalletService {
 
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+	private static final String WALLET_TARGET_URL = "/mypage";
 
 	private final WalletRepository walletRepository;
 	private final WalletLedgerRepository walletLedgerRepository;
 	private final MemberRepository memberRepository;
+	private final NotificationCenterService notificationCenterService;
+	private final FcmNotificationService fcmNotificationService;
 
 	@Transactional
 	public WalletResponse getMyWallet(Long memberId) {
@@ -128,9 +140,10 @@ public class WalletService {
 			throw new InvalidWalletRequestException(exception.getMessage());
 		}
 
-		walletLedgerRepository.save(
+		WalletLedger ledger = walletLedgerRepository.save(
 			WalletLedger.create(wallet, type, signedAmount, nextBalance, description)
 		);
+		sendWalletNotification(memberId, ledger);
 		return nextBalance;
 	}
 
@@ -157,6 +170,74 @@ public class WalletService {
 			ledger.getDescription(),
 			toSeoulOffsetDateTime(ledger.getCreatedAt())
 		);
+	}
+
+	private void sendWalletNotification(Long memberId, WalletLedger ledger) {
+		String title = getWalletNotificationTitle(ledger.getType());
+		String content = "%s %s 처리되었습니다. 현재 잔액은 %s입니다.".formatted(
+			getWalletLedgerTypeLabel(ledger.getType()),
+			formatWon(Math.abs(ledger.getAmount())),
+			formatWon(ledger.getBalanceAfter())
+		);
+
+		notificationCenterService.create(
+			memberId,
+			new NotificationCreateRequest(
+				InAppNotificationType.WALLET,
+				title,
+				content,
+				"WALLET",
+				ledger.getWalletLedgerId(),
+				WALLET_TARGET_URL
+			)
+		);
+
+		try {
+			int sentCount = fcmNotificationService.sendToMember(
+				memberId,
+				title,
+				content,
+				Map.of(
+					"type", "WALLET_UPDATED",
+					"ledgerId", String.valueOf(ledger.getWalletLedgerId()),
+					"ledgerType", ledger.getType().name(),
+					"targetUrl", WALLET_TARGET_URL
+				)
+			);
+			log.debug("Sent wallet push notification. memberId={}, ledgerId={}, sentCount={}",
+				memberId, ledger.getWalletLedgerId(), sentCount);
+		} catch (RuntimeException exception) {
+			log.warn("Failed to send wallet push notification. memberId={}, ledgerId={}",
+				memberId, ledger.getWalletLedgerId(), exception);
+		}
+	}
+
+	private String getWalletNotificationTitle(WalletLedgerType type) {
+		return switch (type) {
+			case TEMP_CHARGE -> "딜릿머니 충전 완료";
+			case REFUND, AUCTION_REFUND -> "딜릿머니 환불 완료";
+			case WITHDRAWAL -> "딜릿머니 출금 완료";
+			case PURCHASE -> "딜릿머니 결제 완료";
+			case SETTLEMENT, AUCTION_SETTLEMENT -> "딜릿머니 정산 완료";
+			case AUCTION_RESERVE -> "경매 예치금 차감 완료";
+		};
+	}
+
+	private String getWalletLedgerTypeLabel(WalletLedgerType type) {
+		return switch (type) {
+			case TEMP_CHARGE -> "충전";
+			case REFUND -> "환불";
+			case WITHDRAWAL -> "출금";
+			case PURCHASE -> "결제";
+			case SETTLEMENT -> "정산";
+			case AUCTION_RESERVE -> "경매 예치금";
+			case AUCTION_REFUND -> "경매 환불";
+			case AUCTION_SETTLEMENT -> "경매 정산";
+		};
+	}
+
+	private String formatWon(long amount) {
+		return NumberFormat.getNumberInstance(Locale.KOREA).format(amount) + "원";
 	}
 
 	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
