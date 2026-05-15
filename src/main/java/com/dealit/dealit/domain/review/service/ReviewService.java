@@ -181,9 +181,12 @@ public class ReviewService {
 	}
 
 	private ReviewRatingSummaryResponse toRatingSummary(Long memberId) {
-		long reviewCount = reviewRepository.countByRevieweeIdAndDeletedAtIsNull(memberId);
-		double averageRating = reviewCount == 0 ? 0.0 : roundToOneDecimal(reviewRepository.averageRatingByRevieweeId(memberId));
-		return new ReviewRatingSummaryResponse(memberId, averageRating, reviewCount);
+		ReviewRatingSummaryResponse summary = reviewRepository.getRatingSummaryByRevieweeId(memberId);
+		return new ReviewRatingSummaryResponse(
+			memberId,
+			roundToOneDecimal(summary.averageRating()),
+			summary.reviewCount()
+		);
 	}
 
 	private ReviewResponse toReviewResponse(
