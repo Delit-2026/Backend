@@ -17,6 +17,13 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 		Long buyerId
 	);
 
+	boolean existsByProductIdAndSellerIdAndBuyerIdAndStatusAndDeletedAtIsNull(
+		Long productId,
+		Long sellerId,
+		Long buyerId,
+		PurchaseStatus status
+	);
+
 	List<Purchase> findTop100ByStatusAndShippingDeadlineAtLessThanEqualOrderByShippingDeadlineAtAsc(
 		PurchaseStatus status,
 		LocalDateTime now

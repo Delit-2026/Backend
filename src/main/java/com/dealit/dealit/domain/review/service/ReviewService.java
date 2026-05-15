@@ -7,16 +7,16 @@ import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
-import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
+import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.domain.review.dto.CreateReviewRequest;
 import com.dealit.dealit.domain.review.dto.ReviewListResponse;
 import com.dealit.dealit.domain.review.dto.ReviewRatingSummaryResponse;
 import com.dealit.dealit.domain.review.dto.ReviewResponse;
 import com.dealit.dealit.domain.review.entity.Review;
 import com.dealit.dealit.domain.review.repository.ReviewRepository;
-import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -47,7 +47,7 @@ public class ReviewService {
 	private final ProductRepository productRepository;
 	private final AuctionRepository auctionRepository;
 	private final MemberRepository memberRepository;
-	private final EntityManager entityManager;
+	private final PurchaseRepository purchaseRepository;
 
 	@Transactional
 	public ReviewResponse createReview(Long reviewerId, CreateReviewRequest request) {
@@ -130,29 +130,19 @@ public class ReviewService {
 		if (product.getSaleType() != ProductSaleType.REGULAR) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auction products must be reviewed with auctionId.");
 		}
-		if (product.getStatus() != ProductStatus.SOLD) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only sold products can be reviewed.");
-		}
-		if (!existsTradeChatRoom(product.getMemberId(), reviewerId, product.getProductId())) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the buyer can review this product.");
+		if (!existsCompletedPurchase(product.getProductId(), product.getMemberId(), reviewerId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the completed buyer can review this product.");
 		}
 		return new ReviewTarget(product, null, product.getMemberId());
 	}
 
-	private boolean existsTradeChatRoom(Long sellerId, Long buyerId, Long productId) {
-		Long count = entityManager.createQuery("""
-				select count(r)
-				from ChatRoom r
-				where r.sellerId = :sellerId
-					and r.buyerId = :buyerId
-					and r.productId = :productId
-					and r.deletedAt is null
-				""", Long.class)
-			.setParameter("sellerId", sellerId)
-			.setParameter("buyerId", buyerId)
-			.setParameter("productId", productId)
-			.getSingleResult();
-		return count > 0;
+	private boolean existsCompletedPurchase(Long productId, Long sellerId, Long buyerId) {
+		return purchaseRepository.existsByProductIdAndSellerIdAndBuyerIdAndStatusAndDeletedAtIsNull(
+			productId,
+			sellerId,
+			buyerId,
+			PurchaseStatus.COMPLETED
+		);
 	}
 
 	private void validateDuplicateReview(Long reviewerId, ReviewTarget target) {
