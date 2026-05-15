@@ -1,0 +1,277 @@
+package com.dealit.dealit.domain.review.service;
+
+import com.dealit.dealit.domain.auction.AuctionStatus;
+import com.dealit.dealit.domain.auction.entity.Auction;
+import com.dealit.dealit.domain.auction.repository.AuctionRepository;
+import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.product.ProductSaleType;
+import com.dealit.dealit.domain.product.ProductStatus;
+import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.review.dto.CreateReviewRequest;
+import com.dealit.dealit.domain.review.dto.ReviewListResponse;
+import com.dealit.dealit.domain.review.dto.ReviewRatingSummaryResponse;
+import com.dealit.dealit.domain.review.dto.ReviewResponse;
+import com.dealit.dealit.domain.review.entity.Review;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
+import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ReviewService {
+
+	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+
+	private final ReviewRepository reviewRepository;
+	private final ProductRepository productRepository;
+	private final AuctionRepository auctionRepository;
+	private final MemberRepository memberRepository;
+	private final EntityManager entityManager;
+
+	@Transactional
+	public ReviewResponse createReview(Long reviewerId, CreateReviewRequest request) {
+		Member reviewer = loadActiveMember(reviewerId);
+		validateRatingUnit(request.rating());
+		ReviewTarget target = resolveReviewTarget(reviewer.getMemberId(), request);
+
+		if (reviewer.getMemberId().equals(target.revieweeId())) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot review yourself.");
+		}
+		validateDuplicateReview(reviewer.getMemberId(), target);
+
+		Review review = reviewRepository.save(Review.create(
+			reviewer.getMemberId(),
+			target.revieweeId(),
+			target.product().getProductId(),
+			target.auctionId(),
+			request.rating().setScale(1, RoundingMode.UNNECESSARY),
+			request.content().trim()
+		));
+
+		Map<Long, Member> membersById = loadMembersById(Set.of(review.getReviewerId(), review.getRevieweeId()));
+		Map<Long, Product> productsById = loadProductsById(Set.of(review.getProductId()));
+		return toReviewResponse(review, membersById, productsById);
+	}
+
+	public ReviewListResponse getReceivedReviews(Long revieweeId, int page, int size) {
+		loadActiveMember(revieweeId);
+		Page<Review> reviewPage = reviewRepository.findAllByRevieweeIdAndDeletedAtIsNull(
+			revieweeId,
+			toPageRequest(page, size)
+		);
+		return toListResponse(reviewPage, revieweeId);
+	}
+
+	public ReviewListResponse getWrittenReviews(Long reviewerId, int page, int size) {
+		loadActiveMember(reviewerId);
+		Page<Review> reviewPage = reviewRepository.findAllByReviewerIdAndDeletedAtIsNull(
+			reviewerId,
+			toPageRequest(page, size)
+		);
+		return toListResponse(reviewPage, reviewerId);
+	}
+
+	private ReviewTarget resolveReviewTarget(Long reviewerId, CreateReviewRequest request) {
+		boolean hasProductId = request.productId() != null;
+		boolean hasAuctionId = request.auctionId() != null;
+		if (hasProductId == hasAuctionId) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Either productId or auctionId must be provided.");
+		}
+		if (hasAuctionId) {
+			return resolveAuctionReviewTarget(reviewerId, request.auctionId());
+		}
+		return resolveRegularProductReviewTarget(reviewerId, request.productId());
+	}
+
+	private void validateRatingUnit(BigDecimal rating) {
+		BigDecimal doubled = rating.stripTrailingZeros().multiply(BigDecimal.valueOf(2));
+		if (doubled.setScale(0, RoundingMode.DOWN).compareTo(doubled) != 0) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "rating must increase by 0.5.");
+		}
+	}
+
+	private ReviewTarget resolveAuctionReviewTarget(Long reviewerId, Long auctionId) {
+		Auction auction = auctionRepository.findDetailByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auction not found."));
+		Product product = auction.getProduct();
+		if (auction.getStatus() != AuctionStatus.SUCCESSFUL_BID) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only successful auctions can be reviewed.");
+		}
+		if (!reviewerId.equals(auction.getWinnerId())) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the winning bidder can review this auction.");
+		}
+		return new ReviewTarget(product, auction.getAuctionId(), product.getMemberId());
+	}
+
+	private ReviewTarget resolveRegularProductReviewTarget(Long reviewerId, Long productId) {
+		Product product = productRepository.findByProductIdAndDeletedAtIsNull(productId)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product not found."));
+		if (product.getSaleType() != ProductSaleType.REGULAR) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auction products must be reviewed with auctionId.");
+		}
+		if (product.getStatus() != ProductStatus.SOLD) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only sold products can be reviewed.");
+		}
+		if (!existsTradeChatRoom(product.getMemberId(), reviewerId, product.getProductId())) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the buyer can review this product.");
+		}
+		return new ReviewTarget(product, null, product.getMemberId());
+	}
+
+	private boolean existsTradeChatRoom(Long sellerId, Long buyerId, Long productId) {
+		Long count = entityManager.createQuery("""
+				select count(r)
+				from ChatRoom r
+				where r.sellerId = :sellerId
+					and r.buyerId = :buyerId
+					and r.productId = :productId
+					and r.deletedAt is null
+				""", Long.class)
+			.setParameter("sellerId", sellerId)
+			.setParameter("buyerId", buyerId)
+			.setParameter("productId", productId)
+			.getSingleResult();
+		return count > 0;
+	}
+
+	private void validateDuplicateReview(Long reviewerId, ReviewTarget target) {
+		boolean exists = target.auctionId() == null
+			? reviewRepository.existsByReviewerIdAndProductIdAndAuctionIdIsNullAndDeletedAtIsNull(
+				reviewerId,
+				target.product().getProductId()
+			)
+			: reviewRepository.existsByReviewerIdAndAuctionIdAndDeletedAtIsNull(reviewerId, target.auctionId());
+		if (exists) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Review already exists.");
+		}
+	}
+
+	private ReviewListResponse toListResponse(Page<Review> reviewPage, Long ratingOwnerId) {
+		Set<Long> memberIds = new HashSet<>();
+		Set<Long> productIds = new HashSet<>();
+		for (Review review : reviewPage.getContent()) {
+			memberIds.add(review.getReviewerId());
+			memberIds.add(review.getRevieweeId());
+			productIds.add(review.getProductId());
+		}
+
+		Map<Long, Member> membersById = loadMembersById(memberIds);
+		Map<Long, Product> productsById = loadProductsById(productIds);
+		return new ReviewListResponse(
+			toRatingSummary(ratingOwnerId),
+			reviewPage.getContent().stream()
+				.map(review -> toReviewResponse(review, membersById, productsById))
+				.toList(),
+			reviewPage.getNumber(),
+			reviewPage.getSize(),
+			reviewPage.getTotalElements(),
+			reviewPage.hasNext()
+		);
+	}
+
+	private ReviewRatingSummaryResponse toRatingSummary(Long memberId) {
+		long reviewCount = reviewRepository.countByRevieweeIdAndDeletedAtIsNull(memberId);
+		double averageRating = reviewCount == 0 ? 0.0 : roundToOneDecimal(reviewRepository.averageRatingByRevieweeId(memberId));
+		return new ReviewRatingSummaryResponse(memberId, averageRating, reviewCount);
+	}
+
+	private ReviewResponse toReviewResponse(
+		Review review,
+		Map<Long, Member> membersById,
+		Map<Long, Product> productsById
+	) {
+		Member reviewer = membersById.get(review.getReviewerId());
+		Member reviewee = membersById.get(review.getRevieweeId());
+		Product product = productsById.get(review.getProductId());
+		return new ReviewResponse(
+			review.getReviewId(),
+			review.getReviewerId(),
+			resolveNickname(reviewer, review.getReviewerId()),
+			review.getRevieweeId(),
+			resolveNickname(reviewee, review.getRevieweeId()),
+			review.getProductId(),
+			product == null ? "" : product.getName(),
+			review.getAuctionId(),
+			review.getRating(),
+			review.getContent(),
+			toSeoulOffsetDateTime(review.getCreatedAt())
+		);
+	}
+
+	private Member loadActiveMember(Long memberId) {
+		return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
+			.orElseThrow(() -> new InvalidCredentialsException("Member not found."));
+	}
+
+	private Map<Long, Member> loadMembersById(Collection<Long> memberIds) {
+		Map<Long, Member> membersById = new HashMap<>();
+		if (memberIds.isEmpty()) {
+			return membersById;
+		}
+		memberRepository.findAllByMemberIdInAndDeletedAtIsNull(memberIds)
+			.forEach(member -> membersById.put(member.getMemberId(), member));
+		return membersById;
+	}
+
+	private Map<Long, Product> loadProductsById(Collection<Long> productIds) {
+		Map<Long, Product> productsById = new HashMap<>();
+		if (productIds.isEmpty()) {
+			return productsById;
+		}
+		productRepository.findAllById(productIds)
+			.forEach(product -> productsById.put(product.getProductId(), product));
+		return productsById;
+	}
+
+	private String resolveNickname(Member member, Long memberId) {
+		if (member == null || member.getNickname() == null || member.getNickname().isBlank()) {
+			return "User#" + memberId;
+		}
+		return member.getNickname();
+	}
+
+	private PageRequest toPageRequest(int page, int size) {
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		return PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+	}
+
+	private double roundToOneDecimal(double value) {
+		return Math.round(value * 10.0) / 10.0;
+	}
+
+	private OffsetDateTime toSeoulOffsetDateTime(LocalDateTime dateTime) {
+		if (dateTime == null) {
+			return null;
+		}
+		return dateTime.atZone(SEOUL_ZONE).toOffsetDateTime();
+	}
+
+	private record ReviewTarget(
+		Product product,
+		Long auctionId,
+		Long revieweeId
+	) {
+	}
+}
