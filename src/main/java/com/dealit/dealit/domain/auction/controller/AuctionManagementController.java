@@ -62,8 +62,11 @@ public class AuctionManagementController {
 
 	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
 	@GetMapping("/auctions/{auctionId:\\d+}")
-	public AuctionDetailResponse getAuction(@PathVariable Long auctionId) {
-		return auctionBidService.getAuction(auctionId);
+	public AuctionDetailResponse getAuction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId
+	) {
+		return auctionBidService.getAuction(auctionId, member == null ? null : member.memberId());
 	}
 
 	@Operation(summary = "경매 입찰", description = "서버 도착 시간 기준으로 입찰을 처리한다.")

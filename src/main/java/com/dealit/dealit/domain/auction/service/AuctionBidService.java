@@ -33,6 +33,7 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.wallet.service.WalletService;
+import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -66,10 +67,15 @@ public class AuctionBidService {
 	private final AuctionNotificationService auctionNotificationService;
 	private final ApplicationEventPublisher applicationEventPublisher;
 	private final ChatRoomRepository chatRoomRepository;
+	private final WishlistService wishlistService;
 	private final ImageUrlService imageUrlService;
 	private final Clock clock;
 
 	public AuctionDetailResponse getAuction(Long auctionId) {
+		return getAuction(auctionId, null);
+	}
+
+	public AuctionDetailResponse getAuction(Long auctionId, Long memberId) {
 		Auction auction = loadAuctionDetail(auctionId);
 		Product product = auction.getProduct();
 		BigDecimal currentPrice = auction.getCurrentPrice();
@@ -105,7 +111,9 @@ public class AuctionBidService {
 			auction.getAuctionStartAt(),
 			auction.getEndsAt(),
 			serverTime(),
-			auction.getStatus()
+			auction.getStatus(),
+			memberId != null && wishlistService.isLiked(memberId, product.getProductId()),
+			product.getFavoriteCount()
 		);
 	}
 

@@ -34,6 +34,7 @@ import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.wallet.service.WalletService;
+import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -71,6 +72,7 @@ class AuctionBidServiceTest {
 	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final ApplicationEventPublisher applicationEventPublisher = mock(ApplicationEventPublisher.class);
 	private final ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+	private final WishlistService wishlistService = mock(WishlistService.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
 
 	private final AuctionBidService auctionBidService = new AuctionBidService(
@@ -85,6 +87,7 @@ class AuctionBidServiceTest {
 		auctionNotificationService,
 		applicationEventPublisher,
 		chatRoomRepository,
+		wishlistService,
 		imageUrlService,
 		FIXED_CLOCK
 	);
