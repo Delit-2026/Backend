@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.auction.repository;
 
 import com.dealit.dealit.domain.auction.entity.Bid;
+import java.util.Collection;
 import java.util.List;
 import java.time.OffsetDateTime;
 import org.springframework.data.domain.Page;
@@ -41,6 +42,16 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
 
 	@Query("select count(distinct b.bidderId) from Bid b where b.auction.auctionId = :auctionId")
 	long countDistinctBidderIdByAuctionId(Long auctionId);
+
+	@Query("""
+		select b.auction.auctionId as auctionId,
+			count(b) as bidCount
+		from Bid b
+		where b.auction.auctionId in :auctionIds
+			and b.deletedAt is null
+		group by b.auction.auctionId
+		""")
+	List<AuctionBidCountProjection> countByAuctionIds(@Param("auctionIds") Collection<Long> auctionIds);
 
 	@Query(
 		value = """

@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.wishlist.service;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.Category;
+import com.dealit.dealit.domain.auction.repository.AuctionBidCountProjection;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
@@ -135,8 +136,14 @@ public class WishlistService {
 
 		Map<Long, String> categoryNamesById = loadCategoryNames(wishlistPage.getContent());
 		Map<Long, Auction> auctionsByProductId = loadAuctionsByProductId(wishlistPage.getContent());
+		Map<Long, Long> bidCountsByAuctionId = loadBidCountsByAuctionId(auctionsByProductId);
 		List<MyAuctionWishlistItemResponse> content = wishlistPage.getContent().stream()
-			.map(wishlist -> toMyAuctionWishlistItemResponse(wishlist, auctionsByProductId, categoryNamesById))
+			.map(wishlist -> toMyAuctionWishlistItemResponse(
+				wishlist,
+				auctionsByProductId,
+				bidCountsByAuctionId,
+				categoryNamesById
+			))
 			.toList();
 
 		return new MyAuctionWishlistListResponse(
@@ -238,6 +245,21 @@ public class WishlistService {
 		return auctionsByProductId;
 	}
 
+	private Map<Long, Long> loadBidCountsByAuctionId(Map<Long, Auction> auctionsByProductId) {
+		Set<Long> auctionIds = auctionsByProductId.values().stream()
+			.map(Auction::getAuctionId)
+			.collect(java.util.stream.Collectors.toSet());
+
+		Map<Long, Long> bidCountsByAuctionId = new HashMap<>();
+		if (auctionIds.isEmpty()) {
+			return bidCountsByAuctionId;
+		}
+		bidRepository.countByAuctionIds(auctionIds).forEach(count ->
+			bidCountsByAuctionId.put(count.getAuctionId(), count.getBidCount())
+		);
+		return bidCountsByAuctionId;
+	}
+
 	private MyWishlistItemResponse toMyWishlistItemResponse(Wishlist wishlist, Map<Long, String> categoryNamesById) {
 		Product product = wishlist.getProduct();
 		return new MyWishlistItemResponse(
@@ -257,6 +279,7 @@ public class WishlistService {
 	private MyAuctionWishlistItemResponse toMyAuctionWishlistItemResponse(
 		Wishlist wishlist,
 		Map<Long, Auction> auctionsByProductId,
+		Map<Long, Long> bidCountsByAuctionId,
 		Map<Long, String> categoryNamesById
 	) {
 		Product product = wishlist.getProduct();
@@ -270,7 +293,7 @@ public class WishlistService {
 			product.getLocation(),
 			product.getFavoriteCount(),
 			auction == null ? null : auction.getCurrentPrice(),
-			auction == null ? 0 : (int) bidRepository.countByAuctionAuctionId(auction.getAuctionId()),
+			auction == null ? 0 : bidCountsByAuctionId.getOrDefault(auction.getAuctionId(), 0L).intValue(),
 			auction == null ? null : auction.getStatus(),
 			auction == null ? null : auction.getEndsAt(),
 			toSeoulOffsetDateTime(wishlist.getCreatedAt())

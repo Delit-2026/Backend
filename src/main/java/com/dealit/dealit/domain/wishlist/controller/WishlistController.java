@@ -57,8 +57,8 @@ public class WishlistController {
 		return wishlistService.getMyWishlist(member.memberId(), page, size);
 	}
 
-	@Operation(summary = "??寃쎈ℓ 李?紐⑸줉 議고쉶")
-	@ApiResponse(responseCode = "200", description = "??寃쎈ℓ 李?紐⑸줉 議고쉶 ?깃났")
+	@Operation(summary = "내 경매 찜 목록 조회")
+	@ApiResponse(responseCode = "200", description = "내 경매 찜 목록 조회 성공")
 	@GetMapping("/mypage/wishlist/auctions")
 	public MyAuctionWishlistListResponse getMyAuctionWishlist(
 		@AuthenticationPrincipal AuthenticatedMember member,
