@@ -43,6 +43,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@EntityGraph(attributePaths = {"images"})
 	List<Product> findAllBySaleTypeAndStatusAndDeletedAtIsNull(ProductSaleType saleType, ProductStatus status);
 
+	@EntityGraph(attributePaths = {"images"})
+	Page<Product> findPageBySaleTypeAndStatusAndDeletedAtIsNull(
+		ProductSaleType saleType,
+		ProductStatus status,
+		Pageable pageable
+	);
+
 	@Query("""
 		select distinct p.categoryId
 		from Product p

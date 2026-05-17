@@ -11,19 +11,26 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
-@RequiredArgsConstructor
 public class OpenSearchClient {
 
 	private static final String NDJSON_MEDIA_TYPE = "application/x-ndjson";
 
 	private final OpenSearchProperties properties;
 	private final ObjectMapper objectMapper;
+	private final RestClient restClient;
+
+	public OpenSearchClient(OpenSearchProperties properties, ObjectMapper objectMapper) {
+		this.properties = properties;
+		this.objectMapper = objectMapper;
+		this.restClient = RestClient.builder()
+			.baseUrl(properties.getUri())
+			.build();
+	}
 
 	public String indexName() {
 		return properties.getIndexName();
@@ -42,7 +49,7 @@ public class OpenSearchClient {
 			"query", buildSearchQuery(keyword, categoryId)
 		);
 
-		String response = restClient().post()
+		String response = restClient.post()
 			.uri("/{index}/_search", properties.getIndexName())
 			.contentType(MediaType.APPLICATION_JSON)
 			.body(request)
@@ -89,10 +96,14 @@ public class OpenSearchClient {
 		return Map.of("term", Map.of("categoryPathIds", categoryId));
 	}
 
-	public int rebuild(List<SearchDocument> documents) {
+	public void recreateIndex() {
 		ensureEnabled();
 		deleteIndexIfExists();
 		createIndexIfNeeded();
+	}
+
+	public int bulkIndex(List<SearchDocument> documents) {
+		ensureEnabled();
 		if (documents.isEmpty()) {
 			return 0;
 		}
@@ -102,7 +113,7 @@ public class OpenSearchClient {
 				.append('\n');
 			body.append(toJson(document)).append('\n');
 		}
-		String response = restClient().post()
+		String response = restClient.post()
 			.uri("/_bulk?refresh=true")
 			.contentType(MediaType.parseMediaType(NDJSON_MEDIA_TYPE))
 			.body(toUtf8Bytes(body.toString()))
@@ -115,7 +126,7 @@ public class OpenSearchClient {
 	public void index(SearchDocument document) {
 		ensureEnabled();
 		createIndexIfNeeded();
-		restClient().put()
+		restClient.put()
 			.uri("/{index}/_doc/{id}?refresh=true", properties.getIndexName(), document.id())
 			.contentType(MediaType.APPLICATION_JSON)
 			.body(toUtf8Bytes(toJson(document)))
@@ -126,13 +137,13 @@ public class OpenSearchClient {
 	public void delete(String documentId) {
 		ensureEnabled();
 		createIndexIfNeeded();
-		restClient().delete()
+		restClient.delete()
 			.uri("/{index}/_doc/{id}?refresh=true", properties.getIndexName(), documentId)
 			.exchange((request, response) -> null);
 	}
 
 	private void createIndexIfNeeded() {
-		Boolean exists = restClient().head()
+		Boolean exists = restClient.head()
 			.uri("/{index}", properties.getIndexName())
 			.exchange((request, response) -> response.getStatusCode().is2xxSuccessful());
 		if (Boolean.TRUE.equals(exists)) {
@@ -182,7 +193,7 @@ public class OpenSearchClient {
 				)
 			)
 		);
-		restClient().put()
+		restClient.put()
 			.uri("/{index}", properties.getIndexName())
 			.contentType(MediaType.APPLICATION_JSON)
 			.body(body)
@@ -191,15 +202,9 @@ public class OpenSearchClient {
 	}
 
 	private void deleteIndexIfExists() {
-		restClient().delete()
+		restClient.delete()
 			.uri("/{index}", properties.getIndexName())
 			.exchange((request, response) -> null);
-	}
-
-	private RestClient restClient() {
-		return RestClient.builder()
-			.baseUrl(properties.getUri())
-			.build();
 	}
 
 	private String toJson(Object value) {

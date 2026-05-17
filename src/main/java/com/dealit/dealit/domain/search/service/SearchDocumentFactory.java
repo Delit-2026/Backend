@@ -29,7 +29,10 @@ public class SearchDocumentFactory {
 	private final ImageUrlService imageUrlService;
 
 	public SearchDocument regularProduct(Product product) {
-		Map<Long, CategoryNode> nodesById = loadCategoryNodes();
+		return regularProduct(product, loadCategoryNodes());
+	}
+
+	public SearchDocument regularProduct(Product product, Map<Long, CategoryNode> nodesById) {
 		return new SearchDocument(
 			"REGULAR-" + product.getProductId(),
 			SearchResultType.REGULAR,
@@ -54,8 +57,11 @@ public class SearchDocumentFactory {
 	}
 
 	public SearchDocument auction(Auction auction) {
+		return auction(auction, loadCategoryNodes());
+	}
+
+	public SearchDocument auction(Auction auction, Map<Long, CategoryNode> nodesById) {
 		Product product = auction.getProduct();
-		Map<Long, CategoryNode> nodesById = loadCategoryNodes();
 		return new SearchDocument(
 			"AUCTION-" + auction.getAuctionId(),
 			SearchResultType.AUCTION,
@@ -79,18 +85,7 @@ public class SearchDocumentFactory {
 		);
 	}
 
-	private String resolveThumbnailUrl(Product product) {
-		return product.getImages().stream()
-			.filter(image -> image.getDeletedAt() == null)
-			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
-			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-				.thenComparing(ProductImage::getCreatedAt))
-			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
-			.findFirst()
-			.orElse(null);
-	}
-
-	private Map<Long, CategoryNode> loadCategoryNodes() {
+	public Map<Long, CategoryNode> loadCategoryNodes() {
 		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
 		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
 		for (Category category : categories) {
@@ -107,6 +102,17 @@ public class SearchDocumentFactory {
 			}
 		}
 		return nodesById;
+	}
+
+	private String resolveThumbnailUrl(Product product) {
+		return product.getImages().stream()
+			.filter(image -> image.getDeletedAt() == null)
+			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
+			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+				.thenComparing(ProductImage::getCreatedAt))
+			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
+			.findFirst()
+			.orElse(null);
 	}
 
 	private List<Long> resolveCategoryPathIds(Long categoryId, Map<Long, CategoryNode> nodesById) {
@@ -139,7 +145,7 @@ public class SearchDocumentFactory {
 		return dateTime.atZone(SEOUL_ZONE).toOffsetDateTime();
 	}
 
-	private static final class CategoryNode {
+	public static final class CategoryNode {
 
 		private final Category category;
 		private CategoryNode parent;

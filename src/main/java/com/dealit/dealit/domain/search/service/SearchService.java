@@ -5,16 +5,20 @@ import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
+import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
 import com.dealit.dealit.domain.search.document.SearchDocument;
 import com.dealit.dealit.domain.search.dto.PopularSearchKeywordListResponse;
 import com.dealit.dealit.domain.search.dto.SearchListResponse;
 import com.dealit.dealit.domain.search.dto.SearchReindexResponse;
+import com.dealit.dealit.domain.search.service.SearchDocumentFactory.CategoryNode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SearchService {
+
+	private static final int REINDEX_BATCH_SIZE = 200;
 
 	private final ProductRepository productRepository;
 	private final AuctionRepository auctionRepository;
@@ -46,26 +52,51 @@ public class SearchService {
 	}
 
 	public SearchReindexResponse rebuildIndex() {
-		List<SearchDocument> documents = new ArrayList<>();
-
-		productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
-				ProductSaleType.REGULAR,
-				ProductStatus.ON_SALE
-			)
-			.stream()
-			.map(searchDocumentFactory::regularProduct)
-			.forEach(documents::add);
-
-		auctionRepository.findAllByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNull(
-				AuctionStatus.ONGOING,
-				OffsetDateTime.now(clock)
-			)
-			.stream()
-			.map(searchDocumentFactory::auction)
-			.forEach(documents::add);
-
-		int indexedCount = openSearchClient.rebuild(documents);
+		openSearchClient.recreateIndex();
+		Map<Long, CategoryNode> categoryNodes = searchDocumentFactory.loadCategoryNodes();
+		int indexedCount = 0;
+		indexedCount += reindexRegularProducts(categoryNodes);
+		indexedCount += reindexOngoingAuctions(categoryNodes);
 		return new SearchReindexResponse(openSearchClient.indexName(), indexedCount);
+	}
+
+	private int reindexRegularProducts(Map<Long, CategoryNode> categoryNodes) {
+		int indexedCount = 0;
+		int page = 0;
+		Page<Product> products;
+		do {
+			products = productRepository.findPageBySaleTypeAndStatusAndDeletedAtIsNull(
+				ProductSaleType.REGULAR,
+				ProductStatus.ON_SALE,
+				PageRequest.of(page, REINDEX_BATCH_SIZE)
+			);
+			List<SearchDocument> documents = products.stream()
+				.map(product -> searchDocumentFactory.regularProduct(product, categoryNodes))
+				.toList();
+			indexedCount += openSearchClient.bulkIndex(documents);
+			page++;
+		} while (products.hasNext());
+		return indexedCount;
+	}
+
+	private int reindexOngoingAuctions(Map<Long, CategoryNode> categoryNodes) {
+		int indexedCount = 0;
+		int page = 0;
+		OffsetDateTime now = OffsetDateTime.now(clock);
+		Page<Auction> auctions;
+		do {
+			auctions = auctionRepository.findPageByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNull(
+				AuctionStatus.ONGOING,
+				now,
+				PageRequest.of(page, REINDEX_BATCH_SIZE)
+			);
+			List<SearchDocument> documents = auctions.stream()
+				.map(auction -> searchDocumentFactory.auction(auction, categoryNodes))
+				.toList();
+			indexedCount += openSearchClient.bulkIndex(documents);
+			page++;
+		} while (auctions.hasNext());
+		return indexedCount;
 	}
 
 	private String normalizeKeyword(String keyword) {
