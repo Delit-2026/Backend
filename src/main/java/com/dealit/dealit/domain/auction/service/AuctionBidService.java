@@ -15,6 +15,7 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.entity.Bid;
 import com.dealit.dealit.domain.auction.event.AuctionEventPublisher;
 import com.dealit.dealit.domain.auction.event.AuctionRefundRequestedEvent;
+import com.dealit.dealit.domain.auction.exception.AuctionBidException;
 import com.dealit.dealit.domain.auction.exception.AuctionNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
@@ -148,13 +149,13 @@ public class AuctionBidService {
 			throw new InvalidAuctionRequestException("자신이 등록한 경매에는 입찰할 수 없습니다.");
 		}
 		if (!auction.isOngoing()) {
-			throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
+			throw AuctionBidException.auctionEnded();
 		}
 		if (!auction.getEndsAt().isAfter(serverTime())) {
-			throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
+			throw AuctionBidException.auctionEnded();
 		}
 		if (bidPrice.compareTo(auction.getCurrentPrice().add(auction.getMinimumBidAmount())) < 0) {
-			throw new InvalidAuctionRequestException("최소 입찰 금액을 충족해야 합니다.");
+			throw AuctionBidException.priceBelowMinimum();
 		}
 		Member bidder = loadActiveMember(bidderId);
 		if (!bidder.isVerified()) {
@@ -166,8 +167,8 @@ public class AuctionBidService {
 
 		BidScriptResult result = auctionRedisService.bid(auctionId, bidPrice, bidderId);
 		switch (result.status()) {
-			case AUCTION_ENDED -> throw new InvalidAuctionRequestException("이미 종료된 경매입니다.");
-			case BID_TOO_LOW -> throw new InvalidAuctionRequestException("현재가보다 높은 금액만 입찰할 수 있습니다.");
+			case AUCTION_ENDED -> throw AuctionBidException.auctionEnded();
+			case BID_TOO_LOW -> throw AuctionBidException.priceChanged();
 			case SAME_BIDDER -> throw new InvalidAuctionRequestException("현재 최고 입찰자는 다시 입찰할 수 없습니다.");
 			case SUCCESS -> {
 				try {
