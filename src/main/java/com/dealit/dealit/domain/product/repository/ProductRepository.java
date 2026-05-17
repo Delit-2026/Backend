@@ -62,4 +62,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 		Collection<Long> categoryIds,
 		Pageable pageable
 	);
+
 }

@@ -42,10 +42,13 @@ import com.dealit.dealit.domain.product.exception.ProductImageNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductDraftRepository;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.search.event.ProductSearchDeleteRequestedEvent;
+import com.dealit.dealit.domain.search.event.ProductSearchIndexRequestedEvent;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -84,6 +87,7 @@ public class ProductService {
 	private final ProductImageStorage productImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	@Transactional
 	public UploadProductImageResponse uploadImage(Long memberId, MultipartFile file) {
@@ -235,6 +239,7 @@ public class ProductService {
 		);
 		product.updateAllowOffer(request.allowOffer());
 		replaceProductImages(product, request.images());
+		applicationEventPublisher.publishEvent(new ProductSearchIndexRequestedEvent(product.getProductId()));
 
 		return getProductEditDetail(memberId, productId);
 	}
@@ -250,6 +255,7 @@ public class ProductService {
 			productImageStorage.delete(image.getImageUrl());
 		}
 		product.softDeleteWithImages();
+		applicationEventPublisher.publishEvent(new ProductSearchDeleteRequestedEvent(product.getProductId()));
 	}
 
 	@Transactional
@@ -426,6 +432,7 @@ public class ProductService {
 			product.attachImage(image, imagePayload.sortOrder());
 		}
 		productImageRepository.saveAll(imagesById.values());
+		applicationEventPublisher.publishEvent(new ProductSearchIndexRequestedEvent(product.getProductId()));
 
 		return new CreateProductResponse(
 			product.getProductId(),

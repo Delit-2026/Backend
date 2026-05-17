@@ -71,6 +71,12 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 		Pageable pageable
 	);
 
+	@EntityGraph(attributePaths = {"product", "product.images"})
+	List<Auction> findAllByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNull(
+		AuctionStatus status,
+		OffsetDateTime now
+	);
+
 	@EntityGraph(attributePaths = {"product"})
 	List<Auction> findAllByStatusAndEndsAtBetweenAndDeletedAtIsNullAndProductDeletedAtIsNull(
 		AuctionStatus status,

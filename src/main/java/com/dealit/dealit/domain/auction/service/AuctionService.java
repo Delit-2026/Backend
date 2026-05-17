@@ -46,10 +46,13 @@ import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
+import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
 import com.dealit.dealit.global.service.ImageUrlService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -92,6 +95,7 @@ public class AuctionService {
 	private final ObjectMapper objectMapper;
 	private final AuctionRedisService auctionRedisService;
 	private final Clock clock;
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	public AuctionListResponse getPopularAuctions(int limit) {
 		int normalizedLimit = normalizeLimit(limit);
@@ -294,6 +298,7 @@ public class AuctionService {
 		}
 		auction.softDelete();
 		auction.getProduct().softDelete();
+		applicationEventPublisher.publishEvent(new AuctionSearchDeleteRequestedEvent(auction.getAuctionId()));
 	}
 
 	@Transactional
@@ -328,6 +333,7 @@ public class AuctionService {
 		auctionRedisService.refreshEnding(auction);
 
 		replaceAuctionImages(product, request.images());
+		applicationEventPublisher.publishEvent(new AuctionSearchIndexRequestedEvent(auction.getAuctionId()));
 
 		return getAuctionEditDetail(memberId, auctionId);
 	}
@@ -738,6 +744,7 @@ public class AuctionService {
 			product.attachImage(image, imagePayload.sortOrder());
 		}
 		productImageRepository.saveAll(imagesById.values());
+		applicationEventPublisher.publishEvent(new AuctionSearchIndexRequestedEvent(auction.getAuctionId()));
 
 		return new CreateAuctionResponse(
 			product.getProductId(),
