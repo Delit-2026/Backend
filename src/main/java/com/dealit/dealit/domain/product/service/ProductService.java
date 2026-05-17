@@ -19,6 +19,8 @@ import com.dealit.dealit.domain.product.dto.MySellingProductItemResponse;
 import com.dealit.dealit.domain.product.dto.MySellingProductListResponse;
 import com.dealit.dealit.domain.product.dto.PopularProductItemResponse;
 import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
+import com.dealit.dealit.domain.product.dto.ProductSearchItemResponse;
+import com.dealit.dealit.domain.product.dto.ProductSearchListResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse;
 import com.dealit.dealit.domain.product.dto.ProductEditDetailResponse.ProductEditImageResponse;
 import com.dealit.dealit.domain.product.dto.ProductImagePayload;
@@ -28,6 +30,7 @@ import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
+import com.dealit.dealit.domain.product.dto.SearchCategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.UpdateProductRequest;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
 import com.dealit.dealit.domain.product.entity.Product;
@@ -61,6 +64,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -339,6 +343,51 @@ public class ProductService {
 		return roots.stream().map(this::toCategoryResponse).toList();
 	}
 
+	public List<SearchCategoryOptionResponse> getSearchCategories() {
+		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
+		List<CategoryNode> roots = connectCategoryNodes(categories, nodesById);
+		Set<Long> activeLeafCategoryIds = new LinkedHashSet<>(
+			productRepository.findDistinctCategoryIdsBySaleTypeAndStatusAndDeletedAtIsNull(
+				ProductSaleType.REGULAR,
+				ProductStatus.ON_SALE
+			)
+		);
+
+		return roots.stream()
+			.map(root -> toSearchCategoryResponse(root, activeLeafCategoryIds))
+			.toList();
+	}
+
+	public ProductSearchListResponse searchProductsByCategory(Long categoryId, int page, int size) {
+		Category selectedCategory = categoryRepository.findById(categoryId)
+			.orElseThrow(() -> new InvalidProductRequestException("존재하지 않는 카테고리입니다."));
+
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		Set<Long> searchableCategoryIds = resolveSearchableCategoryIds(selectedCategory);
+
+		Page<Product> productPage = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNullAndCategoryIdIn(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE,
+			searchableCategoryIds,
+			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNames(productPage.getContent());
+		List<ProductSearchItemResponse> content = productPage.getContent().stream()
+			.map(product -> toProductSearchItemResponse(product, categoryNamesById))
+			.toList();
+
+		return new ProductSearchListResponse(
+			content,
+			productPage.getNumber(),
+			productPage.getSize(),
+			productPage.getTotalElements(),
+			productPage.hasNext()
+		);
+	}
+
 	public RecommendPriceResponse recommendPrice(RecommendPriceRequest request) {
 		if (request.saleType() != ProductSaleType.REGULAR) {
 			throw new InvalidProductRequestException("일반 상품 가격 추천에서는 saleType이 REGULAR여야 합니다.");
@@ -539,6 +588,72 @@ public class ProductService {
 		);
 	}
 
+	private SearchCategoryOptionResponse toSearchCategoryResponse(CategoryNode node, Set<Long> activeLeafCategoryIds) {
+		Category category = node.category();
+		List<SearchCategoryOptionResponse> children = node.children().stream()
+			.map(child -> toSearchCategoryResponse(child, activeLeafCategoryIds))
+			.toList();
+		boolean enabled = activeLeafCategoryIds.contains(category.getId())
+			|| children.stream().anyMatch(SearchCategoryOptionResponse::enabled);
+
+		return new SearchCategoryOptionResponse(
+			category.getId(),
+			category.getNameKo(),
+			category.getNameEn(),
+			category.getDepth(),
+			category.getParentId(),
+			enabled,
+			children
+		);
+	}
+
+	private Map<Long, CategoryNode> buildCategoryNodesById(List<Category> categories) {
+		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
+		for (Category category : categories) {
+			nodesById.put(category.getId(), new CategoryNode(category));
+		}
+		return nodesById;
+	}
+
+	private List<CategoryNode> connectCategoryNodes(List<Category> categories, Map<Long, CategoryNode> nodesById) {
+		List<CategoryNode> roots = new ArrayList<>();
+		for (Category category : categories) {
+			CategoryNode node = nodesById.get(category.getId());
+			if (category.getParentId() == null) {
+				roots.add(node);
+				continue;
+			}
+
+			CategoryNode parent = nodesById.get(category.getParentId());
+			if (parent != null) {
+				parent.children().add(node);
+			}
+		}
+		return roots;
+	}
+
+	private Set<Long> resolveSearchableCategoryIds(Category selectedCategory) {
+		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
+		connectCategoryNodes(categories, nodesById);
+
+		CategoryNode selectedNode = nodesById.get(selectedCategory.getId());
+		Set<Long> categoryIds = new LinkedHashSet<>();
+		collectCategoryIds(selectedNode, categoryIds);
+		return categoryIds;
+	}
+
+	private void collectCategoryIds(CategoryNode node, Set<Long> categoryIds) {
+		if (node == null) {
+			return;
+		}
+
+		categoryIds.add(node.category().getId());
+		for (CategoryNode child : node.children()) {
+			collectCategoryIds(child, categoryIds);
+		}
+	}
+
 	private Map<Long, String> loadCategoryNames(List<Product> products) {
 		Set<Long> categoryIds = products.stream()
 			.map(Product::getCategoryId)
@@ -636,6 +751,24 @@ public class ProductService {
 			product.getFavoriteCount(),
 			calculateHotScore(product),
 			rank,
+			toSeoulOffsetDateTime(product.getCreatedAt())
+		);
+	}
+
+	private ProductSearchItemResponse toProductSearchItemResponse(
+		Product product,
+		Map<Long, String> categoryNamesById
+	) {
+		return new ProductSearchItemResponse(
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			product.getPrice(),
+			product.getLocation(),
+			product.getCategoryId(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getViewCount(),
+			product.getFavoriteCount(),
 			toSeoulOffsetDateTime(product.getCreatedAt())
 		);
 	}

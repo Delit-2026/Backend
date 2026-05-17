@@ -6,12 +6,14 @@ import com.dealit.dealit.domain.product.dto.CreateProductResponse;
 import com.dealit.dealit.domain.product.dto.DeleteProductImageResponse;
 import com.dealit.dealit.domain.product.dto.HotListProductListResponse;
 import com.dealit.dealit.domain.product.dto.PopularProductListResponse;
+import com.dealit.dealit.domain.product.dto.ProductSearchListResponse;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.product.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.product.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.product.dto.RecommendPriceResponse;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftRequest;
 import com.dealit.dealit.domain.product.dto.SaveProductDraftResponse;
+import com.dealit.dealit.domain.product.dto.SearchCategoryOptionResponse;
 import com.dealit.dealit.domain.product.dto.UploadProductImageResponse;
 import com.dealit.dealit.domain.product.service.ProductService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
@@ -109,6 +111,32 @@ public class ProductController {
 	@GetMapping("/categories")
 	public List<CategoryOptionResponse> getCategories() {
 		return productService.getCategories();
+	}
+
+	@Operation(summary = "상품 검색 카테고리 목록 조회", description = "판매 중인 일반 상품이 있는 카테고리만 검색 가능 상태로 내려줍니다.")
+	@ApiResponse(
+		responseCode = "200",
+		description = "상품 검색 카테고리 조회 성공",
+		content = @Content(schema = @Schema(implementation = SearchCategoryOptionResponse.class))
+	)
+	@GetMapping("/search/categories")
+	public List<SearchCategoryOptionResponse> getSearchCategories() {
+		return productService.getSearchCategories();
+	}
+
+	@Operation(summary = "카테고리 기반 상품 검색")
+	@ApiResponse(
+		responseCode = "200",
+		description = "카테고리 기반 상품 검색 성공",
+		content = @Content(schema = @Schema(implementation = ProductSearchListResponse.class))
+	)
+	@GetMapping("/search")
+	public ProductSearchListResponse searchProducts(
+		@RequestParam Long categoryId,
+		@RequestParam(defaultValue = "0") int page,
+		@RequestParam(defaultValue = "20") int size
+	) {
+		return productService.searchProductsByCategory(categoryId, page, size);
 	}
 
 	@Operation(summary = "가격 추천")

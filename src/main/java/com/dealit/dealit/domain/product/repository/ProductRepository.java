@@ -9,6 +9,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -40,4 +42,24 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	@EntityGraph(attributePaths = {"images"})
 	List<Product> findAllBySaleTypeAndStatusAndDeletedAtIsNull(ProductSaleType saleType, ProductStatus status);
+
+	@Query("""
+		select distinct p.categoryId
+		from Product p
+		where p.saleType = :saleType
+			and p.status = :status
+			and p.deletedAt is null
+		""")
+	List<Long> findDistinctCategoryIdsBySaleTypeAndStatusAndDeletedAtIsNull(
+		@Param("saleType") ProductSaleType saleType,
+		@Param("status") ProductStatus status
+	);
+
+	@EntityGraph(attributePaths = {"images"})
+	Page<Product> findAllBySaleTypeAndStatusAndDeletedAtIsNullAndCategoryIdIn(
+		ProductSaleType saleType,
+		ProductStatus status,
+		Collection<Long> categoryIds,
+		Pageable pageable
+	);
 }

@@ -50,6 +50,27 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 	@EntityGraph(attributePaths = {"product", "product.images"})
 	List<Auction> findAllByProductProductIdInAndDeletedAtIsNullAndProductDeletedAtIsNull(Collection<Long> productIds);
 
+	@Query("""
+		select distinct a.product.categoryId
+		from Auction a
+		where a.status = :status
+			and a.endsAt > :now
+			and a.deletedAt is null
+			and a.product.deletedAt is null
+		""")
+	List<Long> findDistinctCategoryIdsByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNull(
+		@Param("status") AuctionStatus status,
+		@Param("now") OffsetDateTime now
+	);
+
+	@EntityGraph(attributePaths = {"product", "product.images"})
+	Page<Auction> findAllByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNullAndProductCategoryIdIn(
+		AuctionStatus status,
+		OffsetDateTime now,
+		Collection<Long> categoryIds,
+		Pageable pageable
+	);
+
 	@EntityGraph(attributePaths = {"product"})
 	List<Auction> findAllByStatusAndEndsAtBetweenAndDeletedAtIsNullAndProductDeletedAtIsNull(
 		AuctionStatus status,

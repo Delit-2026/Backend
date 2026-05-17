@@ -19,6 +19,7 @@ import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceResponse;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
+import com.dealit.dealit.domain.auction.dto.SearchCategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.UploadAuctionImageResponse;
 import com.dealit.dealit.domain.auction.entity.Auction;
@@ -33,6 +34,7 @@ import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException
 import com.dealit.dealit.domain.auction.redis.AuctionRedisService;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.AuctionDraftRepository;
+import com.dealit.dealit.domain.auction.repository.AuctionBidCountProjection;
 import com.dealit.dealit.domain.auction.repository.AuctionRankProjection;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
@@ -65,8 +67,10 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.ArrayList;
 
 @Service
@@ -115,6 +119,53 @@ public class AuctionService {
 		List<Auction> auctions = loadRankedAuctions(rankedAuctions);
 		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctions);
 		return new AuctionListResponse(toAuctionListItems(rankedAuctions, auctions, categoryNamesById));
+	}
+
+	public List<SearchCategoryOptionResponse> getSearchCategories() {
+		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
+		List<CategoryNode> roots = connectCategoryNodes(categories, nodesById);
+		Set<Long> activeLeafCategoryIds = new LinkedHashSet<>(
+			auctionRepository.findDistinctCategoryIdsByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNull(
+				AuctionStatus.ONGOING,
+				OffsetDateTime.now(clock)
+			)
+		);
+
+		return roots.stream()
+			.map(root -> toSearchCategoryResponse(root, activeLeafCategoryIds))
+			.toList();
+	}
+
+	public AuctionListResponse searchAuctionsByCategory(Long categoryId, int page, int size) {
+		Category selectedCategory = categoryRepository.findById(categoryId)
+			.orElseThrow(() -> new InvalidAuctionRequestException("존재하지 않는 카테고리입니다."));
+
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		Set<Long> searchableCategoryIds = resolveSearchableCategoryIds(selectedCategory);
+
+		Page<Auction> auctionPage = auctionRepository.findAllByStatusAndEndsAtAfterAndDeletedAtIsNullAndProductDeletedAtIsNullAndProductCategoryIdIn(
+			AuctionStatus.ONGOING,
+			OffsetDateTime.now(clock),
+			searchableCategoryIds,
+			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "product.createdAt"))
+		);
+
+		Map<Long, String> categoryNamesById = loadCategoryNamesFromAuctions(auctionPage.getContent());
+		Map<Long, Long> bidCountsByAuctionId = loadBidCountsByAuctionId(auctionPage.getContent());
+		List<AuctionListItemResponse> content = new ArrayList<>();
+		for (int index = 0; index < auctionPage.getContent().size(); index++) {
+			Auction auction = auctionPage.getContent().get(index);
+			content.add(toAuctionSearchListItemResponse(
+				auction,
+				categoryNamesById,
+				bidCountsByAuctionId.getOrDefault(auction.getAuctionId(), 0L),
+				normalizedPage * normalizedSize + index + 1
+			));
+		}
+
+		return new AuctionListResponse(content);
 	}
 
 	public MySellingAuctionListResponse getMySellingAuctionProducts(Long memberId, int page, int size) {
@@ -336,6 +387,23 @@ public class AuctionService {
 		return categoryNamesById;
 	}
 
+	private Map<Long, Long> loadBidCountsByAuctionId(List<Auction> auctions) {
+		List<Long> auctionIds = auctions.stream()
+			.map(Auction::getAuctionId)
+			.toList();
+		if (auctionIds.isEmpty()) {
+			return Map.of();
+		}
+
+		Map<Long, Long> bidCountsByAuctionId = new LinkedHashMap<>();
+		bidRepository.countByAuctionIds(auctionIds)
+			.forEach(projection -> bidCountsByAuctionId.put(
+				projection.getAuctionId(),
+				projection.getBidCount()
+			));
+		return bidCountsByAuctionId;
+	}
+
 	private List<AuctionListItemResponse> toAuctionListItems(
 		List<AuctionRankProjection> rankedAuctions,
 		List<Auction> auctions,
@@ -378,6 +446,32 @@ public class AuctionService {
 			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
 			product.getMemberId(),
 			toDouble(rank.getPopularScore()),
+			displayRank,
+			toSeoulOffsetDateTime(product.getCreatedAt())
+		);
+	}
+
+	private AuctionListItemResponse toAuctionSearchListItemResponse(
+		Auction auction,
+		Map<Long, String> categoryNamesById,
+		long bidCount,
+		int displayRank
+	) {
+		Product product = auction.getProduct();
+		return new AuctionListItemResponse(
+			auction.getAuctionId(),
+			product.getProductId(),
+			product.getName(),
+			resolveThumbnailUrl(product),
+			auction.getStartPrice(),
+			resolveCurrentPrice(auction),
+			bidCount,
+			toSeoulOffsetDateTime(auction.getAuctionEndAt()),
+			auction.getStatus(),
+			product.getLocation(),
+			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
+			product.getMemberId(),
+			0.0,
 			displayRank,
 			toSeoulOffsetDateTime(product.getCreatedAt())
 		);
@@ -877,6 +971,72 @@ public class AuctionService {
 				.map(this::toCategoryResponse)
 				.toList()
 		);
+	}
+
+	private SearchCategoryOptionResponse toSearchCategoryResponse(CategoryNode node, Set<Long> activeLeafCategoryIds) {
+		Category category = node.category();
+		List<SearchCategoryOptionResponse> children = node.children().stream()
+			.map(child -> toSearchCategoryResponse(child, activeLeafCategoryIds))
+			.toList();
+		boolean enabled = activeLeafCategoryIds.contains(category.getId())
+			|| children.stream().anyMatch(SearchCategoryOptionResponse::enabled);
+
+		return new SearchCategoryOptionResponse(
+			category.getId(),
+			category.getNameKo(),
+			category.getNameEn(),
+			category.getDepth(),
+			category.getParentId(),
+			enabled,
+			children
+		);
+	}
+
+	private Map<Long, CategoryNode> buildCategoryNodesById(List<Category> categories) {
+		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
+		for (Category category : categories) {
+			nodesById.put(category.getId(), new CategoryNode(category));
+		}
+		return nodesById;
+	}
+
+	private List<CategoryNode> connectCategoryNodes(List<Category> categories, Map<Long, CategoryNode> nodesById) {
+		List<CategoryNode> roots = new ArrayList<>();
+		for (Category category : categories) {
+			CategoryNode node = nodesById.get(category.getId());
+			if (category.getParentId() == null) {
+				roots.add(node);
+				continue;
+			}
+
+			CategoryNode parent = nodesById.get(category.getParentId());
+			if (parent != null) {
+				parent.children().add(node);
+			}
+		}
+		return roots;
+	}
+
+	private Set<Long> resolveSearchableCategoryIds(Category selectedCategory) {
+		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
+		connectCategoryNodes(categories, nodesById);
+
+		CategoryNode selectedNode = nodesById.get(selectedCategory.getId());
+		Set<Long> categoryIds = new LinkedHashSet<>();
+		collectCategoryIds(selectedNode, categoryIds);
+		return categoryIds;
+	}
+
+	private void collectCategoryIds(CategoryNode node, Set<Long> categoryIds) {
+		if (node == null) {
+			return;
+		}
+
+		categoryIds.add(node.category().getId());
+		for (CategoryNode child : node.children()) {
+			collectCategoryIds(child, categoryIds);
+		}
 	}
 
 	private record CategoryNode(

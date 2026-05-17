@@ -8,6 +8,7 @@ import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
 import com.dealit.dealit.domain.auction.dto.MyBuyingAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionListResponse;
+import com.dealit.dealit.domain.auction.dto.SearchCategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
 import com.dealit.dealit.domain.auction.service.AuctionBuyingService;
@@ -34,6 +35,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 @Tag(name = "Auction", description = "경매 상품 관리 API")
 @RestController
 @RequiredArgsConstructor
@@ -58,6 +61,26 @@ public class AuctionManagementController {
 	@GetMapping("/auctions/closing-soon")
 	public AuctionListResponse getClosingSoonAuctions(@RequestParam(defaultValue = "3") int limit) {
 		return auctionService.getClosingSoonAuctions(limit);
+	}
+
+	@Operation(summary = "경매 검색 카테고리 목록 조회", description = "진행 중인 경매가 있는 카테고리 정보를 함께 내려줍니다.")
+	@ApiResponse(responseCode = "200", description = "경매 검색 카테고리 조회 성공",
+		content = @Content(schema = @Schema(implementation = SearchCategoryOptionResponse.class)))
+	@GetMapping("/auctions/search/categories")
+	public List<SearchCategoryOptionResponse> getAuctionSearchCategories() {
+		return auctionService.getSearchCategories();
+	}
+
+	@Operation(summary = "카테고리 기반 경매 검색")
+	@ApiResponse(responseCode = "200", description = "카테고리 기반 경매 검색 성공",
+		content = @Content(schema = @Schema(implementation = AuctionListResponse.class)))
+	@GetMapping("/auctions/search")
+	public AuctionListResponse searchAuctions(
+		@RequestParam Long categoryId,
+		@RequestParam(defaultValue = "0") int page,
+		@RequestParam(defaultValue = "20") int size
+	) {
+		return auctionService.searchAuctionsByCategory(categoryId, page, size);
 	}
 
 	@Operation(summary = "경매 상세 조회", description = "경매 현재가와 서버 시간을 조회한다.")
