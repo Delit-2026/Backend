@@ -8,6 +8,9 @@ public record SearchListResponse(
 	@Schema(description = "검색어", example = "맥북")
 	String keyword,
 
+	@Schema(description = "검색 결과 유형 필터", example = "REGULAR")
+	SearchResultType type,
+
 	@Schema(description = "카테고리 ID", example = "1")
 	Long categoryId,
 

@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.search.controller;
 import com.dealit.dealit.domain.search.dto.PopularSearchKeywordListResponse;
 import com.dealit.dealit.domain.search.dto.SearchListResponse;
 import com.dealit.dealit.domain.search.dto.SearchReindexResponse;
+import com.dealit.dealit.domain.search.dto.SearchResultType;
 import com.dealit.dealit.domain.search.service.SearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,29 +25,31 @@ public class SearchController {
 
 	@Operation(
 		summary = "Text Search",
-		description = "keyword, categoryId 조건으로 판매 중인 일반 상품과 진행 중인 경매를 OpenSearch에서 조회합니다."
+		description = "keyword, type, categoryId 조건으로 판매 중인 일반 상품과 진행 중인 경매를 OpenSearch에서 조회합니다. type이 없으면 전체 검색입니다."
 	)
 	@ApiResponse(responseCode = "200", description = "통합 검색 성공")
 	@GetMapping("/search")
 	public SearchListResponse search(
 		@RequestParam(required = false) String keyword,
+		@RequestParam(required = false) SearchResultType type,
 		@RequestParam(required = false) Long categoryId,
 		@RequestParam(defaultValue = "0") int page,
 		@RequestParam(defaultValue = "20") int size
 	) {
-		return searchService.search(keyword, categoryId, page, size);
+		return searchService.search(keyword, type, categoryId, page, size);
 	}
 
 	@Operation(
 		summary = "Popular Search Keywords",
-		description = "사용자가 검색한 keyword 횟수를 기준으로 인기 검색어를 조회합니다."
+		description = "사용자가 검색한 keyword 횟수를 기준으로 인기 검색어를 조회합니다. type이 없으면 전체 인기검색어입니다."
 	)
 	@ApiResponse(responseCode = "200", description = "인기 검색어 조회 성공")
 	@GetMapping("/search/popular")
 	public PopularSearchKeywordListResponse popularKeywords(
+		@RequestParam(required = false) SearchResultType type,
 		@RequestParam(defaultValue = "10") int size
 	) {
-		return searchService.findPopularKeywords(size);
+		return searchService.findPopularKeywords(type, size);
 	}
 
 	@Operation(

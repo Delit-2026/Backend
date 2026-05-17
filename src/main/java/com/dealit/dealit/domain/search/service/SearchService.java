@@ -11,6 +11,7 @@ import com.dealit.dealit.domain.search.document.SearchDocument;
 import com.dealit.dealit.domain.search.dto.PopularSearchKeywordListResponse;
 import com.dealit.dealit.domain.search.dto.SearchListResponse;
 import com.dealit.dealit.domain.search.dto.SearchReindexResponse;
+import com.dealit.dealit.domain.search.dto.SearchResultType;
 import com.dealit.dealit.domain.search.service.SearchDocumentFactory.CategoryNode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -38,17 +39,17 @@ public class SearchService {
 	private final SearchKeywordStatsService searchKeywordStatsService;
 	private final Clock clock;
 
-	public SearchListResponse search(String keyword, Long categoryId, int page, int size) {
+	public SearchListResponse search(String keyword, SearchResultType type, Long categoryId, int page, int size) {
 		String normalizedKeyword = normalizeKeyword(keyword);
 		validateSearchCondition(normalizedKeyword, categoryId);
 		int normalizedPage = Math.max(page, 0);
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
-		searchKeywordStatsService.record(normalizedKeyword);
-		return openSearchClient.search(normalizedKeyword, categoryId, normalizedPage, normalizedSize);
+		searchKeywordStatsService.record(normalizedKeyword, type);
+		return openSearchClient.search(normalizedKeyword, type, categoryId, normalizedPage, normalizedSize);
 	}
 
-	public PopularSearchKeywordListResponse findPopularKeywords(int size) {
-		return searchKeywordStatsService.findPopularKeywords(size);
+	public PopularSearchKeywordListResponse findPopularKeywords(SearchResultType type, int size) {
+		return searchKeywordStatsService.findPopularKeywords(type, size);
 	}
 
 	public SearchReindexResponse rebuildIndex() {

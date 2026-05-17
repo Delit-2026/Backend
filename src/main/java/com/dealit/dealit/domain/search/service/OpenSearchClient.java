@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.search.config.OpenSearchProperties;
 import com.dealit.dealit.domain.search.document.SearchDocument;
 import com.dealit.dealit.domain.search.dto.SearchItemResponse;
 import com.dealit.dealit.domain.search.dto.SearchListResponse;
+import com.dealit.dealit.domain.search.dto.SearchResultType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -40,13 +41,13 @@ public class OpenSearchClient {
 		return properties.isEnabled();
 	}
 
-	public SearchListResponse search(String keyword, Long categoryId, int page, int size) {
+	public SearchListResponse search(String keyword, SearchResultType type, Long categoryId, int page, int size) {
 		ensureEnabled();
 		Map<String, Object> request = Map.of(
 			"from", page * size,
 			"size", size,
 			"sort", List.of(Map.of("createdAt", Map.of("order", "desc"))),
-			"query", buildSearchQuery(keyword, categoryId)
+			"query", buildSearchQuery(keyword, type, categoryId)
 		);
 
 		String response = restClient.post()
@@ -62,24 +63,21 @@ public class OpenSearchClient {
 		for (JsonNode hit : hits.path("hits")) {
 			content.add(objectMapper.convertValue(hit.path("_source"), SearchItemResponse.class));
 		}
-		return new SearchListResponse(keyword, categoryId, content, page, size, totalElements, (long) (page + 1) * size < totalElements);
+		return new SearchListResponse(keyword, type, categoryId, content, page, size, totalElements, (long) (page + 1) * size < totalElements);
 	}
 
-	private Map<String, Object> buildSearchQuery(String keyword, Long categoryId) {
+	private Map<String, Object> buildSearchQuery(String keyword, SearchResultType type, Long categoryId) {
 		boolean hasKeyword = keyword != null && !keyword.isBlank();
 		boolean hasCategory = categoryId != null;
-		if (hasKeyword && hasCategory) {
+		if (hasKeyword) {
 			return Map.of(
 				"bool", Map.of(
 					"must", List.of(multiMatchQuery(keyword)),
-					"filter", List.of(categoryFilter(categoryId))
+					"filter", buildFilters(type, categoryId)
 				)
 			);
 		}
-		if (hasKeyword) {
-			return multiMatchQuery(keyword);
-		}
-		return Map.of("bool", Map.of("filter", List.of(categoryFilter(categoryId))));
+		return Map.of("bool", Map.of("filter", buildFilters(type, categoryId)));
 	}
 
 	private Map<String, Object> multiMatchQuery(String keyword) {
@@ -94,6 +92,21 @@ public class OpenSearchClient {
 
 	private Map<String, Object> categoryFilter(Long categoryId) {
 		return Map.of("term", Map.of("categoryPathIds", categoryId));
+	}
+
+	private Map<String, Object> typeFilter(SearchResultType type) {
+		return Map.of("term", Map.of("type", type.name()));
+	}
+
+	private List<Map<String, Object>> buildFilters(SearchResultType type, Long categoryId) {
+		List<Map<String, Object>> filters = new ArrayList<>();
+		if (type != null) {
+			filters.add(typeFilter(type));
+		}
+		if (categoryId != null) {
+			filters.add(categoryFilter(categoryId));
+		}
+		return filters;
 	}
 
 	public void recreateIndex() {
