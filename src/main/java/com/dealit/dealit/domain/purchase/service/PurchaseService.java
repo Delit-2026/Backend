@@ -17,6 +17,10 @@ import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.purchase.dto.MyPurchaseItemResponse;
+import com.dealit.dealit.domain.purchase.dto.MyPurchaseListResponse;
+import com.dealit.dealit.domain.purchase.dto.MySaleItemResponse;
+import com.dealit.dealit.domain.purchase.dto.MySaleListResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseCompletionResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseReceiptResponse;
 import com.dealit.dealit.domain.purchase.dto.PurchaseResponse;
@@ -37,10 +41,15 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -160,6 +169,62 @@ public class PurchaseService {
 		);
 	}
 
+	public MyPurchaseListResponse getMyPurchases(
+		Long memberId,
+		int page,
+		int size,
+		List<PurchaseStatus> statuses
+	) {
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		PageRequest pageRequest = PageRequest.of(normalizedPage, normalizedSize);
+
+		Page<Purchase> purchasePage = statuses == null || statuses.isEmpty()
+			? purchaseRepository.findByBuyerIdOrderByPurchaseIdDesc(memberId, pageRequest)
+			: purchaseRepository.findByBuyerIdAndStatusInOrderByPurchaseIdDesc(memberId, statuses, pageRequest);
+
+		Map<Long, Product> productsById = loadProductsById(purchasePage.getContent());
+		List<MyPurchaseItemResponse> content = purchasePage.getContent().stream()
+			.map(purchase -> toMyPurchaseItemResponse(purchase, productsById.get(purchase.getProductId())))
+			.toList();
+
+		return new MyPurchaseListResponse(
+			content,
+			purchasePage.getNumber(),
+			purchasePage.getSize(),
+			purchasePage.getTotalElements(),
+			purchasePage.hasNext()
+		);
+	}
+
+	public MySaleListResponse getMySales(
+		Long memberId,
+		int page,
+		int size,
+		List<PurchaseStatus> statuses
+	) {
+		int normalizedPage = Math.max(page, 0);
+		int normalizedSize = Math.min(Math.max(size, 1), 100);
+		PageRequest pageRequest = PageRequest.of(normalizedPage, normalizedSize);
+
+		Page<Purchase> purchasePage = statuses == null || statuses.isEmpty()
+			? purchaseRepository.findBySellerIdOrderByPurchaseIdDesc(memberId, pageRequest)
+			: purchaseRepository.findBySellerIdAndStatusInOrderByPurchaseIdDesc(memberId, statuses, pageRequest);
+
+		Map<Long, Product> productsById = loadProductsById(purchasePage.getContent());
+		List<MySaleItemResponse> content = purchasePage.getContent().stream()
+			.map(purchase -> toMySaleItemResponse(purchase, productsById.get(purchase.getProductId())))
+			.toList();
+
+		return new MySaleListResponse(
+			content,
+			purchasePage.getNumber(),
+			purchasePage.getSize(),
+			purchasePage.getTotalElements(),
+			purchasePage.hasNext()
+		);
+	}
+
 	@Transactional
 	public PurchaseCompletionResponse completeByBuyer(Long purchaseId, Long buyerId) {
 		Purchase purchase = purchaseRepository.findById(purchaseId)
@@ -258,6 +323,44 @@ public class PurchaseService {
 			toWalletAmount(purchase.getPriceSnapshot()),
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt())
+		);
+	}
+
+	private Map<Long, Product> loadProductsById(List<Purchase> purchases) {
+		List<Long> productIds = purchases.stream()
+			.map(Purchase::getProductId)
+			.distinct()
+			.toList();
+
+		return productRepository.findAllByProductIdInAndDeletedAtIsNull(productIds).stream()
+			.collect(Collectors.toMap(Product::getProductId, Function.identity()));
+	}
+
+	private MyPurchaseItemResponse toMyPurchaseItemResponse(Purchase purchase, Product product) {
+		return new MyPurchaseItemResponse(
+			purchase.getPurchaseId(),
+			purchase.getProductId(),
+			product == null ? null : product.getName(),
+			product == null ? null : resolveThumbnailUrl(product),
+			purchase.getSellerId(),
+			toWalletAmount(purchase.getPriceSnapshot()),
+			purchase.getStatus(),
+			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
+			purchase.getChatRoomId()
+		);
+	}
+
+	private MySaleItemResponse toMySaleItemResponse(Purchase purchase, Product product) {
+		return new MySaleItemResponse(
+			purchase.getPurchaseId(),
+			purchase.getProductId(),
+			product == null ? null : product.getName(),
+			product == null ? null : resolveThumbnailUrl(product),
+			purchase.getBuyerId(),
+			toWalletAmount(purchase.getPriceSnapshot()),
+			purchase.getStatus(),
+			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
+			purchase.getChatRoomId()
 		);
 	}
 

@@ -542,6 +542,138 @@ class PurchaseIntegrationTest {
 		assertThat(productRepository.findById(product.getProductId()).orElseThrow().getStatus()).isEqualTo(ProductStatus.ENDED);
 	}
 
+	@Test
+	@DisplayName("마이페이지에서 구매자는 본인 구매내역을 조회할 수 있다")
+	void buyerCanGetMyPurchases() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/mypage/purchases")
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[0].purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.content[0].productId").value(product.getProductId()))
+			.andExpect(jsonPath("$.content[0].productTitle").value("Purchase Product"))
+			.andExpect(jsonPath("$.content[0].counterpartMemberId").value(seller.getMemberId()))
+			.andExpect(jsonPath("$.content[0].amount").value(30000))
+			.andExpect(jsonPath("$.content[0].status").value("PAID"))
+			.andExpect(jsonPath("$.content[0].purchasedAt").exists())
+			.andExpect(jsonPath("$.content[0].chatRoomId").isNumber())
+			.andExpect(jsonPath("$.page").value(0))
+			.andExpect(jsonPath("$.size").value(20))
+			.andExpect(jsonPath("$.totalElements").value(1))
+			.andExpect(jsonPath("$.hasNext").value(false));
+	}
+
+	@Test
+	@DisplayName("마이페이지 구매내역은 status 필터가 적용된다")
+	void buyerCanFilterMyPurchasesByStatus() throws Exception {
+		Product paidProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		Product shippedProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(20000));
+		walletService.charge(buyer.getMemberId(), 70000);
+		purchaseProduct(paidProduct, buyer);
+		Long shippedPurchaseId = purchaseProduct(shippedProduct, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/ship", shippedPurchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("SHIPPED"));
+
+		mockMvc.perform(get("/api/v1/mypage/purchases")
+				.param("status", "SHIPPED")
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].purchaseId").value(shippedPurchaseId))
+			.andExpect(jsonPath("$.content[0].status").value("SHIPPED"))
+			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
+	@Test
+	@DisplayName("마이페이지 구매내역은 본인 데이터만 조회된다")
+	void buyerCanOnlyGetOwnPurchases() throws Exception {
+		Product buyerProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		Product otherBuyerProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(20000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		walletService.charge(otherBuyer.getMemberId(), 50000);
+		Long buyerPurchaseId = purchaseProduct(buyerProduct, buyer);
+		purchaseProduct(otherBuyerProduct, otherBuyer);
+
+		mockMvc.perform(get("/api/v1/mypage/purchases")
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].purchaseId").value(buyerPurchaseId))
+			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
+	@Test
+	@DisplayName("마이페이지에서 판매자는 본인 판매내역을 조회할 수 있다")
+	void sellerCanGetMySales() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/mypage/sales")
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[0].purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.content[0].productId").value(product.getProductId()))
+			.andExpect(jsonPath("$.content[0].productTitle").value("Purchase Product"))
+			.andExpect(jsonPath("$.content[0].counterpartMemberId").value(buyer.getMemberId()))
+			.andExpect(jsonPath("$.content[0].amount").value(30000))
+			.andExpect(jsonPath("$.content[0].status").value("PAID"))
+			.andExpect(jsonPath("$.content[0].purchasedAt").exists())
+			.andExpect(jsonPath("$.content[0].chatRoomId").isNumber())
+			.andExpect(jsonPath("$.page").value(0))
+			.andExpect(jsonPath("$.size").value(20))
+			.andExpect(jsonPath("$.totalElements").value(1))
+			.andExpect(jsonPath("$.hasNext").value(false));
+	}
+
+	@Test
+	@DisplayName("마이페이지 판매내역은 status 필터가 적용된다")
+	void sellerCanFilterMySalesByStatus() throws Exception {
+		Product paidProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		Product shippedProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(20000));
+		walletService.charge(buyer.getMemberId(), 70000);
+		purchaseProduct(paidProduct, buyer);
+		Long shippedPurchaseId = purchaseProduct(shippedProduct, buyer);
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/ship", shippedPurchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("SHIPPED"));
+
+		mockMvc.perform(get("/api/v1/mypage/sales")
+				.param("status", "SHIPPED")
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].purchaseId").value(shippedPurchaseId))
+			.andExpect(jsonPath("$.content[0].status").value("SHIPPED"))
+			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
+	@Test
+	@DisplayName("마이페이지 판매내역은 본인 데이터만 조회된다")
+	void sellerCanOnlyGetOwnSales() throws Exception {
+		Member otherSeller = saveMember("purchase-other-seller", "other-seller@example.com", "Purchase Other Seller", true);
+		Product sellerProduct = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		Product otherSellerProduct = saveProduct(otherSeller, ProductStatus.ON_SALE, BigDecimal.valueOf(20000));
+		walletService.charge(buyer.getMemberId(), 70000);
+		Long sellerPurchaseId = purchaseProduct(sellerProduct, buyer);
+		purchaseProduct(otherSellerProduct, buyer);
+
+		mockMvc.perform(get("/api/v1/mypage/sales")
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].purchaseId").value(sellerPurchaseId))
+			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
 	private Member saveMember(String loginId, String email, String name, boolean verified) {
 		Member member = memberRepository.save(Member.create(loginId, "password", email, name, verified));
 		member.assignDefaultNickname();
