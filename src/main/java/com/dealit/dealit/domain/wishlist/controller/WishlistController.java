@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.wishlist.controller;
 
+import com.dealit.dealit.domain.wishlist.dto.MyAuctionWishlistListResponse;
 import com.dealit.dealit.domain.wishlist.dto.MyWishlistListResponse;
 import com.dealit.dealit.domain.wishlist.dto.WishlistToggleResponse;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
@@ -54,5 +55,16 @@ public class WishlistController {
 		@RequestParam(defaultValue = "20") int size
 	) {
 		return wishlistService.getMyWishlist(member.memberId(), page, size);
+	}
+
+	@Operation(summary = "내 경매 찜 목록 조회")
+	@ApiResponse(responseCode = "200", description = "내 경매 찜 목록 조회 성공")
+	@GetMapping("/mypage/wishlist/auctions")
+	public MyAuctionWishlistListResponse getMyAuctionWishlist(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@RequestParam(defaultValue = "0") int page,
+		@RequestParam(defaultValue = "20") int size
+	) {
+		return wishlistService.getMyAuctionWishlist(member.memberId(), page, size);
 	}
 }

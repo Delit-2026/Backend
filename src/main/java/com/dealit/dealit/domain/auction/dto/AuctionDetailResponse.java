@@ -24,7 +24,9 @@ public record AuctionDetailResponse(
 	OffsetDateTime startAt,
 	OffsetDateTime endsAt,
 	OffsetDateTime serverTime,
-	AuctionStatus status
+	AuctionStatus status,
+	boolean liked,
+	long favoriteCount
 ) {
 	public record ImageResponse(
 		Long imageId,
