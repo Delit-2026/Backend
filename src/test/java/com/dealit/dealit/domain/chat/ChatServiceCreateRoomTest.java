@@ -14,6 +14,7 @@ import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomRequest;
 import com.dealit.dealit.domain.chat.dto.CreateChatRoomResponse;
 import com.dealit.dealit.domain.chat.entity.ChatRoom;
@@ -54,6 +55,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(anyLong(), anyLong(), anyLong()))
                 .thenReturn(Optional.empty());
@@ -71,6 +73,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.systemUTC()
         );
 
@@ -95,6 +98,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         ChatRoom existingRoom = ChatRoom.create(10L, 20L, 100L, ChatType.GENERAL);
         when(productOwnershipPort.getOwnerIdByProductId(100L)).thenReturn(10L);
@@ -115,6 +119,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.systemUTC()
         );
 
@@ -141,6 +146,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         ChatRoom room = ChatRoom.create(10L, 20L, 100L, ChatType.AUCTION);
         ProductSummaryPort.ProductSummary product =
@@ -183,6 +189,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -208,6 +215,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         ChatRoom room = ChatRoom.create(10L, 20L, 100L, ChatType.AUCTION);
         ProductSummaryPort.ProductSummary product =
@@ -247,6 +255,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -272,6 +281,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         ChatRoom room = ChatRoom.create(10L, 20L, 100L, ChatType.GENERAL);
         ProductSummaryPort.ProductSummary product =
@@ -311,6 +321,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -335,6 +346,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         ChatRoom room = ChatRoom.create(10L, 20L, 100L, ChatType.AUCTION);
         ProductSummaryPort.ProductSummary product =
@@ -374,6 +386,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -400,6 +413,7 @@ class ChatServiceCreateRoomTest {
         PurchaseRepository purchaseRepository = mock(PurchaseRepository.class);
         EventStreamService eventStreamService = mock(EventStreamService.class);
         FcmNotificationService fcmNotificationService = mock(FcmNotificationService.class);
+        AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 
         when(productOwnershipPort.getOwnerIdByProductId(404L))
                 .thenThrow(new ProductNotFoundException("유효한 상품을 찾을 수 없습니다. productId=404"));
@@ -416,6 +430,7 @@ class ChatServiceCreateRoomTest {
                 purchaseRepository,
                 eventStreamService,
                 fcmNotificationService,
+                auctionNotificationService,
                 Clock.systemUTC()
         );
 
