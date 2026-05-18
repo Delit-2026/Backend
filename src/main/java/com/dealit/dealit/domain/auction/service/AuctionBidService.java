@@ -33,6 +33,8 @@ import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
+import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
@@ -211,6 +213,7 @@ public class AuctionBidService {
 						bidderCount,
 						serverTime
 					);
+					applicationEventPublisher.publishEvent(new AuctionSearchIndexRequestedEvent(auctionId));
 					return new BidResponse(auctionId, bidPrice, bidderId, serverTime, BidMessages.defaults());
 				} catch (RuntimeException exception) {
 					auctionRedisService.restoreBidState(auctionId, bidPrice, bidderId, result.previousPrice(), result.previousBidderId());
@@ -251,6 +254,7 @@ public class AuctionBidService {
 				AuctionStatus.NO_BID,
 				serverTime()
 			);
+			applicationEventPublisher.publishEvent(new AuctionSearchDeleteRequestedEvent(auctionId));
 			return;
 		}
 
@@ -300,6 +304,7 @@ public class AuctionBidService {
 				state.highestBidderId(),
 				state.currentPrice()
 			));
+		applicationEventPublisher.publishEvent(new AuctionSearchDeleteRequestedEvent(auctionId));
 	}
 
 	private Auction loadAuction(Long auctionId) {
