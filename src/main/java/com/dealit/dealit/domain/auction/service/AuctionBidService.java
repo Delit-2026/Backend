@@ -233,9 +233,9 @@ public class AuctionBidService {
 
 		AuctionState state = auctionRedisService.getState(auctionId);
 		if (state.highestBidderId() == null) {
-			auction.completeWithoutBid();
-			auction.getProduct().markEnded();
-			auction.softDelete();
+			OffsetDateTime noBidAt = serverTime();
+			auction.completeWithoutBid(noBidAt, noBidAt.plusDays(3));
+			auction.getProduct().markEndedWithoutDelete();
 			auctionRedisService.removeEnding(auctionId);
 			auctionRedisService.deleteState(auctionId);
 			auctionRedisService.removeClosingSoonNotified(auctionId);

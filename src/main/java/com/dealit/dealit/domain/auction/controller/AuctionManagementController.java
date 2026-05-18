@@ -6,8 +6,12 @@ import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.BidRequest;
 import com.dealit.dealit.domain.auction.dto.BidResponse;
 import com.dealit.dealit.domain.auction.dto.AuctionEditDetailResponse;
+import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
+import com.dealit.dealit.domain.auction.dto.DeclineReauctionResponse;
 import com.dealit.dealit.domain.auction.dto.MyBuyingAuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionListResponse;
+import com.dealit.dealit.domain.auction.dto.ReauctionPreviewResponse;
+import com.dealit.dealit.domain.auction.dto.ReauctionResponse;
 import com.dealit.dealit.domain.auction.dto.SearchCategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.UpdateAuctionRequest;
 import com.dealit.dealit.domain.auction.service.AuctionBidService;
@@ -153,6 +157,35 @@ public class AuctionManagementController {
 		@PathVariable Long auctionId
 	) {
 		return auctionService.getAuctionEditDetail(member.memberId(), auctionId);
+	}
+
+	@Operation(summary = "재경매 미리보기", description = "유찰된 본인 경매를 재등록하기 위한 기존 상품 정보를 조회한다.")
+	@GetMapping("/auctions/{auctionId:\\d+}/reauction-preview")
+	public ReauctionPreviewResponse getReauctionPreview(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId
+	) {
+		return auctionService.getReauctionPreview(member.memberId(), auctionId);
+	}
+
+	@Operation(summary = "재경매 등록", description = "유찰된 본인 경매를 바탕으로 새 경매를 등록한다.")
+	@PostMapping("/auctions/{auctionId:\\d+}/reauction")
+	@ResponseStatus(HttpStatus.CREATED)
+	public ReauctionResponse reauction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId,
+		@Valid @RequestBody CreateAuctionRequest request
+	) {
+		return auctionService.reauction(member.memberId(), auctionId, request);
+	}
+
+	@Operation(summary = "재경매 거절", description = "유찰된 경매의 재등록 대기를 종료한다.")
+	@PatchMapping("/auctions/{auctionId:\\d+}/reauction/decline")
+	public DeclineReauctionResponse declineReauction(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long auctionId
+	) {
+		return auctionService.declineReauction(member.memberId(), auctionId);
 	}
 
 	@Operation(summary = "경매 수정", description = "입찰이 없는 현재 사용자의 경매를 수정한다.")
