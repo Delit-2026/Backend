@@ -109,8 +109,10 @@ class AuctionBidServiceTest {
 
 		assertThat(auction.getStatus()).isEqualTo(AuctionStatus.NO_BID);
 		assertThat(auction.getProduct().getStatus()).isEqualTo(ProductStatus.ENDED);
-		assertThat(auction.getDeletedAt()).isNotNull();
-		assertThat(auction.getProduct().getDeletedAt()).isNotNull();
+		assertThat(auction.getDeletedAt()).isNull();
+		assertThat(auction.getProduct().getDeletedAt()).isNull();
+		assertThat(auction.getNoBidAt()).isEqualTo(OffsetDateTime.parse("2026-05-02T00:00:00Z"));
+		assertThat(auction.getReauctionExpiresAt()).isEqualTo(OffsetDateTime.parse("2026-05-05T00:00:00Z"));
 		assertThat(auction.getWinnerId()).isNull();
 		assertThat(auction.getFinalPrice()).isNull();
 		verify(auctionRedisService).removeEnding(auctionId);

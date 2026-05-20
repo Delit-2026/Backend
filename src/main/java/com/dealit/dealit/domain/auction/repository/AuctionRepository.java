@@ -26,6 +26,13 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 	);
 
 	@EntityGraph(attributePaths = {"product", "product.images"})
+	Page<Auction> findAllByProductMemberIdAndStatusInAndDeletedAtIsNullAndProductDeletedAtIsNull(
+		Long memberId,
+		Collection<AuctionStatus> statuses,
+		Pageable pageable
+	);
+
+	@EntityGraph(attributePaths = {"product", "product.images"})
 	Optional<Auction> findByAuctionIdAndProductMemberIdAndDeletedAtIsNullAndProductDeletedAtIsNull(
 		Long auctionId,
 		Long memberId
@@ -89,6 +96,12 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 		AuctionStatus status,
 		OffsetDateTime startsAt,
 		OffsetDateTime endsAt
+	);
+
+	@EntityGraph(attributePaths = {"product"})
+	List<Auction> findAllByStatusAndReauctionExpiresAtLessThanEqualAndDeletedAtIsNullAndProductDeletedAtIsNull(
+		AuctionStatus status,
+		OffsetDateTime now
 	);
 
 	@Query(value = """

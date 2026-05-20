@@ -9,6 +9,7 @@ import com.dealit.dealit.domain.auction.dto.AuctionListResponse;
 import com.dealit.dealit.domain.auction.dto.CategoryOptionResponse;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionRequest;
 import com.dealit.dealit.domain.auction.dto.CreateAuctionResponse;
+import com.dealit.dealit.domain.auction.dto.DeclineReauctionResponse;
 import com.dealit.dealit.domain.auction.dto.DeleteAuctionImageResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionItemResponse;
 import com.dealit.dealit.domain.auction.dto.MySellingAuctionListResponse;
@@ -17,6 +18,8 @@ import com.dealit.dealit.domain.auction.dto.RecommendCategoryRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendCategoryResponse;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceRequest;
 import com.dealit.dealit.domain.auction.dto.RecommendPriceResponse;
+import com.dealit.dealit.domain.auction.dto.ReauctionPreviewResponse;
+import com.dealit.dealit.domain.auction.dto.ReauctionResponse;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftRequest;
 import com.dealit.dealit.domain.auction.dto.SaveAuctionDraftResponse;
 import com.dealit.dealit.domain.auction.dto.SearchCategoryOptionResponse;
@@ -28,6 +31,7 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.auction.exception.AuctionAccessDeniedException;
 import com.dealit.dealit.domain.auction.exception.AuctionAlreadyBiddedException;
+import com.dealit.dealit.domain.auction.exception.AuctionConflictException;
 import com.dealit.dealit.domain.auction.exception.AuctionImageNotFoundException;
 import com.dealit.dealit.domain.auction.exception.AuctionProductNotFoundException;
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
@@ -176,9 +180,9 @@ public class AuctionService {
 		loadActiveMember(memberId);
 		int normalizedPage = Math.max(page, 0);
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
-		Page<Auction> auctionPage = auctionRepository.findAllByProductMemberIdAndStatusAndDeletedAtIsNullAndProductDeletedAtIsNull(
+		Page<Auction> auctionPage = auctionRepository.findAllByProductMemberIdAndStatusInAndDeletedAtIsNullAndProductDeletedAtIsNull(
 			memberId,
-			AuctionStatus.ONGOING,
+			List.of(AuctionStatus.ONGOING, AuctionStatus.NO_BID),
 			PageRequest.of(normalizedPage, normalizedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
 		);
 
@@ -256,16 +260,6 @@ public class AuctionService {
 		int bidCount = getBidCount(auction);
 		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
 
-		List<AuctionEditImageResponse> images = product.getImages().stream()
-			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
-			.sorted(this::compareImagesBySortOrder)
-			.map(image -> new AuctionEditImageResponse(
-				image.getImageId(),
-				imageUrlService.toPublicUrl(image.getImageUrl()),
-				image.getSortOrder()
-			))
-			.toList();
-
 		return new AuctionEditDetailResponse(
 			product.getProductId(),
 			auction.getAuctionId(),
@@ -274,7 +268,7 @@ public class AuctionService {
 			product.getCategoryId(),
 			category == null ? "" : category.getNameKo(),
 			product.getLocation(),
-			images,
+			toAuctionEditImageResponses(product),
 			auction.getStartPrice(),
 			auction.getMinimumBidAmount(),
 			resolveAuctionDurationDays(auction),
@@ -283,6 +277,92 @@ public class AuctionService {
 			getBidderCount(auction),
 			bidCount == 0
 		);
+	}
+
+	public ReauctionPreviewResponse getReauctionPreview(Long memberId, Long auctionId) {
+		loadActiveMember(memberId);
+		Auction auction = loadReauctionCandidate(memberId, auctionId);
+		Product product = auction.getProduct();
+		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
+		OffsetDateTime now = OffsetDateTime.now(clock);
+
+		return new ReauctionPreviewResponse(
+			product.getProductId(),
+			auction.getAuctionId(),
+			product.getName(),
+			product.getDescription(),
+			product.getCategoryId(),
+			category == null ? "" : category.getNameKo(),
+			product.getLocation(),
+			toAuctionEditImageResponses(product),
+			auction.getStartPrice(),
+			auction.getMinimumBidAmount(),
+			resolveAuctionDurationDays(auction),
+			auction.getStatus(),
+			toSeoulOffsetDateTime(auction.getNoBidAt()),
+			toSeoulOffsetDateTime(auction.getReauctionExpiresAt()),
+			Math.max(0L, Duration.between(now, auction.getReauctionExpiresAt()).getSeconds())
+		);
+	}
+
+	@Transactional
+	public ReauctionResponse reauction(Long memberId, Long auctionId, CreateAuctionRequest request) {
+		validateReauctionRequestBySaleType(request);
+		validateCategorySelection(request.categoryId());
+		Member member = loadActiveMember(memberId);
+		Auction sourceAuction = loadReauctionCandidate(memberId, auctionId);
+		Product sourceProduct = sourceAuction.getProduct();
+		OffsetDateTime now = OffsetDateTime.now(clock);
+		AuctionPeriod auctionPeriod = resolveReauctionPeriod(request, sourceAuction, now);
+		BigDecimal minimumBidAmount = resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
+
+		Product product = productRepository.save(
+			Product.create(
+				request.name().trim(),
+				request.description().trim(),
+				com.dealit.dealit.domain.product.ProductSaleType.AUCTION,
+				request.categoryId(),
+				member.getMemberId(),
+				request.startPrice(),
+				false,
+				request.location().trim(),
+				request.draftId(),
+				ProductStatus.ON_SALE
+			)
+		);
+
+		Auction auction = auctionRepository.save(
+			Auction.create(
+				product,
+				request.startPrice(),
+				minimumBidAmount,
+				auctionPeriod.startAt(),
+				auctionPeriod.endAt(),
+				determineStatus(auctionPeriod.endAt(), now)
+			)
+		);
+		auctionRedisService.initialize(auction);
+
+		List<ProductImage> nextImages = loadRequestedReauctionImages(member.getMemberId(), sourceProduct, request.images());
+		for (int index = 0; index < request.images().size(); index++) {
+			ProductImagePayload imagePayload = request.images().get(index);
+			ProductImage image = nextImages.get(index);
+			product.attachImage(image, imagePayload.sortOrder());
+		}
+		productImageRepository.saveAll(nextImages);
+
+		sourceAuction.markReauctioned(now);
+		applicationEventPublisher.publishEvent(new AuctionSearchIndexRequestedEvent(auction.getAuctionId()));
+
+		return new ReauctionResponse(sourceAuction.getAuctionId(), product.getProductId(), auction.getAuctionId());
+	}
+
+	@Transactional
+	public DeclineReauctionResponse declineReauction(Long memberId, Long auctionId) {
+		loadActiveMember(memberId);
+		Auction auction = loadReauctionCandidate(memberId, auctionId);
+		auction.declineReauction();
+		return new DeclineReauctionResponse(auction.getAuctionId(), auction.getStatus());
 	}
 
 	@Transactional
@@ -351,6 +431,18 @@ public class AuctionService {
 		productImageRepository.saveAll(removedImages);
 	}
 
+	private List<AuctionEditImageResponse> toAuctionEditImageResponses(Product product) {
+		return product.getImages().stream()
+			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
+			.sorted(this::compareImagesBySortOrder)
+			.map(image -> new AuctionEditImageResponse(
+				image.getImageId(),
+				imageUrlService.toPublicUrl(image.getImageUrl()),
+				image.getSortOrder()
+			))
+			.toList();
+	}
+
 	private List<ProductImage> toOrderedProductImages(
 		Product product,
 		List<ProductImagePayload> imagePayloads,
@@ -377,6 +469,21 @@ public class AuctionService {
 			.orElseThrow(() -> new AuctionProductNotFoundException("존재하지 않는 경매 상품입니다."));
 		if (!auction.getProduct().getMemberId().equals(memberId)) {
 			throw new AuctionAccessDeniedException("본인이 등록한 경매만 접근할 수 있습니다.");
+		}
+		return auction;
+	}
+
+	private Auction loadReauctionCandidate(Long memberId, Long auctionId) {
+		Auction auction = loadOwnedAuction(memberId, auctionId);
+		if (auction.getStatus() != AuctionStatus.NO_BID) {
+			throw new AuctionConflictException("재경매 대기 상태의 경매만 재등록할 수 있습니다.");
+		}
+		if (auction.getReauctionedAt() != null) {
+			throw new AuctionConflictException("이미 재경매 등록이 완료된 경매입니다.");
+		}
+		OffsetDateTime expiresAt = auction.getReauctionExpiresAt();
+		if (expiresAt == null || !expiresAt.isAfter(OffsetDateTime.now(clock))) {
+			throw new AuctionConflictException("재경매 가능 기간이 지났습니다.");
 		}
 		return auction;
 	}
@@ -779,6 +886,49 @@ public class AuctionService {
 		return imagesById;
 	}
 
+	private List<ProductImage> loadRequestedReauctionImages(
+		Long memberId,
+		Product sourceProduct,
+		List<ProductImagePayload> imagePayloads
+	) {
+		List<Long> imageIds = imagePayloads.stream()
+			.map(ProductImagePayload::imageId)
+			.toList();
+
+		List<ProductImage> images = productImageRepository.findAllByImageIdInAndDeletedAtIsNull(imageIds);
+		if (images.size() != imageIds.size()) {
+			throw new AuctionImageNotFoundException("존재하지 않는 이미지가 포함되어 있습니다.");
+		}
+
+		Map<Long, ProductImage> imagesById = new LinkedHashMap<>();
+		for (ProductImage image : images) {
+			if (!image.getMemberId().equals(memberId)) {
+				throw new AuctionAccessDeniedException("본인이 업로드한 이미지만 사용할 수 있습니다.");
+			}
+			imagesById.put(image.getImageId(), image);
+		}
+		validateDuplicateImageIds(imageIds, imagesById.keySet());
+
+		return imagePayloads.stream()
+			.map(imagePayload -> toReusableReauctionImage(imagesById.get(imagePayload.imageId()), sourceProduct))
+			.toList();
+	}
+
+	private ProductImage toReusableReauctionImage(ProductImage image, Product sourceProduct) {
+		if (image.getProduct() == null) {
+			return image;
+		}
+		if (!image.getProduct().getProductId().equals(sourceProduct.getProductId())) {
+			throw new InvalidAuctionRequestException("이미 다른 상품에 연결된 이미지가 포함되어 있습니다.");
+		}
+
+		return ProductImage.createTemporary(
+			image.getImageUrl(),
+			image.getOriginalFileName(),
+			image.getMemberId()
+		);
+	}
+
 	private Map<Long, ProductImage> loadRequestedProductImagesForUpdate(
 		Product product,
 		List<ProductImagePayload> imagePayloads
@@ -870,6 +1020,26 @@ public class AuctionService {
 		}
 	}
 
+	private void validateReauctionRequestBySaleType(CreateAuctionRequest request) {
+		if (request.saleType() != ProductSaleType.AUCTION) {
+			throw new InvalidAuctionRequestException("경매 등록에서는 AUCTION 판매 유형만 허용됩니다.");
+		}
+
+		if (request.startPrice() == null) {
+			throw new InvalidAuctionRequestException("경매 판매에서는 시작가가 필수입니다.");
+		}
+		if (request.startPrice().signum() <= 0) {
+			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
+		}
+		resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());
+		if (request.auctionDurationDays() != null && request.auctionDurationDays().signum() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간은 0보다 커야 합니다.");
+		}
+		if (request.auctionDurationSeconds() != null && request.auctionDurationSeconds() <= 0) {
+			throw new InvalidAuctionRequestException("경매 진행 기간(초)은 0보다 커야 합니다.");
+		}
+	}
+
 	private void validateUpdateAuctionRequest(UpdateAuctionRequest request) {
 		if (request.startPrice().signum() <= 0) {
 			throw new InvalidAuctionRequestException("시작가는 0보다 커야 합니다.");
@@ -901,6 +1071,18 @@ public class AuctionService {
 			endAt = startAt.plus(toDurationFromDays(request.auctionDurationDays()));
 		}
 		return new AuctionPeriod(startAt, endAt);
+	}
+
+	private AuctionPeriod resolveReauctionPeriod(CreateAuctionRequest request, Auction sourceAuction, OffsetDateTime now) {
+		if (request.endsAt() != null || request.auctionDurationSeconds() != null || request.auctionDurationDays() != null) {
+			return resolveAuctionPeriod(request, now);
+		}
+
+		Duration sourceDuration = Duration.between(sourceAuction.getAuctionStartAt(), sourceAuction.getAuctionEndAt());
+		if (!sourceDuration.isPositive()) {
+			throw new InvalidAuctionRequestException("원본 경매 기간이 올바르지 않습니다.");
+		}
+		return new AuctionPeriod(now, now.plus(sourceDuration));
 	}
 
 	private Duration toDurationFromDays(BigDecimal auctionDurationDays) {
