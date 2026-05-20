@@ -165,7 +165,15 @@ public class PurchaseService {
 			toWalletAmount(purchase.getPriceSnapshot()),
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
-			purchase.getChatRoomId()
+			purchase.getChatRoomId(),
+			product.getSaleType(),
+			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
+			toSeoulOffsetDateTime(purchase.getShippedAt()),
+			toSeoulOffsetDateTime(purchase.getCompletedAt()),
+			toSeoulOffsetDateTime(purchase.getCanceledAt()),
+			purchase.getShippedAt() != null,
+			purchase.getBuyerCompletedAt() != null,
+			resolveCounterpartNickname(purchase, memberId)
 		);
 	}
 
@@ -516,6 +524,16 @@ public class PurchaseService {
 		return productRepository.findByProductIdAndDeletedAtIsNull(purchase.getProductId())
 			.map(Product::getName)
 			.orElse("구매한");
+	}
+
+	private String resolveCounterpartNickname(Purchase purchase, Long memberId) {
+		Long counterpartId = purchase.getBuyerId().equals(memberId)
+			? purchase.getSellerId()
+			: purchase.getBuyerId();
+
+		return memberRepository.findByMemberIdAndDeletedAtIsNull(counterpartId)
+			.map(Member::getNickname)
+			.orElse(null);
 	}
 
 	private PurchaseCompletionResponse toCompletionResponse(Purchase purchase) {
