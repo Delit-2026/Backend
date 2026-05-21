@@ -33,6 +33,7 @@ import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
 import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
 import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
 import com.dealit.dealit.domain.wallet.service.WalletService;
@@ -72,6 +73,7 @@ public class AuctionBidService {
 	private final ChatRoomRepository chatRoomRepository;
 	private final WishlistService wishlistService;
 	private final ImageUrlService imageUrlService;
+	private final RecentProductService recentProductService;
 	private final Clock clock;
 
 	public AuctionDetailResponse getAuction(Long auctionId) {
@@ -80,6 +82,7 @@ public class AuctionBidService {
 
 	public AuctionDetailResponse getAuction(Long auctionId, Long memberId) {
 		Auction auction = loadAuctionDetail(auctionId);
+		recentProductService.recordAuction(memberId, auction.getAuctionId());
 		Product product = auction.getProduct();
 		BigDecimal currentPrice = auction.getCurrentPrice();
 		if (auction.isOngoing()) {

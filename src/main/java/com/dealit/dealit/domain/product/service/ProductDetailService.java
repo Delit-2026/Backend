@@ -12,6 +12,7 @@ import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
 import com.dealit.dealit.global.service.ImageUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ProductDetailService {
 	private final CategoryRepository categoryRepository;
 	private final MemberRepository memberRepository;
 	private final ImageUrlService imageUrlService;
+	private final RecentProductService recentProductService;
 
 	@Transactional
 	public ProductDetailResponse getProductDetail(Long memberId, Long productId) {
@@ -46,6 +48,7 @@ public class ProductDetailService {
 		}
 
 		product.increaseViewCount();
+		recentProductService.recordRegularProduct(viewer.getMemberId(), product.getProductId());
 
 		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
 		Member seller = memberRepository.findByMemberIdAndDeletedAtIsNull(product.getMemberId())
