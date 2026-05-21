@@ -124,6 +124,13 @@ public class Auction extends BaseEntity {
 		return startPrice.multiply(BigDecimal.valueOf(0.01)).setScale(0, RoundingMode.CEILING);
 	}
 
+	public BigDecimal resolveDisplayCurrentPrice(BigDecimal currentPrice) {
+		if (currentPrice == null || currentPrice.signum() <= 0) {
+			return startPrice;
+		}
+		return currentPrice;
+	}
+
 	public void completeWithWinner(Long winnerId, BigDecimal finalPrice) {
 		this.winnerId = winnerId;
 		this.finalPrice = finalPrice;

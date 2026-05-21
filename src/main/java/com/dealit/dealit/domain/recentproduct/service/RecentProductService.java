@@ -5,20 +5,17 @@ import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.AuctionRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.product.entity.Product;
-import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.product.service.ProductThumbnailResolver;
 import com.dealit.dealit.domain.recentproduct.RecentProductType;
 import com.dealit.dealit.domain.recentproduct.dto.RecentProductItemResponse;
 import com.dealit.dealit.domain.recentproduct.dto.RecentProductListResponse;
-import com.dealit.dealit.global.service.ImageUrlService;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +44,7 @@ public class RecentProductService {
 	private final ProductRepository productRepository;
 	private final AuctionRepository auctionRepository;
 	private final CategoryRepository categoryRepository;
-	private final ImageUrlService imageUrlService;
+	private final ProductThumbnailResolver productThumbnailResolver;
 	private final Clock clock;
 
 	public void recordRegularProduct(Long memberId, Long productId) {
@@ -99,23 +96,17 @@ public class RecentProductService {
 			return List.of();
 		}
 
-		Map<Long, Product> productsById = productRepository.findAllByProductIdInAndDeletedAtIsNull(
-				refs.stream()
-					.filter(ref -> ref.type() == RecentProductType.REGULAR)
-					.map(RecentProductRef::id)
-					.collect(Collectors.toSet())
-			)
-			.stream()
-			.collect(Collectors.toMap(Product::getProductId, Function.identity()));
+		Set<Long> productIds = refs.stream()
+			.filter(ref -> ref.type() == RecentProductType.REGULAR)
+			.map(RecentProductRef::id)
+			.collect(Collectors.toSet());
+		Set<Long> auctionIds = refs.stream()
+			.filter(ref -> ref.type() == RecentProductType.AUCTION)
+			.map(RecentProductRef::id)
+			.collect(Collectors.toSet());
 
-		Map<Long, Auction> auctionsById = auctionRepository.findAllByAuctionIdInAndDeletedAtIsNullAndProductDeletedAtIsNull(
-				refs.stream()
-					.filter(ref -> ref.type() == RecentProductType.AUCTION)
-					.map(RecentProductRef::id)
-					.collect(Collectors.toSet())
-			)
-			.stream()
-			.collect(Collectors.toMap(Auction::getAuctionId, Function.identity()));
+		Map<Long, Product> productsById = loadProductsById(productIds);
+		Map<Long, Auction> auctionsById = loadAuctionsById(auctionIds);
 
 		Map<Long, String> categoryNamesById = loadCategoryNames(productsById.values(), auctionsById.values());
 		List<RecentProductItemResponse> responses = new ArrayList<>();
@@ -129,6 +120,24 @@ public class RecentProductService {
 			}
 		}
 		return responses;
+	}
+
+	private Map<Long, Product> loadProductsById(Set<Long> productIds) {
+		if (productIds.isEmpty()) {
+			return Map.of();
+		}
+		return productRepository.findAllByProductIdInAndDeletedAtIsNull(productIds)
+			.stream()
+			.collect(Collectors.toMap(Product::getProductId, Function.identity()));
+	}
+
+	private Map<Long, Auction> loadAuctionsById(Set<Long> auctionIds) {
+		if (auctionIds.isEmpty()) {
+			return Map.of();
+		}
+		return auctionRepository.findAllByAuctionIdInAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionIds)
+			.stream()
+			.collect(Collectors.toMap(Auction::getAuctionId, Function.identity()));
 	}
 
 	private Map<Long, String> loadCategoryNames(Collection<Product> products, Collection<Auction> auctions) {
@@ -160,7 +169,7 @@ public class RecentProductService {
 			product.getProductId(),
 			null,
 			product.getName(),
-			thumbnailUrl(product),
+			productThumbnailResolver.resolve(product),
 			product.getPrice(),
 			null,
 			product.getLocation(),
@@ -179,31 +188,13 @@ public class RecentProductService {
 			product.getProductId(),
 			auction.getAuctionId(),
 			product.getName(),
-			thumbnailUrl(product),
+			productThumbnailResolver.resolve(product),
 			null,
-			resolveAuctionCurrentPrice(auction),
+			auction.resolveDisplayCurrentPrice(auction.getCurrentPrice()),
 			product.getLocation(),
 			categoryNamesById.getOrDefault(product.getCategoryId(), ""),
 			viewedAt
 		);
-	}
-
-	private String thumbnailUrl(Product product) {
-		return product.getImages().stream()
-			.filter(image -> image.getDeletedAt() == null)
-			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
-			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-				.thenComparing(ProductImage::getCreatedAt))
-			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
-			.findFirst()
-			.orElse(null);
-	}
-
-	private BigDecimal resolveAuctionCurrentPrice(Auction auction) {
-		if (auction.getCurrentPrice() == null || auction.getCurrentPrice().signum() <= 0) {
-			return auction.getStartPrice();
-		}
-		return auction.getCurrentPrice();
 	}
 
 	private String categoryName(Category category) {

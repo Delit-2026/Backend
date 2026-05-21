@@ -4,15 +4,13 @@ import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.product.entity.Product;
-import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.product.service.ProductThumbnailResolver;
 import com.dealit.dealit.domain.search.document.SearchDocument;
 import com.dealit.dealit.domain.search.dto.SearchResultType;
-import com.dealit.dealit.global.service.ImageUrlService;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +24,7 @@ public class SearchDocumentFactory {
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
 	private final CategoryRepository categoryRepository;
-	private final ImageUrlService imageUrlService;
+	private final ProductThumbnailResolver productThumbnailResolver;
 
 	public SearchDocument regularProduct(Product product) {
 		return regularProduct(product, loadCategoryNodes());
@@ -40,7 +38,7 @@ public class SearchDocumentFactory {
 			null,
 			product.getName(),
 			product.getDescription(),
-			resolveThumbnailUrl(product),
+			productThumbnailResolver.resolve(product),
 			product.getCategoryId(),
 			resolveCategoryPathIds(product.getCategoryId(), nodesById),
 			resolveCategoryNames(product.getCategoryId(), nodesById),
@@ -69,7 +67,7 @@ public class SearchDocumentFactory {
 			auction.getAuctionId(),
 			product.getName(),
 			product.getDescription(),
-			resolveThumbnailUrl(product),
+			productThumbnailResolver.resolve(product),
 			product.getCategoryId(),
 			resolveCategoryPathIds(product.getCategoryId(), nodesById),
 			resolveCategoryNames(product.getCategoryId(), nodesById),
@@ -102,17 +100,6 @@ public class SearchDocumentFactory {
 			}
 		}
 		return nodesById;
-	}
-
-	private String resolveThumbnailUrl(Product product) {
-		return product.getImages().stream()
-			.filter(image -> image.getDeletedAt() == null)
-			.filter(image -> image.getImageUrl() != null && !image.getImageUrl().isBlank())
-			.sorted(Comparator.comparing(ProductImage::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-				.thenComparing(ProductImage::getCreatedAt))
-			.map(image -> imageUrlService.toPublicUrl(image.getImageUrl()))
-			.findFirst()
-			.orElse(null);
 	}
 
 	private List<Long> resolveCategoryPathIds(Long categoryId, Map<Long, CategoryNode> nodesById) {
