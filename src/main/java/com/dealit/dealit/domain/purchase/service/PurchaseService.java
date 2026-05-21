@@ -1,6 +1,10 @@
 package com.dealit.dealit.domain.purchase.service;
 
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
+import com.dealit.dealit.domain.auction.entity.Auction;
+import com.dealit.dealit.domain.auction.entity.AuctionPayment;
+import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.chat.entity.ChatRoom;
 import com.dealit.dealit.domain.chat.entity.ChatType;
 import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
@@ -43,6 +47,7 @@ import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -62,6 +67,7 @@ public class PurchaseService {
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
 	private final PurchaseRepository purchaseRepository;
+	private final AuctionPaymentRepository auctionPaymentRepository;
 	private final ProductRepository productRepository;
 	private final MemberRepository memberRepository;
 	private final WalletService walletService;
@@ -122,6 +128,35 @@ public class PurchaseService {
 			notifyPurchasePaid(purchase, product);
 			return toPurchaseResponse(purchase);
 		}
+
+	@Transactional
+	public Purchase createAuctionPurchase(Auction auction, AuctionPayment winningPayment, Long chatRoomId) {
+		if (auction == null || winningPayment == null) {
+			throw new IllegalArgumentException("낙찰 경매와 결제 정보는 필수입니다.");
+		}
+
+		Product product = auction.getProduct();
+		String idempotencyKey = "auction-" + auction.getAuctionId();
+		Purchase purchase = purchaseRepository.findByBuyerIdAndIdempotencyKey(
+				winningPayment.getBidderId(),
+				idempotencyKey
+			)
+			.orElseGet(() -> purchaseRepository.save(Purchase.paid(
+				product.getProductId(),
+				winningPayment.getBidderId(),
+				winningPayment.getSellerId(),
+				BigDecimal.valueOf(winningPayment.getAmount()),
+				idempotencyKey
+			)));
+
+		if (chatRoomId != null) {
+			purchase.linkChatRoom(chatRoomId);
+		} else {
+			linkPurchaseChatRoomIfNeeded(purchase);
+		}
+		winningPayment.linkPurchase(purchase.getPurchaseId());
+		return purchase;
+	}
 
 	private void linkPurchaseChatRoomIfNeeded(Purchase purchase) {
 		if (purchase.getChatRoomId() != null) {
@@ -261,6 +296,7 @@ public class PurchaseService {
 		} catch (IllegalStateException exception) {
 			throw new PurchaseNotCompletableException(exception.getMessage());
 		}
+		markLinkedAuctionPaymentShipped(purchase);
 		notifyPurchaseShipped(purchase);
 		return toCompletionResponse(purchase);
 	}
@@ -401,6 +437,14 @@ public class PurchaseService {
 		} catch (IllegalStateException exception) {
 			return 0;
 		}
+		Optional<AuctionPayment> linkedAuctionPayment = findLinkedAuctionPayment(purchase);
+		if (linkedAuctionPayment.isPresent()) {
+			AuctionPayment payment = linkedAuctionPayment.get();
+			if (payment.getStatus() == AuctionPaymentStatus.RESERVED) {
+				payment.requestRefund(toSeoulOffsetDateTime(LocalDateTime.now()));
+			}
+			return 1;
+		}
 		productPaymentService.findByPurchaseId(purchase.getPurchaseId())
 			.ifPresentOrElse(
 				payment -> productPaymentService.refund(payment, "판매자 3일 내 미발송 자동 취소"),
@@ -413,6 +457,23 @@ public class PurchaseService {
 		if (purchase.isSettled()) {
 			return;
 		}
+		Optional<AuctionPayment> linkedAuctionPayment = findLinkedAuctionPayment(purchase);
+		if (linkedAuctionPayment.isPresent()) {
+			AuctionPayment payment = linkedAuctionPayment.get();
+			if (payment.getStatus() == AuctionPaymentStatus.SETTLED) {
+				purchase.settle();
+				return;
+			}
+			if (payment.confirmReceived(toSeoulOffsetDateTime(LocalDateTime.now()))) {
+				walletService.settleAuctionPayment(
+					payment.getSellerId(),
+					payment.getAmount(),
+					payment.getAuction().getAuctionId()
+				);
+				purchase.settle();
+			}
+			return;
+		}
 		productPaymentService.findByPurchaseId(purchase.getPurchaseId())
 			.ifPresentOrElse(
 				payment -> productPaymentService.settle(payment, settlementReason),
@@ -423,6 +484,66 @@ public class PurchaseService {
 				)
 			);
 		purchase.settle();
+	}
+
+	@Transactional
+	public void syncAuctionPurchaseShipped(Long purchaseId) {
+		if (purchaseId == null) {
+			return;
+		}
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElse(null);
+		if (purchase == null || purchase.getStatus() != PurchaseStatus.PAID) {
+			return;
+		}
+		try {
+			purchase.markShipped();
+		} catch (IllegalStateException ignored) {
+		}
+	}
+
+	@Transactional
+	public void syncAuctionPurchaseCompleted(Long purchaseId) {
+		if (purchaseId == null) {
+			return;
+		}
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElse(null);
+		if (purchase == null || purchase.getStatus() == PurchaseStatus.CANCELED) {
+			return;
+		}
+		try {
+			if (purchase.getStatus() == PurchaseStatus.PAID) {
+				purchase.markShipped();
+			}
+			purchase.markBuyerCompleted();
+			purchase.complete();
+			purchase.settle();
+		} catch (IllegalStateException ignored) {
+		}
+	}
+
+	@Transactional
+	public void syncAuctionPurchaseCanceled(Long purchaseId) {
+		if (purchaseId == null) {
+			return;
+		}
+		Purchase purchase = purchaseRepository.findById(purchaseId).orElse(null);
+		if (purchase == null || purchase.getStatus() != PurchaseStatus.PAID) {
+			return;
+		}
+		try {
+			purchase.cancel();
+		} catch (IllegalStateException ignored) {
+		}
+	}
+
+	private void markLinkedAuctionPaymentShipped(Purchase purchase) {
+		findLinkedAuctionPayment(purchase)
+			.filter(payment -> payment.getStatus() == AuctionPaymentStatus.RESERVED)
+			.ifPresent(payment -> payment.markShipped(toSeoulOffsetDateTime(LocalDateTime.now())));
+	}
+
+	private Optional<AuctionPayment> findLinkedAuctionPayment(Purchase purchase) {
+		return auctionPaymentRepository.findByPurchaseIdAndDeletedAtIsNull(purchase.getPurchaseId());
 	}
 
 	private void markProductEnded(Purchase purchase) {

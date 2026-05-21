@@ -14,6 +14,7 @@ import com.dealit.dealit.domain.auction.service.AuctionRefundService;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -30,9 +31,11 @@ class AuctionRefundServiceTest {
 
 	private final AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
 	private final WalletService walletService = mock(WalletService.class);
+	private final PurchaseService purchaseService = mock(PurchaseService.class);
 	private final AuctionRefundService auctionRefundService = new AuctionRefundService(
 		auctionPaymentRepository,
 		walletService,
+		purchaseService,
 		FIXED_CLOCK
 	);
 

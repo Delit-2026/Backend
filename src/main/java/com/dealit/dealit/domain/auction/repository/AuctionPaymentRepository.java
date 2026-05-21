@@ -26,6 +26,9 @@ public interface AuctionPaymentRepository extends JpaRepository<AuctionPayment, 
 	Optional<AuctionPayment> findByAuctionPaymentIdAndDeletedAtIsNull(Long auctionPaymentId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	Optional<AuctionPayment> findByPurchaseIdAndDeletedAtIsNull(Long purchaseId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	Optional<AuctionPayment> findFirstByAuctionAuctionIdAndBidderIdAndSellerIdAndStatusInAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
 		Long auctionId,
 		Long bidderId,

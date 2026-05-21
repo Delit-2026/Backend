@@ -176,6 +176,7 @@ public class ChatService {
         if (!payment.markShipped(now)) {
             throw new IllegalArgumentException("현재 상태에서는 발송 처리를 할 수 없습니다.");
         }
+        syncAuctionPurchaseShipped(payment.getPurchaseId());
 
         publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
         return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
@@ -209,6 +210,7 @@ public class ChatService {
                 payment.getAmount(),
                 payment.getAuction().getAuctionId()
         );
+        syncAuctionPurchaseCompleted(payment.getPurchaseId());
 
         publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
         return buildCreateRoomResponse(room, currentUserId, room.getSellerId(), room.getBuyerId(), room.getCreatedAt());
@@ -724,6 +726,39 @@ public class ChatService {
     private boolean isAuctionTradeReady(AuctionPayment payment) {
         return payment.getAuction().getStatus() == AuctionStatus.SUCCESSFUL_BID
                 && payment.getBidderId().equals(payment.getAuction().getWinnerId());
+    }
+
+    private void syncAuctionPurchaseShipped(Long purchaseId) {
+        if (purchaseId == null) {
+            return;
+        }
+        Purchase purchase = purchaseRepository.findById(purchaseId).orElse(null);
+        if (purchase == null || purchase.getStatus() != PurchaseStatus.PAID) {
+            return;
+        }
+        try {
+            purchase.markShipped();
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    private void syncAuctionPurchaseCompleted(Long purchaseId) {
+        if (purchaseId == null) {
+            return;
+        }
+        Purchase purchase = purchaseRepository.findById(purchaseId).orElse(null);
+        if (purchase == null || purchase.getStatus() == PurchaseStatus.CANCELED) {
+            return;
+        }
+        try {
+            if (purchase.getStatus() == PurchaseStatus.PAID) {
+                purchase.markShipped();
+            }
+            purchase.markBuyerCompleted();
+            purchase.complete();
+            purchase.settle();
+        } catch (IllegalStateException ignored) {
+        }
     }
 
     private CreateChatRoomResponse.ActionButtons inactiveActionButtons(
