@@ -37,6 +37,7 @@ public class RecentProductService {
 	private static final String KEY_PREFIX = "recent-products:";
 	private static final String ALL = "ALL";
 	private static final int MAX_RECENT_PRODUCTS = 100;
+	private static final long RECENT_PRODUCT_TTL_MILLIS = 24 * 60 * 60 * 1000L;
 
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -58,8 +59,10 @@ public class RecentProductService {
 	public RecentProductListResponse findRecentProducts(Long memberId, int size) {
 		int normalizedSize = Math.min(Math.max(size, 1), 50);
 		try {
+			String key = key(memberId);
+			removeExpiredItems(key);
 			Set<TypedTuple<String>> tuples = stringRedisTemplate.opsForZSet()
-				.reverseRangeWithScores(key(memberId), 0, normalizedSize - 1);
+				.reverseRangeWithScores(key, 0, normalizedSize - 1);
 			if (tuples == null || tuples.isEmpty()) {
 				return new RecentProductListResponse(List.of(), normalizedSize);
 			}
@@ -83,8 +86,14 @@ public class RecentProductService {
 	}
 
 	private void recordToKey(String key, String value, double score) {
+		removeExpiredItems(key);
 		stringRedisTemplate.opsForZSet().add(key, value, score);
 		stringRedisTemplate.opsForZSet().removeRange(key, 0, -(MAX_RECENT_PRODUCTS + 1L));
+	}
+
+	private void removeExpiredItems(String key) {
+		long cutoffMillis = clock.millis() - RECENT_PRODUCT_TTL_MILLIS;
+		stringRedisTemplate.opsForZSet().removeRangeByScore(key, 0, cutoffMillis);
 	}
 
 	private List<RecentProductItemResponse> resolveItems(Collection<TypedTuple<String>> tuples) {
