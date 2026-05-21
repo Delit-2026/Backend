@@ -35,6 +35,9 @@ public class AuctionPayment extends BaseEntity {
 	@Column(name = "auction_payment_id")
 	private Long auctionPaymentId;
 
+	@Column(name = "purchase_id")
+	private Long purchaseId;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "auction_id", nullable = false)
 	private Auction auction;
@@ -84,6 +87,12 @@ public class AuctionPayment extends BaseEntity {
 
 	public static AuctionPayment reserve(Auction auction, Long bidderId, Long sellerId, Long amount, OffsetDateTime reservedAt) {
 		return new AuctionPayment(auction, bidderId, sellerId, amount, reservedAt);
+	}
+
+	public void linkPurchase(Long purchaseId) {
+		if (this.purchaseId == null) {
+			this.purchaseId = purchaseId;
+		}
 	}
 
 	public boolean requestRefund(OffsetDateTime refundRequestedAt) {

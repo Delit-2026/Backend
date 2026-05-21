@@ -3,6 +3,7 @@ package com.dealit.dealit.domain.auction.service;
 import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -22,6 +23,7 @@ public class AuctionRefundService {
 
 	private final AuctionPaymentRepository auctionPaymentRepository;
 	private final WalletService walletService;
+	private final PurchaseService purchaseService;
 	private final Clock clock;
 
 	@Transactional
@@ -82,7 +84,9 @@ public class AuctionRefundService {
 		if (payment == null || payment.getStatus() != AuctionPaymentStatus.RESERVED) {
 			return;
 		}
-		payment.requestRefund(OffsetDateTime.now(clock));
+		if (payment.requestRefund(OffsetDateTime.now(clock))) {
+			purchaseService.syncAuctionPurchaseCanceled(payment.getPurchaseId());
+		}
 	}
 
 	@Transactional
@@ -98,6 +102,7 @@ public class AuctionRefundService {
 				payment.getAmount(),
 				payment.getAuction().getAuctionId()
 			);
+			purchaseService.syncAuctionPurchaseCompleted(payment.getPurchaseId());
 		}
 	}
 }
