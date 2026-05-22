@@ -4,6 +4,7 @@ import com.dealit.dealit.domain.auction.AuctionPaymentStatus;
 import com.dealit.dealit.domain.auction.AuctionStatus;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
 import com.dealit.dealit.domain.chat.dto.ChatMessageListResponse;
 import com.dealit.dealit.domain.chat.dto.ChatMessageResponse;
 import com.dealit.dealit.domain.chat.dto.ChatRoomDetailResponse;
@@ -71,6 +72,7 @@ public class ChatService {
     private final PurchaseRepository purchaseRepository;
     private final EventStreamService eventStreamService;
     private final FcmNotificationService fcmNotificationService;
+    private final AuctionNotificationService auctionNotificationService;
     private final Clock clock;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
@@ -176,6 +178,7 @@ public class ChatService {
         if (!payment.markShipped(now)) {
             throw new IllegalArgumentException("현재 상태에서는 발송 처리를 할 수 없습니다.");
         }
+        auctionNotificationService.notifyAuctionShipped(payment.getAuction(), payment.getBidderId(), room.getRoomId());
         syncAuctionPurchaseShipped(payment.getPurchaseId());
 
         publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));
@@ -210,6 +213,8 @@ public class ChatService {
                 payment.getAmount(),
                 payment.getAuction().getAuctionId()
         );
+        auctionNotificationService.notifyAuctionReceived(payment.getAuction(), payment.getSellerId(), room.getRoomId());
+        auctionNotificationService.notifyReviewRequest(payment.getAuction(), currentUserId);
         syncAuctionPurchaseCompleted(payment.getPurchaseId());
 
         publishRoomAndUnreadUpdates(room, room.getSellerId(), room.getBuyerId(), LocalDateTime.now(clock));

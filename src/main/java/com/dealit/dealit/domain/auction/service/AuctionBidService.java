@@ -295,7 +295,6 @@ public class AuctionBidService {
 				state.currentPrice(),
 				AuctionStatus.SUCCESSFUL_BID
 			);
-			auctionNotificationService.notifyReviewRequest(auction, state.highestBidderId());
 			auctionEventPublisher.publishAuctionEnded(
 				state.highestBidderId(),
 				auctionId,
