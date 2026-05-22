@@ -70,4 +70,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 		Pageable pageable
 	);
 
+	@EntityGraph(attributePaths = {"images"})
+	List<Product> findAllBySaleTypeAndStatusAndDeletedAtIsNullAndCategoryIdIn(
+		ProductSaleType saleType,
+		ProductStatus status,
+		Collection<Long> categoryIds
+	);
+
 }

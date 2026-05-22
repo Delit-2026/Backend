@@ -336,7 +336,15 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.amount").value(30000))
 			.andExpect(jsonPath("$.status").value("PAID"))
 			.andExpect(jsonPath("$.purchasedAt").exists())
-			.andExpect(jsonPath("$.chatRoomId").isNumber());
+			.andExpect(jsonPath("$.chatRoomId").isNumber())
+			.andExpect(jsonPath("$.productType").value("REGULAR"))
+			.andExpect(jsonPath("$.paidAt").exists())
+			.andExpect(jsonPath("$.shippedAt").doesNotExist())
+			.andExpect(jsonPath("$.completedAt").doesNotExist())
+			.andExpect(jsonPath("$.canceledAt").doesNotExist())
+			.andExpect(jsonPath("$.sellerShipped").value(false))
+			.andExpect(jsonPath("$.buyerConfirmed").value(false))
+			.andExpect(jsonPath("$.counterpartNickname").value(seller.getNickname()));
 	}
 
 	@Test
@@ -349,7 +357,23 @@ class PurchaseIntegrationTest {
 		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
 				.with(authentication(authenticatedMember(seller))))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.purchaseId").value(purchaseId));
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.counterpartNickname").value(buyer.getNickname()));
+	}
+
+	@Test
+	@DisplayName("留덉씠?섏씠吏 alias濡??곸닔利앹쓣 議고쉶?????덈떎")
+	void buyerCanGetReceiptThroughMyPageAlias() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+
+		mockMvc.perform(get("/api/v1/mypage/purchases/{purchaseId}/receipt", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.productType").value("REGULAR"))
+			.andExpect(jsonPath("$.counterpartNickname").value(seller.getNickname()));
 	}
 
 	@Test
@@ -415,6 +439,15 @@ class PurchaseIntegrationTest {
 
 		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(buyer.getMemberId()))
 			.isEqualTo(4);
+
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("SHIPPED"))
+			.andExpect(jsonPath("$.shippedAt").exists())
+			.andExpect(jsonPath("$.completedAt").doesNotExist())
+			.andExpect(jsonPath("$.sellerShipped").value(true))
+			.andExpect(jsonPath("$.buyerConfirmed").value(false));
 	}
 
 	@Test
@@ -451,6 +484,15 @@ class PurchaseIntegrationTest {
 			.isEqualTo(3);
 		assertThat(notificationRepository.countByMemberMemberIdAndReadAtIsNullAndDeletedAtIsNull(buyer.getMemberId()))
 			.isEqualTo(4);
+
+		mockMvc.perform(get("/api/v1/purchases/{purchaseId}", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("COMPLETED"))
+			.andExpect(jsonPath("$.shippedAt").exists())
+			.andExpect(jsonPath("$.completedAt").exists())
+			.andExpect(jsonPath("$.sellerShipped").value(true))
+			.andExpect(jsonPath("$.buyerConfirmed").value(true));
 	}
 
 	@Test

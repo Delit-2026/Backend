@@ -18,6 +18,7 @@ import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -37,11 +38,13 @@ class AuctionRefundServiceTest {
 	private final WalletService walletService = mock(WalletService.class);
 	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+	private final PurchaseService purchaseService = mock(PurchaseService.class);
 	private final AuctionRefundService auctionRefundService = new AuctionRefundService(
 		auctionPaymentRepository,
 		walletService,
 		auctionNotificationService,
 		chatRoomRepository,
+		purchaseService,
 		FIXED_CLOCK
 	);
 
@@ -141,6 +144,7 @@ class AuctionRefundServiceTest {
 		verify(walletService).settleAuctionPayment(sellerId, 101000L, payment.getAuction().getAuctionId());
 		verify(auctionNotificationService).notifyAuctionReceived(payment.getAuction(), payment.getSellerId(), 30L);
 		verify(auctionNotificationService).notifyReviewRequest(payment.getAuction(), payment.getBidderId());
+		verify(purchaseService).syncAuctionPurchaseCompleted(payment.getPurchaseId());
 	}
 
 	private Auction auction(Long sellerId) {

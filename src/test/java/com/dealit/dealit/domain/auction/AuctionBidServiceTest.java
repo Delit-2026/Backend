@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,7 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
@@ -74,6 +76,7 @@ class AuctionBidServiceTest {
 	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
 	private final ApplicationEventPublisher applicationEventPublisher = mock(ApplicationEventPublisher.class);
 	private final ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+	private final PurchaseService purchaseService = mock(PurchaseService.class);
 	private final WishlistService wishlistService = mock(WishlistService.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
 
@@ -89,6 +92,7 @@ class AuctionBidServiceTest {
 		auctionNotificationService,
 		applicationEventPublisher,
 		chatRoomRepository,
+		purchaseService,
 		wishlistService,
 		imageUrlService,
 		FIXED_CLOCK
@@ -109,8 +113,10 @@ class AuctionBidServiceTest {
 
 		assertThat(auction.getStatus()).isEqualTo(AuctionStatus.NO_BID);
 		assertThat(auction.getProduct().getStatus()).isEqualTo(ProductStatus.ENDED);
-		assertThat(auction.getDeletedAt()).isNotNull();
-		assertThat(auction.getProduct().getDeletedAt()).isNotNull();
+		assertThat(auction.getDeletedAt()).isNull();
+		assertThat(auction.getProduct().getDeletedAt()).isNull();
+		assertThat(auction.getNoBidAt()).isEqualTo(OffsetDateTime.parse("2026-05-02T00:00:00Z"));
+		assertThat(auction.getReauctionExpiresAt()).isEqualTo(OffsetDateTime.parse("2026-05-05T00:00:00Z"));
 		assertThat(auction.getWinnerId()).isNull();
 		assertThat(auction.getFinalPrice()).isNull();
 		verify(auctionRedisService).removeEnding(auctionId);
@@ -140,10 +146,30 @@ class AuctionBidServiceTest {
 		Long winnerId = 20L;
 		BigDecimal finalPrice = new BigDecimal("150000");
 		Auction auction = auction(sellerId);
+		AuctionPayment winningPayment = AuctionPayment.reserve(
+			auction,
+			winnerId,
+			sellerId,
+			150000L,
+			OffsetDateTime.now(FIXED_CLOCK)
+		);
 		when(auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(auctionId))
 			.thenReturn(Optional.of(auction));
 		when(auctionRedisService.getState(auctionId))
 			.thenReturn(new AuctionState(finalPrice, new BigDecimal("1000"), winnerId));
+		when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
+			eq(sellerId),
+			eq(winnerId),
+			any()
+		)).thenReturn(Optional.empty());
+		when(chatRoomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		when(auctionPaymentRepository
+			.findFirstByAuctionAuctionIdAndBidderIdAndSellerIdAndStatusInAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
+				auctionId,
+				winnerId,
+				sellerId,
+				List.of(AuctionPaymentStatus.RESERVED)
+			)).thenReturn(Optional.of(winningPayment));
 		when(bidRepository.findDistinctBidderIdsByAuctionIdAndBidderIdNot(auctionId, winnerId))
 			.thenReturn(Collections.emptyList());
 
@@ -154,6 +180,7 @@ class AuctionBidServiceTest {
 		assertThat(auction.getWinnerId()).isEqualTo(winnerId);
 		assertThat(auction.getFinalPrice()).isEqualByComparingTo(finalPrice);
 		assertThat(auction.getCurrentPrice()).isEqualByComparingTo(finalPrice);
+		verify(purchaseService).createAuctionPurchase(auction, winningPayment, null);
 		verify(auctionRedisService).removeEnding(auctionId);
 		verify(auctionRedisService).deleteState(auctionId);
 		verify(auctionNotificationService).notifyAuctionEnded(
@@ -334,9 +361,9 @@ class AuctionBidServiceTest {
 		assertThat(previousPayment.getRefundRequestedAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
 		verify(walletService, never()).refundAuctionPayment(anyLong(), anyLong(), anyLong());
 		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-		verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
-		assertThat(eventCaptor.getValue())
-			.isInstanceOf(com.dealit.dealit.domain.auction.event.AuctionRefundRequestedEvent.class);
+		verify(applicationEventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getAllValues())
+			.anyMatch(com.dealit.dealit.domain.auction.event.AuctionRefundRequestedEvent.class::isInstance);
 	}
 
 	@Test

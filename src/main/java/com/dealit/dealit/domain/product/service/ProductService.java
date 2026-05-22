@@ -5,6 +5,7 @@ import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
+import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -84,6 +85,7 @@ public class ProductService {
 	private final ProductDraftRepository productDraftRepository;
 	private final CategoryRepository categoryRepository;
 	private final MemberRepository memberRepository;
+	private final MemberInterestCategoryRepository memberInterestCategoryRepository;
 	private final ProductImageStorage productImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final ObjectMapper objectMapper;
@@ -165,12 +167,9 @@ public class ProductService {
 		return new PopularProductListResponse(content);
 	}
 
-	public HotListProductListResponse getHotListProducts(int size) {
+	public HotListProductListResponse getHotListProducts(Long memberId, int size) {
 		int normalizedSize = Math.min(Math.max(size, 1), 100);
-		List<Product> products = productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
-			ProductSaleType.REGULAR,
-			ProductStatus.ON_SALE
-		);
+		List<Product> products = loadHotListCandidateProducts(memberId);
 
 		Map<Long, String> categoryNamesById = loadCategoryNames(products);
 		List<Product> rankedProducts = products.stream()
@@ -188,6 +187,38 @@ public class ProductService {
 		}
 
 		return new HotListProductListResponse(content);
+	}
+
+	private List<Product> loadHotListCandidateProducts(Long memberId) {
+		Set<Long> interestCategoryIds = resolveInterestCategoryIds(memberId);
+		if (interestCategoryIds.isEmpty()) {
+			return productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNull(
+				ProductSaleType.REGULAR,
+				ProductStatus.ON_SALE
+			);
+		}
+
+		return productRepository.findAllBySaleTypeAndStatusAndDeletedAtIsNullAndCategoryIdIn(
+			ProductSaleType.REGULAR,
+			ProductStatus.ON_SALE,
+			interestCategoryIds
+		);
+	}
+
+	private Set<Long> resolveInterestCategoryIds(Long memberId) {
+		List<Long> topLevelCategoryIds = memberInterestCategoryRepository
+			.findAllByMemberIdOrderByCategoryIdAsc(memberId)
+			.stream()
+			.map(memberInterestCategory -> memberInterestCategory.getCategoryId())
+			.toList();
+		if (topLevelCategoryIds.isEmpty()) {
+			return Set.of();
+		}
+
+		Set<Long> categoryIds = new LinkedHashSet<>();
+		categoryRepository.findAllById(topLevelCategoryIds)
+			.forEach(category -> categoryIds.addAll(resolveSearchableCategoryIds(category)));
+		return categoryIds;
 	}
 
 	public ProductEditDetailResponse getProductEditDetail(Long memberId, Long productId) {

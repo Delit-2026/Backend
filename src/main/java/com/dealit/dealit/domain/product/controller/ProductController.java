@@ -186,8 +186,9 @@ public class ProductController {
 	)
 	@GetMapping("/hot-list")
 	public HotListProductListResponse getHotListProducts(
+		@AuthenticationPrincipal AuthenticatedMember member,
 		@RequestParam(defaultValue = "8") int size
 	) {
-		return productService.getHotListProducts(size);
+		return productService.getHotListProducts(member.memberId(), size);
 	}
 }

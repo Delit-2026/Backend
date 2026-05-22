@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.Comparator;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -406,6 +407,148 @@ class AuctionIntegrationTest {
 		var auction = auctionRepository.findAll().getFirst();
 		assertThat(Duration.between(auction.getAuctionStartAt(), auction.getAuctionEndAt()))
 			.isEqualTo(Duration.ofSeconds(60));
+	}
+
+	@Test
+	@DisplayName("재경매 그대로 올리기는 원본 경매 기간을 담은 요청값으로 다시 등록한다")
+	void reauctionSameKeepsSourceAuctionDurationFromRequest() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Original auction",
+					  "description": "Original seven day auction.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 500000,
+					  "minimumBidAmount": 5000,
+					  "auctionDurationDays": 7,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		var sourceAuction = auctionRepository.findAll().getFirst();
+		sourceAuction.completeWithoutBid(OffsetDateTime.now(), OffsetDateTime.now().plusDays(3));
+		auctionRepository.save(sourceAuction);
+
+		mockMvc.perform(post("/api/v1/auctions/{auctionId}/reauction", sourceAuction.getAuctionId())
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Original auction",
+					  "description": "Original seven day auction.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 500000,
+					  "minimumBidAmount": 5000,
+					  "auctionDurationDays": 7,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		var reauction = auctionRepository.findAll().stream()
+			.filter(auction -> !auction.getAuctionId().equals(sourceAuction.getAuctionId()))
+			.findFirst()
+			.orElseThrow();
+		assertThat(Duration.between(reauction.getAuctionStartAt(), reauction.getAuctionEndAt()))
+			.isEqualTo(Duration.ofDays(7));
+	}
+
+	@Test
+	@DisplayName("재경매 게시글 수정하기는 변경한 경매 값을 반영한다")
+	void reauctionEditAppliesChangedAuctionValues() throws Exception {
+		mockMvc.perform(post("/api/v1/auction")
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Original auction",
+					  "description": "Original seven day auction.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 500000,
+					  "minimumBidAmount": 5000,
+					  "auctionDurationDays": 7,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 마포구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		var sourceAuction = auctionRepository.findAll().getFirst();
+		sourceAuction.completeWithoutBid(OffsetDateTime.now(), OffsetDateTime.now().plusDays(3));
+		auctionRepository.save(sourceAuction);
+
+		mockMvc.perform(post("/api/v1/auctions/{auctionId}/reauction", sourceAuction.getAuctionId())
+				.header("Authorization", "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "Changed auction",
+					  "description": "Changed five day auction.",
+					  "saleType": "AUCTION",
+					  "categoryId": 21,
+					  "price": null,
+					  "startPrice": 300000,
+					  "minimumBidAmount": 3000,
+					  "auctionDurationDays": 5,
+					  "images": [
+					    {
+					      "imageId": %d,
+					      "imageUrl": "http://localhost:8080/uploads/auction/images/test-image.jpg",
+					      "sortOrder": 1
+					    }
+					  ],
+					  "location": "서울 강남구",
+					  "draftId": null
+					}
+					""".formatted(uploadedImage.getImageId())))
+			.andExpect(status().isCreated());
+
+		var reauctionId = auctionRepository.findAll().stream()
+			.filter(auction -> !auction.getAuctionId().equals(sourceAuction.getAuctionId()))
+			.map(auction -> auction.getAuctionId())
+			.findFirst()
+			.orElseThrow();
+		var reauction = auctionRepository.findByAuctionIdAndDeletedAtIsNullAndProductDeletedAtIsNull(reauctionId)
+			.orElseThrow();
+		assertThat(reauction.getProduct().getName()).isEqualTo("Changed auction");
+		assertThat(reauction.getProduct().getDescription()).isEqualTo("Changed five day auction.");
+		assertThat(reauction.getProduct().getLocation()).isEqualTo("서울 강남구");
+		assertThat(reauction.getStartPrice()).isEqualByComparingTo("300000");
+		assertThat(reauction.getMinimumBidAmount()).isEqualByComparingTo("3000");
+		assertThat(Duration.between(reauction.getAuctionStartAt(), reauction.getAuctionEndAt()))
+			.isEqualTo(Duration.ofDays(5));
 	}
 
 	@Test

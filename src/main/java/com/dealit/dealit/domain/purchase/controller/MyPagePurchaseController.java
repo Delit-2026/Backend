@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.purchase.controller;
 
 import com.dealit.dealit.domain.purchase.dto.MyPurchaseListResponse;
 import com.dealit.dealit.domain.purchase.dto.MySaleListResponse;
+import com.dealit.dealit.domain.purchase.dto.PurchaseReceiptResponse;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.global.security.AuthenticatedMember;
@@ -12,11 +13,12 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "MyPage Purchase", description = "마이페이지 구매내역 API")
+@Tag(name = "MyPage Purchase", description = "마이페이지 구매/판매내역 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/mypage")
@@ -34,6 +36,16 @@ public class MyPagePurchaseController {
 		@RequestParam(required = false) List<PurchaseStatus> status
 	) {
 		return purchaseService.getMyPurchases(member.memberId(), page, size, status);
+	}
+
+	@Operation(summary = "마이페이지 일반 상품 거래 영수증 조회", description = "구매자 또는 판매자가 purchaseId 기준으로 일반 상품 거래 영수증을 조회합니다.")
+	@ApiResponse(responseCode = "200", description = "영수증 조회 성공")
+	@GetMapping("/purchases/{purchaseId}/receipt")
+	public PurchaseReceiptResponse getPurchaseReceipt(
+		@AuthenticationPrincipal AuthenticatedMember member,
+		@PathVariable Long purchaseId
+	) {
+		return purchaseService.getReceipt(purchaseId, member.memberId());
 	}
 
 	@Operation(summary = "내 판매내역 조회", description = "현재 로그인한 사용자의 판매내역을 페이지 단위로 조회합니다.")

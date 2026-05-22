@@ -64,6 +64,15 @@ public class Auction extends BaseEntity {
 	@Column(name = "ends_at", nullable = false)
 	private OffsetDateTime endsAt;
 
+	@Column(name = "no_bid_at")
+	private OffsetDateTime noBidAt;
+
+	@Column(name = "reauction_expires_at")
+	private OffsetDateTime reauctionExpiresAt;
+
+	@Column(name = "reauctioned_at")
+	private OffsetDateTime reauctionedAt;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 30)
 	private AuctionStatus status;
@@ -122,10 +131,25 @@ public class Auction extends BaseEntity {
 		this.status = AuctionStatus.SUCCESSFUL_BID;
 	}
 
-	public void completeWithoutBid() {
+	public void completeWithoutBid(OffsetDateTime noBidAt, OffsetDateTime reauctionExpiresAt) {
 		this.finalPrice = null;
 		this.winnerId = null;
+		this.noBidAt = noBidAt;
+		this.reauctionExpiresAt = reauctionExpiresAt;
 		this.status = AuctionStatus.NO_BID;
+	}
+
+	public void declineReauction() {
+		this.status = AuctionStatus.ENDED;
+	}
+
+	public void markReauctioned(OffsetDateTime reauctionedAt) {
+		this.reauctionedAt = reauctionedAt;
+		this.status = AuctionStatus.ENDED;
+	}
+
+	public void expireReauction() {
+		this.status = AuctionStatus.ENDED;
 	}
 
 	public boolean isOngoing() {

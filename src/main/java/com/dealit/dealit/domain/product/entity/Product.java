@@ -177,6 +177,10 @@ public class Product extends BaseEntity {
 		softDelete();
 	}
 
+	public void markEndedWithoutDelete() {
+		this.status = ProductStatus.ENDED;
+	}
+
 	public void markTradeCompleted() {
 		this.status = ProductStatus.ENDED;
 	}
