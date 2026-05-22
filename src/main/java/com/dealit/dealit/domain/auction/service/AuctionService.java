@@ -43,6 +43,8 @@ import com.dealit.dealit.domain.auction.repository.AuctionRankProjection;
 import com.dealit.dealit.domain.auction.repository.BidRepository;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
 import com.dealit.dealit.domain.member.entity.Member;
+import com.dealit.dealit.domain.category.dto.CategoryRecommendationResult;
+import com.dealit.dealit.domain.category.service.CategoryRecommendationService;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.ProductStatus;
@@ -96,6 +98,7 @@ public class AuctionService {
 	private final ProductImageRepository productImageRepository;
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
+	private final CategoryRecommendationService categoryRecommendationService;
 	private final ObjectMapper objectMapper;
 	private final AuctionRedisService auctionRedisService;
 	private final Clock clock;
@@ -759,14 +762,20 @@ public class AuctionService {
 	}
 
 	public RecommendCategoryResponse recommendCategory(RecommendCategoryRequest request) {
-		String combined = (request.name() + " " + request.description()).toLowerCase();
-		if (combined.contains("watch") || combined.contains("iphone") || combined.contains("switch")) {
-			return new RecommendCategoryResponse(200L, "Digital/Electronics");
-		}
-		if (combined.contains("chair") || combined.contains("table")) {
-			return new RecommendCategoryResponse(300L, "Furniture/Interior");
-		}
-		return new RecommendCategoryResponse(999L, "Others");
+		CategoryRecommendationResult result = categoryRecommendationService.recommend(
+			request.name(),
+			request.description(),
+			request.topCategoryId(),
+			request.imageUrls()
+		);
+		return new RecommendCategoryResponse(
+			result.categoryId(),
+			result.categoryName(),
+			result.categoryPathIds(),
+			result.categoryNames(),
+			result.confidence(),
+			result.reason()
+		);
 	}
 
 	public List<CategoryOptionResponse> getCategories() {
