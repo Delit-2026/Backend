@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.purchase.dto;
 
+import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
@@ -31,6 +32,22 @@ public record MySaleItemResponse(
 	OffsetDateTime purchasedAt,
 
 	@Schema(description = "연결된 채팅방 ID. 없으면 null입니다.", example = "15", nullable = true)
-	Long chatRoomId
+	Long chatRoomId,
+
+	ProductSaleType productType,
+
+	Long auctionId,
+
+	boolean sellerShipped,
+
+	boolean buyerConfirmed,
+
+	boolean completed,
+
+	OffsetDateTime shippedAt,
+
+	OffsetDateTime completedAt,
+
+	boolean reviewReceived
 ) {
 }
