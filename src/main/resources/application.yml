@@ -25,6 +25,11 @@ app:
   images:
     public-base-url: ${APP_IMAGES_PUBLIC_BASE_URL:http://localhost:${SERVER_PORT:8080}}
     storage-root: ${APP_IMAGES_STORAGE_ROOT:${user.dir}/uploads}
+    storage-type: ${APP_IMAGES_STORAGE_TYPE:local}
+    s3-bucket: ${AWS_S3_BUCKET:}
+    s3-region: ${AWS_REGION:ap-northeast-2}
+    s3-access-key-id: ${AWS_ACCESS_KEY_ID:}
+    s3-secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
   email-verification:
     code-ttl-seconds: ${APP_EMAIL_VERIFICATION_CODE_TTL_SECONDS:300}
     verified-ttl-seconds: ${APP_EMAIL_VERIFICATION_VERIFIED_TTL_SECONDS:1800}

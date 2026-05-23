@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.auction.service;
 
 import com.dealit.dealit.domain.auction.exception.InvalidAuctionRequestException;
 import com.dealit.dealit.global.config.ImageProperties;
+import com.dealit.dealit.global.service.S3ImageStorageClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,11 +26,21 @@ public class AuctionImageStorage {
 	);
 
 	private final ImageProperties imageProperties;
+	private final S3ImageStorageClient s3ImageStorageClient;
 
 	public String store(Long imageId, MultipartFile file, String originalFilename) {
 		validate(file);
 
 		String storedFileName = imageId + "-" + UUID.randomUUID() + resolveExtension(originalFilename, file.getContentType());
+		if (imageProperties.isS3Storage()) {
+			try {
+				s3ImageStorageClient.upload(imageProperties.auctionImagePath(storedFileName), file);
+			} catch (IOException | RuntimeException exception) {
+				throw new InvalidAuctionRequestException("이미지 파일 S3 저장에 실패했습니다.");
+			}
+			return storedFileName;
+		}
+
 		Path directory = imageProperties.auctionImageDirectory();
 		Path targetFile = directory.resolve(storedFileName);
 
@@ -51,6 +62,15 @@ public class AuctionImageStorage {
 	}
 
 	public void delete(String imagePath) {
+		if (imageProperties.isS3Storage()) {
+			try {
+				s3ImageStorageClient.delete(imagePath);
+			} catch (RuntimeException exception) {
+				throw new InvalidAuctionRequestException("이미지 파일 S3 삭제에 실패했습니다.");
+			}
+			return;
+		}
+
 		Path relativePath = Path.of(imagePath.replaceFirst("^/+", "").replaceFirst("^uploads/", ""));
 		Path targetFile = imageProperties.auctionImageDirectory().getParent().getParent().resolve(relativePath);
 
