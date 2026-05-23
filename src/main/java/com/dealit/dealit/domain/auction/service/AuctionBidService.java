@@ -33,6 +33,7 @@ import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
 import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
 import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
@@ -71,6 +72,7 @@ public class AuctionBidService {
 	private final AuctionNotificationService auctionNotificationService;
 	private final ApplicationEventPublisher applicationEventPublisher;
 	private final ChatRoomRepository chatRoomRepository;
+	private final PurchaseService purchaseService;
 	private final WishlistService wishlistService;
 	private final ImageUrlService imageUrlService;
 	private final RecentProductService recentProductService;
@@ -263,7 +265,13 @@ public class AuctionBidService {
 
 		auction.completeWithWinner(state.highestBidderId(), state.currentPrice());
 		auction.getProduct().markSold();
-		ensureAuctionChatRoom(auction, state.highestBidderId());
+		Long chatRoomId = ensureAuctionChatRoom(auction, state.highestBidderId());
+		AuctionPayment winningPayment = loadWinningPayment(
+			auctionId,
+			state.highestBidderId(),
+			auction.getProduct().getMemberId()
+		);
+		purchaseService.createAuctionPurchase(auction, winningPayment, chatRoomId);
 		auctionRedisService.removeEnding(auctionId);
 		auctionRedisService.deleteState(auctionId);
 		auctionRedisService.removeClosingSoonNotified(auctionId);
@@ -290,7 +298,6 @@ public class AuctionBidService {
 				state.currentPrice(),
 				AuctionStatus.SUCCESSFUL_BID
 			);
-			auctionNotificationService.notifyReviewRequest(auction, state.highestBidderId());
 			auctionEventPublisher.publishAuctionEnded(
 				state.highestBidderId(),
 				auctionId,
@@ -351,14 +358,27 @@ public class AuctionBidService {
 		}
 	}
 
-	private void ensureAuctionChatRoom(Auction auction, Long buyerId) {
+	private AuctionPayment loadWinningPayment(Long auctionId, Long winnerId, Long sellerId) {
+		return auctionPaymentRepository
+			.findFirstByAuctionAuctionIdAndBidderIdAndSellerIdAndStatusInAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
+				auctionId,
+				winnerId,
+				sellerId,
+				List.of(AuctionPaymentStatus.RESERVED)
+			)
+			.orElseThrow(() -> new InvalidAuctionRequestException("낙찰자의 예치금을 찾을 수 없습니다."));
+	}
+
+	private Long ensureAuctionChatRoom(Auction auction, Long buyerId) {
 		Long sellerId = auction.getProduct().getMemberId();
 		Long productId = auction.getProduct().getProductId();
-		chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(sellerId, buyerId, productId)
-			.ifPresentOrElse(
-				ChatRoom::markAuction,
-				() -> chatRoomRepository.save(ChatRoom.create(sellerId, buyerId, productId, ChatType.AUCTION))
-			);
+		return chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(sellerId, buyerId, productId)
+			.map(chatRoom -> {
+				chatRoom.markAuction();
+				return chatRoom.getRoomId();
+			})
+			.orElseGet(() -> chatRoomRepository.save(ChatRoom.create(sellerId, buyerId, productId, ChatType.AUCTION))
+				.getRoomId());
 	}
 
 	private List<ImageResponse> toImageResponses(Product product) {

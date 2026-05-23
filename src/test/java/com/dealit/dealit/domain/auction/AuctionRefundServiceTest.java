@@ -11,9 +11,14 @@ import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.AuctionPayment;
 import com.dealit.dealit.domain.auction.repository.AuctionPaymentRepository;
 import com.dealit.dealit.domain.auction.service.AuctionRefundService;
+import com.dealit.dealit.domain.auction.service.AuctionNotificationService;
+import com.dealit.dealit.domain.chat.entity.ChatRoom;
+import com.dealit.dealit.domain.chat.entity.ChatType;
+import com.dealit.dealit.domain.chat.repository.ChatRoomRepository;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
+import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -23,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class AuctionRefundServiceTest {
 
@@ -30,9 +36,15 @@ class AuctionRefundServiceTest {
 
 	private final AuctionPaymentRepository auctionPaymentRepository = mock(AuctionPaymentRepository.class);
 	private final WalletService walletService = mock(WalletService.class);
+	private final AuctionNotificationService auctionNotificationService = mock(AuctionNotificationService.class);
+	private final ChatRoomRepository chatRoomRepository = mock(ChatRoomRepository.class);
+	private final PurchaseService purchaseService = mock(PurchaseService.class);
 	private final AuctionRefundService auctionRefundService = new AuctionRefundService(
 		auctionPaymentRepository,
 		walletService,
+		auctionNotificationService,
+		chatRoomRepository,
+		purchaseService,
 		FIXED_CLOCK
 	);
 
@@ -114,8 +126,15 @@ class AuctionRefundServiceTest {
 			OffsetDateTime.now(FIXED_CLOCK).minusDays(8)
 		);
 		payment.markShipped(OffsetDateTime.now(FIXED_CLOCK).minusDays(7).minusSeconds(1));
+		ChatRoom room = ChatRoom.create(sellerId, 20L, payment.getAuction().getProduct().getProductId(), ChatType.AUCTION);
+		ReflectionTestUtils.setField(room, "roomId", 30L);
 		when(auctionPaymentRepository.findByAuctionPaymentIdAndDeletedAtIsNull(paymentId))
 			.thenReturn(Optional.of(payment));
+		when(chatRoomRepository.findBySellerIdAndBuyerIdAndProductIdAndDeletedAtIsNull(
+			sellerId,
+			20L,
+			payment.getAuction().getProduct().getProductId()
+		)).thenReturn(Optional.of(room));
 
 		auctionRefundService.autoConfirmReceived(paymentId);
 
@@ -123,6 +142,9 @@ class AuctionRefundServiceTest {
 		assertThat(payment.getReceivedConfirmedAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
 		assertThat(payment.getSettledAt()).isEqualTo(OffsetDateTime.now(FIXED_CLOCK));
 		verify(walletService).settleAuctionPayment(sellerId, 101000L, payment.getAuction().getAuctionId());
+		verify(auctionNotificationService).notifyAuctionReceived(payment.getAuction(), payment.getSellerId(), 30L);
+		verify(auctionNotificationService).notifyReviewRequest(payment.getAuction(), payment.getBidderId());
+		verify(purchaseService).syncAuctionPurchaseCompleted(payment.getPurchaseId());
 	}
 
 	private Auction auction(Long sellerId) {
@@ -138,6 +160,7 @@ class AuctionRefundServiceTest {
 			null,
 			ProductStatus.ON_SALE
 		);
+		ReflectionTestUtils.setField(product, "productId", 21L);
 		return Auction.create(
 			product,
 			new BigDecimal("100000"),

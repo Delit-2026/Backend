@@ -18,6 +18,7 @@ import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -59,8 +60,54 @@ class AuctionNotificationServiceTest {
 		ArgumentCaptor<NotificationCreateRequest> captor = ArgumentCaptor.forClass(NotificationCreateRequest.class);
 		verify(notificationCenterService).create(eq(10L), captor.capture());
 		assertThat(captor.getValue().type()).isEqualTo(InAppNotificationType.AUCTION);
-		assertThat(captor.getValue().title()).isEqualTo("유찰 알림");
+		assertThat(captor.getValue().title()).isEqualTo("경매가 유찰 되었어요");
 		assertThat(captor.getValue().targetType()).isEqualTo("AUCTION");
+	}
+
+	@Test
+	@DisplayName("후기 작성 알림은 후기 작성 화면으로 이동하는 대상 URL을 포함한다")
+	void notifyReviewRequestCreatesReviewWriteTarget() {
+		Auction auction = auction(10L);
+		when(fcmNotificationService.sendToMember(eq(20L), any(), any(), any())).thenReturn(0);
+
+		auctionNotificationService.notifyReviewRequest(auction, 20L);
+
+		ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
+			ArgumentCaptor.forClass(NotificationCreateRequest.class);
+		verify(notificationCenterService).create(eq(20L), notificationCaptor.capture());
+		assertThat(notificationCaptor.getValue().title()).isEqualTo("후기 작성 알림");
+		assertThat(notificationCaptor.getValue().targetUrl())
+			.isEqualTo("/mypage/review/write?auctionId=1&displayProductId=21");
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<Map<String, String>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+		verify(fcmNotificationService).sendToMember(eq(20L), eq("후기 작성 알림"), any(), dataCaptor.capture());
+		assertThat(dataCaptor.getValue()).containsEntry("type", "REVIEW_REQUESTED");
+		assertThat(dataCaptor.getValue())
+			.containsEntry("targetUrl", "/mypage/review/write?auctionId=1&displayProductId=21");
+	}
+
+	@Test
+	@DisplayName("경매 발송 알림은 채팅방으로 이동하는 대상 URL을 포함한다")
+	void notifyAuctionShippedCreatesChatTarget() {
+		Auction auction = auction(10L);
+		when(fcmNotificationService.sendToMember(eq(20L), any(), any(), any())).thenReturn(0);
+
+		auctionNotificationService.notifyAuctionShipped(auction, 20L, 30L);
+
+		ArgumentCaptor<NotificationCreateRequest> notificationCaptor =
+			ArgumentCaptor.forClass(NotificationCreateRequest.class);
+		verify(notificationCenterService).create(eq(20L), notificationCaptor.capture());
+		assertThat(notificationCaptor.getValue().targetType()).isEqualTo("CHAT");
+		assertThat(notificationCaptor.getValue().targetId()).isEqualTo(30L);
+		assertThat(notificationCaptor.getValue().targetUrl()).isEqualTo("/chats/30");
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<Map<String, String>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+		verify(fcmNotificationService).sendToMember(eq(20L), eq("상품이 발송되었습니다."), any(), dataCaptor.capture());
+		assertThat(dataCaptor.getValue()).containsEntry("type", "AUCTION_SHIPPED");
+		assertThat(dataCaptor.getValue()).containsEntry("targetUrl", "/chats/30");
+		assertThat(dataCaptor.getValue()).containsEntry("roomId", "30");
 	}
 
 	private Auction auction(Long sellerId) {
@@ -76,6 +123,7 @@ class AuctionNotificationServiceTest {
 			null,
 			ProductStatus.ON_SALE
 		);
+		ReflectionTestUtils.setField(product, "productId", 21L);
 		Auction auction = Auction.create(
 			product,
 			new BigDecimal("100000"),

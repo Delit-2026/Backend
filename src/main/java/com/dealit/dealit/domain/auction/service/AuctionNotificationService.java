@@ -66,7 +66,7 @@ public class AuctionNotificationService {
 		}
 
 		if (status == AuctionStatus.NO_BID) {
-			String title = "유찰 알림";
+			String title = "경매가 유찰 되었어요";
 			String content = "'" + auction.getProduct().getName() + "' 경매가 입찰 없이 종료되었어요. 재등록 해볼까요?";
 			createAuctionNotification(receiverId, title, content, auction.getAuctionId());
 			sendAuctionPush(receiverId, title, content, "AUCTION_NO_BID", auction.getAuctionId(), null);
@@ -88,14 +88,35 @@ public class AuctionNotificationService {
 		sendAuctionPush(bidderId, title, content, "AUCTION_BID_FAILED", auction.getAuctionId(), winnerId);
 	}
 
+	public void notifyAuctionShipped(Auction auction, Long winnerId, Long roomId) {
+		String title = "상품이 발송되었습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 상품이 발송되었어요. 물건을 받으면 수령확정을 눌러주세요.";
+		String targetUrl = chatTargetUrl(roomId, auction.getAuctionId());
+		createChatNotification(winnerId, title, content, auction.getAuctionId(), roomId, targetUrl);
+		sendAuctionPush(winnerId, title, content, "AUCTION_SHIPPED", auction.getAuctionId(), null, targetUrl, roomId);
+	}
+
+	public void notifyAuctionReceived(Auction auction, Long sellerId, Long roomId) {
+		String title = "수령확정이 완료되었습니다.";
+		String content = "'" + auction.getProduct().getName() + "' 상품 구매자가 수령확정을 완료했어요.";
+		String targetUrl = chatTargetUrl(roomId, auction.getAuctionId());
+		createChatNotification(sellerId, title, content, auction.getAuctionId(), roomId, targetUrl);
+		sendAuctionPush(sellerId, title, content, "AUCTION_RECEIVED", auction.getAuctionId(), null, targetUrl, roomId);
+	}
+
 	public void notifyReviewRequest(Auction auction, Long winnerId) {
 		String title = "후기 작성 알림";
 		String content = "'" + auction.getProduct().getName() + "' 거래 후기를 작성해 주세요.";
-		createAuctionNotification(winnerId, title, content, auction.getAuctionId());
-		sendAuctionPush(winnerId, title, content, "REVIEW_REQUESTED", auction.getAuctionId(), null);
+		String targetUrl = reviewTargetUrl(auction);
+		createAuctionNotification(winnerId, title, content, auction.getAuctionId(), targetUrl);
+		sendAuctionPush(winnerId, title, content, "REVIEW_REQUESTED", auction.getAuctionId(), null, targetUrl);
 	}
 
 	private void createAuctionNotification(Long receiverId, String title, String content, Long auctionId) {
+		createAuctionNotification(receiverId, title, content, auctionId, "/auctions/" + auctionId);
+	}
+
+	private void createAuctionNotification(Long receiverId, String title, String content, Long auctionId, String targetUrl) {
 		notificationCenterService.create(
 			receiverId,
 			new NotificationCreateRequest(
@@ -104,7 +125,28 @@ public class AuctionNotificationService {
 				content,
 				TARGET_TYPE,
 				auctionId,
-				"/auctions/" + auctionId
+				targetUrl
+			)
+		);
+	}
+
+	private void createChatNotification(
+		Long receiverId,
+		String title,
+		String content,
+		Long auctionId,
+		Long roomId,
+		String targetUrl
+	) {
+		notificationCenterService.create(
+			receiverId,
+			new NotificationCreateRequest(
+				InAppNotificationType.AUCTION,
+				title,
+				content,
+				roomId == null ? TARGET_TYPE : "CHAT",
+				roomId == null ? auctionId : roomId,
+				targetUrl
 			)
 		);
 	}
@@ -117,19 +159,35 @@ public class AuctionNotificationService {
 		Long auctionId,
 		Long actorId
 	) {
+		sendAuctionPush(receiverId, title, content, type, auctionId, actorId, "/auctions/" + auctionId);
+	}
+
+	private void sendAuctionPush(
+		Long receiverId,
+		String title,
+		String content,
+		String type,
+		Long auctionId,
+		Long actorId,
+		String targetUrl
+	) {
+		sendAuctionPush(receiverId, title, content, type, auctionId, actorId, targetUrl, null);
+	}
+
+	private void sendAuctionPush(
+		Long receiverId,
+		String title,
+		String content,
+		String type,
+		Long auctionId,
+		Long actorId,
+		String targetUrl,
+		Long roomId
+	) {
 		try {
 			Map<String, String> data = actorId == null
-				? Map.of(
-					"type", type,
-					"auctionId", String.valueOf(auctionId),
-					"targetUrl", "/auctions/" + auctionId
-				)
-				: Map.of(
-					"type", type,
-					"auctionId", String.valueOf(auctionId),
-					"actorId", String.valueOf(actorId),
-					"targetUrl", "/auctions/" + auctionId
-				);
+				? auctionPushData(type, auctionId, null, targetUrl, roomId)
+				: auctionPushData(type, auctionId, actorId, targetUrl, roomId);
 			int sentCount = fcmNotificationService.sendToMember(receiverId, title, content, data);
 			log.debug("Sent auction push notification. type={}, auctionId={}, receiverId={}, sentCount={}",
 				type, auctionId, receiverId, sentCount);
@@ -144,5 +202,53 @@ public class AuctionNotificationService {
 			return "";
 		}
 		return NumberFormat.getNumberInstance(Locale.KOREA).format(price.stripTrailingZeros());
+	}
+
+	private String reviewTargetUrl(Auction auction) {
+		return "/mypage/review/write?auctionId=" + auction.getAuctionId()
+			+ "&displayProductId=" + auction.getProduct().getProductId();
+	}
+
+	private String chatTargetUrl(Long roomId, Long auctionId) {
+		return roomId == null ? "/auctions/" + auctionId : "/chats/" + roomId;
+	}
+
+	private Map<String, String> auctionPushData(
+		String type,
+		Long auctionId,
+		Long actorId,
+		String targetUrl,
+		Long roomId
+	) {
+		if (actorId != null && roomId != null) {
+			return Map.of(
+				"type", type,
+				"auctionId", String.valueOf(auctionId),
+				"actorId", String.valueOf(actorId),
+				"targetUrl", targetUrl,
+				"roomId", String.valueOf(roomId)
+			);
+		}
+		if (actorId != null) {
+			return Map.of(
+				"type", type,
+				"auctionId", String.valueOf(auctionId),
+				"actorId", String.valueOf(actorId),
+				"targetUrl", targetUrl
+			);
+		}
+		if (roomId != null) {
+			return Map.of(
+				"type", type,
+				"auctionId", String.valueOf(auctionId),
+				"targetUrl", targetUrl,
+				"roomId", String.valueOf(roomId)
+			);
+		}
+		return Map.of(
+			"type", type,
+			"auctionId", String.valueOf(auctionId),
+			"targetUrl", targetUrl
+		);
 	}
 }
