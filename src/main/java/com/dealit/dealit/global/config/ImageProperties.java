@@ -8,7 +8,12 @@ import java.nio.file.Paths;
 @ConfigurationProperties(prefix = "app.images")
 public record ImageProperties(
 	String publicBaseUrl,
-	String storageRoot
+	String storageRoot,
+	String storageType,
+	String s3Bucket,
+	String s3Region,
+	String s3AccessKeyId,
+	String s3SecretAccessKey
 ) {
 
 	public static final String AUCTION_IMAGE_PATH_PREFIX = "/uploads/auction/images/";
@@ -50,5 +55,9 @@ public record ImageProperties(
 		return publicBaseUrl.endsWith("/")
 			? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
 			: publicBaseUrl;
+	}
+
+	public boolean isS3Storage() {
+		return "s3".equalsIgnoreCase(storageType);
 	}
 }

@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.member.service;
 
 import com.dealit.dealit.domain.member.exception.InvalidProfileRequestException;
 import com.dealit.dealit.global.config.ImageProperties;
+import com.dealit.dealit.global.service.S3ImageStorageClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,12 +27,22 @@ public class ProfileImageStorage {
 	);
 
 	private final ImageProperties imageProperties;
+	private final S3ImageStorageClient s3ImageStorageClient;
 
 	public String store(Long memberId, MultipartFile file) {
 		validate(file);
 
 		String originalFilename = file.getOriginalFilename() == null ? "profile.jpg" : file.getOriginalFilename();
 		String storedFileName = memberId + "-" + UUID.randomUUID() + resolveExtension(originalFilename, file.getContentType());
+		if (imageProperties.isS3Storage()) {
+			try {
+				s3ImageStorageClient.upload(imageProperties.profileImagePath(storedFileName), file);
+			} catch (IOException | RuntimeException exception) {
+				throw new InvalidProfileRequestException("프로필 이미지 S3 저장에 실패했습니다.");
+			}
+			return storedFileName;
+		}
+
 		Path directory = imageProperties.profileImageDirectory();
 		Path targetFile = directory.resolve(storedFileName);
 
