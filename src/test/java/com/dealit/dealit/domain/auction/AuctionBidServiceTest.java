@@ -37,6 +37,7 @@ import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.purchase.service.PurchaseService;
+import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.domain.wishlist.service.WishlistService;
 import com.dealit.dealit.global.service.ImageUrlService;
@@ -79,6 +80,7 @@ class AuctionBidServiceTest {
 	private final PurchaseService purchaseService = mock(PurchaseService.class);
 	private final WishlistService wishlistService = mock(WishlistService.class);
 	private final ImageUrlService imageUrlService = mock(ImageUrlService.class);
+	private final RecentProductService recentProductService = mock(RecentProductService.class);
 
 	private final AuctionBidService auctionBidService = new AuctionBidService(
 		auctionRepository,
@@ -95,6 +97,7 @@ class AuctionBidServiceTest {
 		purchaseService,
 		wishlistService,
 		imageUrlService,
+		recentProductService,
 		FIXED_CLOCK
 	);
 

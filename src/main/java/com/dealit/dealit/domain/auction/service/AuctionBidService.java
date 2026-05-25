@@ -34,6 +34,7 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.purchase.service.PurchaseService;
+import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
 import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
 import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
 import com.dealit.dealit.domain.wallet.service.WalletService;
@@ -74,6 +75,7 @@ public class AuctionBidService {
 	private final PurchaseService purchaseService;
 	private final WishlistService wishlistService;
 	private final ImageUrlService imageUrlService;
+	private final RecentProductService recentProductService;
 	private final Clock clock;
 
 	public AuctionDetailResponse getAuction(Long auctionId) {
@@ -82,6 +84,7 @@ public class AuctionBidService {
 
 	public AuctionDetailResponse getAuction(Long auctionId, Long memberId) {
 		Auction auction = loadAuctionDetail(auctionId);
+		recentProductService.recordAuction(memberId, auction.getAuctionId());
 		Product product = auction.getProduct();
 		BigDecimal currentPrice = auction.getCurrentPrice();
 		if (auction.isOngoing()) {
@@ -94,7 +97,7 @@ public class AuctionBidService {
 				currentPrice = auction.getCurrentPrice();
 			}
 		}
-		currentPrice = resolveDisplayCurrentPrice(auction, currentPrice);
+		currentPrice = auction.resolveDisplayCurrentPrice(currentPrice);
 		Category category = categoryRepository.findById(product.getCategoryId()).orElse(null);
 		Member seller = memberRepository.findByMemberIdAndDeletedAtIsNull(product.getMemberId()).orElse(null);
 		return new AuctionDetailResponse(
@@ -147,7 +150,7 @@ public class AuctionBidService {
 
 		return new AuctionBidHistoryResponse(
 			auctionId,
-			resolveDisplayCurrentPrice(auction, auction.getCurrentPrice()),
+			auction.resolveDisplayCurrentPrice(auction.getCurrentPrice()),
 			bidItems.size(),
 			bidItems
 		);
@@ -416,13 +419,6 @@ public class AuctionBidService {
 			return null;
 		}
 		return imageUrlService.toPublicUrl(bidder.getProfileImage());
-	}
-
-	private BigDecimal resolveDisplayCurrentPrice(Auction auction, BigDecimal currentPrice) {
-		if (currentPrice == null || currentPrice.signum() <= 0) {
-			return auction.getStartPrice();
-		}
-		return currentPrice;
 	}
 
 	private OffsetDateTime serverTime() {

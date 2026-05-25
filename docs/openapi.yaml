@@ -25,6 +25,8 @@ tags:
   description: 위치 보조 API
 - name: Wallet
   description: 딜릿머니 API
+- name: MyPage Purchase
+  description: 마이페이지 구매/판매내역 API
 - name: Auction
   description: 경매 상품 관리 API
 - name: Profile
@@ -43,12 +45,12 @@ tags:
   description: 이메일 인증 API
 - name: Auction
   description: 경매 상품 등록 API
-- name: MyPage Purchase
-  description: 마이페이지 구매내역 API
 - name: Member
   description: 회원 API
 - name: Chats
   description: 채팅 API
+- name: Recent Products
+  description: 최근 본 상품 API
 - name: Notification
   description: 알림 API
 - name: Purchase
@@ -1548,6 +1550,57 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+  /api/v1/auctions/{auctionId}/reauction:
+    post:
+      tags:
+      - Auction
+      summary: 재경매 등록
+      description: 유찰된 본인 경매를 바탕으로 새 경매를 등록한다.
+      operationId: reauction
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuctionRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReauctionResponse"
   /api/v1/auctions/{auctionId}/bids:
     get:
       tags:
@@ -2476,6 +2529,51 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuctionEditDetailResponse"
+  /api/v1/auctions/{auctionId}/reauction/decline:
+    patch:
+      tags:
+      - Auction
+      summary: 재경매 거절
+      description: 유찰된 경매의 재등록 대기를 종료한다.
+      operationId: declineReauction
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeclineReauctionResponse"
   /api/v1/wallet:
     get:
       tags:
@@ -2730,6 +2828,52 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ReviewListResponse"
+  /api/v1/users/me/recent-products:
+    get:
+      tags:
+      - Recent Products
+      summary: Recent Products
+      description: 로그인 사용자의 최근 본 일반상품과 경매상품을 최신 조회순으로 함께 조회합니다.
+      operationId: getRecentProducts
+      parameters:
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 최근 본 상품 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecentProductListResponse"
   /api/v1/users/me/mypage:
     get:
       tags:
@@ -2773,8 +2917,8 @@ paths:
       tags:
       - Search
       summary: Text Search
-      description: "keyword, categoryId 조건으로 판매 중인 일반 상품과 진행 중인 경매를 OpenSearch에서 조\
-        회합니다."
+      description: "keyword, type, categoryId 조건으로 판매 중인 일반 상품과 진행 중인 경매를 OpenSearch에\
+        서 조회합니다. type이 없으면 전체 검색입니다."
       operationId: search
       parameters:
       - name: keyword
@@ -2782,6 +2926,15 @@ paths:
         required: false
         schema:
           type: string
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 통합 검색 결과 유형
+          enum:
+          - REGULAR
+          - AUCTION
       - name: categoryId
         in: query
         required: false
@@ -2838,9 +2991,18 @@ paths:
       tags:
       - Search
       summary: Popular Search Keywords
-      description: 사용자가 검색한 keyword 횟수를 기준으로 인기 검색어를 조회합니다.
+      description: 사용자가 검색한 keyword 횟수를 기준으로 인기 검색어를 조회합니다. type이 없으면 전체 인기검색어입니다.
       operationId: popularKeywords
       parameters:
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 통합 검색 결과 유형
+          enum:
+          - REGULAR
+          - AUCTION
       - name: size
         in: query
         required: false
@@ -3557,6 +3719,51 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyPurchaseListResponse"
+  /api/v1/mypage/purchases/{purchaseId}/receipt:
+    get:
+      tags:
+      - MyPage Purchase
+      summary: 마이페이지 일반 상품 거래 영수증 조회
+      description: 구매자 또는 판매자가 purchaseId 기준으로 일반 상품 거래 영수증을 조회합니다.
+      operationId: getPurchaseReceipt
+      parameters:
+      - name: purchaseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: 영수증 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PurchaseReceiptResponse"
   /api/v1/mypage/products/selling:
     get:
       tags:
@@ -4131,6 +4338,51 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CurrentMemberResponse"
+  /api/v1/auctions/{auctionId}/reauction-preview:
+    get:
+      tags:
+      - Auction
+      summary: 재경매 미리보기
+      description: 유찰된 본인 경매를 재등록하기 위한 기존 상품 정보를 조회한다.
+      operationId: getReauctionPreview
+      parameters:
+      - name: auctionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReauctionPreviewResponse"
   /api/v1/auctions/{auctionId}/edit:
     get:
       tags:
@@ -5536,39 +5788,6 @@ components:
           format: int64
           description: 만료 시간(ms)
           example: 3600000
-    BidRequest:
-      type: object
-      description: 경매 입찰 요청
-      properties:
-        bidPrice:
-          type: number
-          description: 입찰가
-          example: 12000
-      required:
-      - bidPrice
-    BidMessages:
-      type: object
-      properties:
-        reserveNotice:
-          type: string
-        refundNotice:
-          type: string
-    BidResponse:
-      type: object
-      properties:
-        auctionId:
-          type: integer
-          format: int64
-        currentPrice:
-          type: number
-        bidderId:
-          type: integer
-          format: int64
-        serverTime:
-          type: string
-          format: date-time
-        messages:
-          $ref: "#/components/schemas/BidMessages"
     CreateAuctionRequest:
       type: object
       description: 경매 상품 등록 요청
@@ -5647,6 +5866,52 @@ components:
       - location
       - name
       - saleType
+    ReauctionResponse:
+      type: object
+      description: 재경매 등록 응답
+      properties:
+        sourceAuctionId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        auctionId:
+          type: integer
+          format: int64
+    BidRequest:
+      type: object
+      description: 경매 입찰 요청
+      properties:
+        bidPrice:
+          type: number
+          description: 입찰가
+          example: 12000
+      required:
+      - bidPrice
+    BidMessages:
+      type: object
+      properties:
+        reserveNotice:
+          type: string
+        refundNotice:
+          type: string
+    BidResponse:
+      type: object
+      properties:
+        auctionId:
+          type: integer
+          format: int64
+        currentPrice:
+          type: number
+        bidderId:
+          type: integer
+          format: int64
+        serverTime:
+          type: string
+          format: date-time
+        messages:
+          $ref: "#/components/schemas/BidMessages"
     AuctionScheduleResponse:
       type: object
       description: 경매 일정 및 상태 정보
@@ -6219,6 +6484,21 @@ components:
           format: int32
           description: 정렬 순서
           example: 1
+    DeclineReauctionResponse:
+      type: object
+      description: 재경매 거절 응답
+      properties:
+        auctionId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - ONGOING
+          - ENDED
+          - NO_BID
+          - SUCCESSFUL_BID
     WalletLedgerListResponse:
       type: object
       properties:
@@ -6297,6 +6577,70 @@ components:
         reviewCount:
           type: integer
           format: int64
+    RecentProductItemResponse:
+      type: object
+      description: 최근 본 상품 항목
+      properties:
+        type:
+          type: string
+          description: 최근 본 상품 유형
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
+        productId:
+          type: integer
+          format: int64
+          description: 상품 ID
+          example: 1
+        auctionId:
+          type: integer
+          format: int64
+          description: 경매 ID
+          example: 10
+        name:
+          type: string
+          description: 상품명
+          example: 맥북 에어
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL
+          example: http://localhost:8080/uploads/product/images/example.jpg
+        price:
+          type: number
+          description: 일반 상품 가격
+          example: 30000
+        currentPrice:
+          type: number
+          description: 경매 현재가
+          example: 50000
+        location:
+          type: string
+          description: 거래 위치
+          example: 서울 강남구
+        categoryName:
+          type: string
+          description: 카테고리명
+          example: 노트북
+        viewedAt:
+          type: string
+          format: date-time
+          description: 조회 시각
+          example: 2026-05-21T12:00:00+09:00
+    RecentProductListResponse:
+      type: object
+      description: 최근 본 상품 목록 응답
+      properties:
+        content:
+          type: array
+          description: 최근 본 상품 목록
+          items:
+            $ref: "#/components/schemas/RecentProductItemResponse"
+        size:
+          type: integer
+          format: int32
+          description: 조회 개수
+          example: 20
     MyLocationResponse:
       type: object
       properties:
@@ -6440,6 +6784,13 @@ components:
           type: string
           description: 검색어
           example: 맥북
+        type:
+          type: string
+          description: 검색 결과 유형 필터
+          enum:
+          - REGULAR
+          - AUCTION
+          example: REGULAR
         categoryId:
           type: integer
           format: int64
@@ -6538,7 +6889,9 @@ components:
           description: 구매 상태
           enum:
           - PAID
+          - SHIPPED
           - COMPLETED
+          - CANCELED
           example: PAID
         purchasedAt:
           type: string
@@ -6550,6 +6903,44 @@ components:
           format: int64
           description: 연결된 채팅방 ID. 현재는 null일 수 있습니다.
           example: 15
+        productType:
+          type: string
+          description: 상품 거래 유형
+          enum:
+          - REGULAR
+          example: REGULAR
+        paidAt:
+          type: string
+          format: date-time
+          description: 결제 완료 일시. 별도 값이 없으면 구매 일시와 같습니다.
+          example: 2026-05-06T21:30:00+09:00
+        shippedAt:
+          type: string
+          format: date-time
+          description: 판매자 발송 완료 일시
+          example: 2026-05-06T22:05:00+09:00
+        completedAt:
+          type: string
+          format: date-time
+          description: 거래 완료 일시
+          example: 2026-05-06T22:10:00+09:00
+        canceledAt:
+          type: string
+          format: date-time
+          description: 거래 취소 일시
+          example: 2026-05-09T22:05:00+09:00
+        sellerShipped:
+          type: boolean
+          description: 판매자 발송 완료 여부
+          example: true
+        buyerConfirmed:
+          type: boolean
+          description: 구매자 수령 확인 여부
+          example: false
+        counterpartNickname:
+          type: string
+          description: "거래 상대 닉네임. 구매자에게는 판매자, 판매자에게는 구매자 닉네임을 반환합니다."
+          example: Dealit#3
     CategoryResponse:
       type: object
       properties:
@@ -7853,6 +8244,55 @@ components:
         sortOrder:
           type: integer
           format: int32
+    ReauctionPreviewResponse:
+      type: object
+      description: 재경매 미리보기 응답
+      properties:
+        productId:
+          type: integer
+          format: int64
+        auctionId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        categoryName:
+          type: string
+        location:
+          type: string
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuctionEditImageResponse"
+        startPrice:
+          type: number
+        minimumBidAmount:
+          type: number
+        auctionDurationDays:
+          type: integer
+          format: int64
+        auctionStatus:
+          type: string
+          enum:
+          - DRAFT
+          - ONGOING
+          - ENDED
+          - NO_BID
+          - SUCCESSFUL_BID
+        noBidAt:
+          type: string
+          format: date-time
+        reauctionExpiresAt:
+          type: string
+          format: date-time
+        remainingSeconds:
+          type: integer
+          format: int64
     AuctionBidHistoryResponse:
       type: object
       properties:
