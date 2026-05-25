@@ -13,6 +13,7 @@ import com.dealit.dealit.domain.purchase.entity.Purchase;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.domain.purchase.service.PurchaseService;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.domain.wallet.entity.WalletLedgerType;
 import com.dealit.dealit.domain.wallet.repository.WalletLedgerRepository;
 import com.dealit.dealit.domain.wallet.repository.WalletRepository;
@@ -62,6 +63,9 @@ class PurchaseIntegrationTest {
 	private PurchaseRepository purchaseRepository;
 
 	@Autowired
+	private ReviewRepository reviewRepository;
+
+	@Autowired
 	private ProductPaymentRepository productPaymentRepository;
 
 	@Autowired
@@ -85,6 +89,7 @@ class PurchaseIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		reviewRepository.deleteAll();
 		notificationRepository.deleteAll();
 		productPaymentRepository.deleteAll();
 		purchaseRepository.deleteAll();
@@ -602,6 +607,15 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.content[0].status").value("PAID"))
 			.andExpect(jsonPath("$.content[0].purchasedAt").exists())
 			.andExpect(jsonPath("$.content[0].chatRoomId").isNumber())
+			.andExpect(jsonPath("$.content[0].productType").value("REGULAR"))
+			.andExpect(jsonPath("$.content[0].auctionId").doesNotExist())
+			.andExpect(jsonPath("$.content[0].sellerShipped").value(false))
+			.andExpect(jsonPath("$.content[0].buyerConfirmed").value(false))
+			.andExpect(jsonPath("$.content[0].completed").value(false))
+			.andExpect(jsonPath("$.content[0].shippedAt").doesNotExist())
+			.andExpect(jsonPath("$.content[0].completedAt").doesNotExist())
+			.andExpect(jsonPath("$.content[0].reviewWritten").value(false))
+			.andExpect(jsonPath("$.content[0].reviewAvailable").value(false))
 			.andExpect(jsonPath("$.page").value(0))
 			.andExpect(jsonPath("$.size").value(20))
 			.andExpect(jsonPath("$.totalElements").value(1))
@@ -668,10 +682,71 @@ class PurchaseIntegrationTest {
 			.andExpect(jsonPath("$.content[0].status").value("PAID"))
 			.andExpect(jsonPath("$.content[0].purchasedAt").exists())
 			.andExpect(jsonPath("$.content[0].chatRoomId").isNumber())
+			.andExpect(jsonPath("$.content[0].productType").value("REGULAR"))
+			.andExpect(jsonPath("$.content[0].auctionId").doesNotExist())
+			.andExpect(jsonPath("$.content[0].sellerShipped").value(false))
+			.andExpect(jsonPath("$.content[0].buyerConfirmed").value(false))
+			.andExpect(jsonPath("$.content[0].completed").value(false))
+			.andExpect(jsonPath("$.content[0].shippedAt").doesNotExist())
+			.andExpect(jsonPath("$.content[0].completedAt").doesNotExist())
+			.andExpect(jsonPath("$.content[0].reviewReceived").value(false))
 			.andExpect(jsonPath("$.page").value(0))
 			.andExpect(jsonPath("$.size").value(20))
 			.andExpect(jsonPath("$.totalElements").value(1))
 			.andExpect(jsonPath("$.hasNext").value(false));
+	}
+
+	@Test
+	@DisplayName("거래 완료 후 구매내역에는 리뷰 작성 가능 상태가 표시된다")
+	void completedPurchaseShowsReviewAvailable() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+		completePurchase(purchaseId);
+
+		mockMvc.perform(get("/api/v1/mypage/purchases")
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[0].purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.content[0].status").value("COMPLETED"))
+			.andExpect(jsonPath("$.content[0].sellerShipped").value(true))
+			.andExpect(jsonPath("$.content[0].buyerConfirmed").value(true))
+			.andExpect(jsonPath("$.content[0].completed").value(true))
+			.andExpect(jsonPath("$.content[0].shippedAt").exists())
+			.andExpect(jsonPath("$.content[0].completedAt").exists())
+			.andExpect(jsonPath("$.content[0].reviewWritten").value(false))
+			.andExpect(jsonPath("$.content[0].reviewAvailable").value(true));
+	}
+
+	@Test
+	@DisplayName("리뷰 작성 후 구매/판매내역에는 리뷰 상태가 반영된다")
+	void reviewStateIsReflectedInMyPageLists() throws Exception {
+		Product product = saveProduct(seller, ProductStatus.ON_SALE, BigDecimal.valueOf(30000));
+		walletService.charge(buyer.getMemberId(), 50000);
+		Long purchaseId = purchaseProduct(product, buyer);
+		completePurchase(purchaseId);
+
+		mockMvc.perform(post("/api/v1/reviews")
+				.with(authentication(authenticatedMember(buyer)))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(reviewRequestJson(product.getProductId())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.productId").value(product.getProductId()))
+			.andExpect(jsonPath("$.reviewerId").value(buyer.getMemberId()))
+			.andExpect(jsonPath("$.revieweeId").value(seller.getMemberId()));
+
+		mockMvc.perform(get("/api/v1/mypage/purchases")
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[0].purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.content[0].reviewWritten").value(true))
+			.andExpect(jsonPath("$.content[0].reviewAvailable").value(false));
+
+		mockMvc.perform(get("/api/v1/mypage/sales")
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[0].purchaseId").value(purchaseId))
+			.andExpect(jsonPath("$.content[0].reviewReceived").value(true));
 	}
 
 	@Test
@@ -774,6 +849,17 @@ class PurchaseIntegrationTest {
 		return purchaseRepository.findAll().getFirst().getPurchaseId();
 	}
 
+	private void completePurchase(Long purchaseId) throws Exception {
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/ship", purchaseId)
+				.with(authentication(authenticatedMember(seller))))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/purchases/{purchaseId}/buyer-complete", purchaseId)
+				.with(authentication(authenticatedMember(buyer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("COMPLETED"));
+	}
+
 	private int performConcurrentPurchase(
 		Long productId,
 		Member buyer,
@@ -798,6 +884,16 @@ class PurchaseIntegrationTest {
 			  "idempotencyKey": "%s"
 			}
 			""".formatted(idempotencyKey);
+	}
+
+	private String reviewRequestJson(Long productId) {
+		return """
+			{
+			  "productId": %d,
+			  "rating": 5.0,
+			  "content": "Great transaction."
+			}
+			""".formatted(productId);
 	}
 
 	private UsernamePasswordAuthenticationToken authenticatedMember(Member member) {

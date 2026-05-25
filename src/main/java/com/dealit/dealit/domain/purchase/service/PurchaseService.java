@@ -37,6 +37,7 @@ import com.dealit.dealit.domain.purchase.exception.PurchaseForbiddenException;
 import com.dealit.dealit.domain.purchase.exception.PurchaseNotFoundException;
 import com.dealit.dealit.domain.purchase.exception.PurchaseNotCompletableException;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.domain.wallet.exception.InvalidWalletRequestException;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.global.service.ImageUrlService;
@@ -45,9 +46,11 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -68,6 +71,7 @@ public class PurchaseService {
 
 	private final PurchaseRepository purchaseRepository;
 	private final AuctionPaymentRepository auctionPaymentRepository;
+	private final ReviewRepository reviewRepository;
 	private final ProductRepository productRepository;
 	private final MemberRepository memberRepository;
 	private final WalletService walletService;
@@ -226,9 +230,23 @@ public class PurchaseService {
 			? purchaseRepository.findByBuyerIdOrderByPurchaseIdDesc(memberId, pageRequest)
 			: purchaseRepository.findByBuyerIdAndStatusInOrderByPurchaseIdDesc(memberId, statuses, pageRequest);
 
-		Map<Long, Product> productsById = loadProductsById(purchasePage.getContent());
-		List<MyPurchaseItemResponse> content = purchasePage.getContent().stream()
-			.map(purchase -> toMyPurchaseItemResponse(purchase, productsById.get(purchase.getProductId())))
+		List<Purchase> purchases = purchasePage.getContent();
+		Map<Long, Product> productsById = loadProductsById(purchases);
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId = loadAuctionPaymentsByPurchaseId(purchases);
+		Set<Long> reviewedRegularProductIds = loadReviewedRegularProductIds(
+			memberId,
+			purchases,
+			auctionPaymentsByPurchaseId
+		);
+		Set<Long> reviewedAuctionIds = loadReviewedAuctionIds(memberId, auctionPaymentsByPurchaseId);
+		List<MyPurchaseItemResponse> content = purchases.stream()
+			.map(purchase -> toMyPurchaseItemResponse(
+				purchase,
+				productsById.get(purchase.getProductId()),
+				auctionPaymentsByPurchaseId.get(purchase.getPurchaseId()),
+				reviewedRegularProductIds,
+				reviewedAuctionIds
+			))
 			.toList();
 
 		return new MyPurchaseListResponse(
@@ -254,9 +272,19 @@ public class PurchaseService {
 			? purchaseRepository.findBySellerIdOrderByPurchaseIdDesc(memberId, pageRequest)
 			: purchaseRepository.findBySellerIdAndStatusInOrderByPurchaseIdDesc(memberId, statuses, pageRequest);
 
-		Map<Long, Product> productsById = loadProductsById(purchasePage.getContent());
-		List<MySaleItemResponse> content = purchasePage.getContent().stream()
-			.map(purchase -> toMySaleItemResponse(purchase, productsById.get(purchase.getProductId())))
+		List<Purchase> purchases = purchasePage.getContent();
+		Map<Long, Product> productsById = loadProductsById(purchases);
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId = loadAuctionPaymentsByPurchaseId(purchases);
+		Set<ReviewProductKey> regularReviewKeys = loadRegularReviewKeys(purchases, auctionPaymentsByPurchaseId);
+		Set<ReviewAuctionKey> auctionReviewKeys = loadAuctionReviewKeys(purchases, auctionPaymentsByPurchaseId);
+		List<MySaleItemResponse> content = purchases.stream()
+			.map(purchase -> toMySaleItemResponse(
+				purchase,
+				productsById.get(purchase.getProductId()),
+				auctionPaymentsByPurchaseId.get(purchase.getPurchaseId()),
+				regularReviewKeys,
+				auctionReviewKeys
+			))
 			.toList();
 
 		return new MySaleListResponse(
@@ -376,11 +404,108 @@ public class PurchaseService {
 			.distinct()
 			.toList();
 
+		if (productIds.isEmpty()) {
+			return Map.of();
+		}
 		return productRepository.findAllByProductIdInAndDeletedAtIsNull(productIds).stream()
 			.collect(Collectors.toMap(Product::getProductId, Function.identity()));
 	}
 
-	private MyPurchaseItemResponse toMyPurchaseItemResponse(Purchase purchase, Product product) {
+	private Map<Long, AuctionPayment> loadAuctionPaymentsByPurchaseId(List<Purchase> purchases) {
+		List<Long> purchaseIds = purchases.stream()
+			.map(Purchase::getPurchaseId)
+			.distinct()
+			.toList();
+
+		if (purchaseIds.isEmpty()) {
+			return Map.of();
+		}
+		return auctionPaymentRepository.findAllByPurchaseIdInAndDeletedAtIsNull(purchaseIds).stream()
+			.collect(Collectors.toMap(AuctionPayment::getPurchaseId, Function.identity()));
+	}
+
+	private Set<Long> loadReviewedRegularProductIds(
+		Long reviewerId,
+		List<Purchase> purchases,
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId
+	) {
+		Set<Long> productIds = purchases.stream()
+			.filter(purchase -> !auctionPaymentsByPurchaseId.containsKey(purchase.getPurchaseId()))
+			.map(Purchase::getProductId)
+			.collect(Collectors.toSet());
+
+		if (productIds.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(reviewRepository.findReviewedRegularProductIds(reviewerId, productIds));
+	}
+
+	private Set<Long> loadReviewedAuctionIds(
+		Long reviewerId,
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId
+	) {
+		Set<Long> auctionIds = auctionPaymentsByPurchaseId.values().stream()
+			.map(payment -> payment.getAuction().getAuctionId())
+			.collect(Collectors.toSet());
+
+		if (auctionIds.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(reviewRepository.findReviewedAuctionIds(reviewerId, auctionIds));
+	}
+
+	private Set<ReviewProductKey> loadRegularReviewKeys(
+		List<Purchase> purchases,
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId
+	) {
+		Set<Long> buyerIds = purchases.stream()
+			.map(Purchase::getBuyerId)
+			.collect(Collectors.toSet());
+		Set<Long> productIds = purchases.stream()
+			.filter(purchase -> !auctionPaymentsByPurchaseId.containsKey(purchase.getPurchaseId()))
+			.map(Purchase::getProductId)
+			.collect(Collectors.toSet());
+
+		if (buyerIds.isEmpty() || productIds.isEmpty()) {
+			return Set.of();
+		}
+		return reviewRepository.findRegularReviewsByReviewersAndProducts(buyerIds, productIds).stream()
+			.map(review -> new ReviewProductKey(review.getReviewerId(), review.getProductId()))
+			.collect(Collectors.toSet());
+	}
+
+	private Set<ReviewAuctionKey> loadAuctionReviewKeys(
+		List<Purchase> purchases,
+		Map<Long, AuctionPayment> auctionPaymentsByPurchaseId
+	) {
+		Set<Long> buyerIds = purchases.stream()
+			.map(Purchase::getBuyerId)
+			.collect(Collectors.toSet());
+		Set<Long> auctionIds = auctionPaymentsByPurchaseId.values().stream()
+			.map(payment -> payment.getAuction().getAuctionId())
+			.collect(Collectors.toSet());
+
+		if (buyerIds.isEmpty() || auctionIds.isEmpty()) {
+			return Set.of();
+		}
+		return reviewRepository.findAuctionReviewsByReviewersAndAuctions(buyerIds, auctionIds).stream()
+			.map(review -> new ReviewAuctionKey(review.getReviewerId(), review.getAuctionId()))
+			.collect(Collectors.toSet());
+	}
+
+	private MyPurchaseItemResponse toMyPurchaseItemResponse(
+		Purchase purchase,
+		Product product,
+		AuctionPayment auctionPayment,
+		Set<Long> reviewedRegularProductIds,
+		Set<Long> reviewedAuctionIds
+	) {
+		Long auctionId = auctionPayment == null ? null : auctionPayment.getAuction().getAuctionId();
+		ProductSaleType productType = product == null ? null : product.getSaleType();
+		boolean reviewWritten = auctionId == null
+			? reviewedRegularProductIds.contains(purchase.getProductId())
+			: reviewedAuctionIds.contains(auctionId);
+		boolean completed = purchase.getStatus() == PurchaseStatus.COMPLETED;
 		return new MyPurchaseItemResponse(
 			purchase.getPurchaseId(),
 			purchase.getProductId(),
@@ -390,11 +515,32 @@ public class PurchaseService {
 			toWalletAmount(purchase.getPriceSnapshot()),
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
-			purchase.getChatRoomId()
+			purchase.getChatRoomId(),
+			productType,
+			auctionId,
+			purchase.getShippedAt() != null,
+			purchase.getBuyerCompletedAt() != null,
+			completed,
+			toSeoulOffsetDateTime(purchase.getShippedAt()),
+			toSeoulOffsetDateTime(purchase.getCompletedAt()),
+			reviewWritten,
+			completed && !reviewWritten
 		);
 	}
 
-	private MySaleItemResponse toMySaleItemResponse(Purchase purchase, Product product) {
+	private MySaleItemResponse toMySaleItemResponse(
+		Purchase purchase,
+		Product product,
+		AuctionPayment auctionPayment,
+		Set<ReviewProductKey> regularReviewKeys,
+		Set<ReviewAuctionKey> auctionReviewKeys
+	) {
+		Long auctionId = auctionPayment == null ? null : auctionPayment.getAuction().getAuctionId();
+		ProductSaleType productType = product == null ? null : product.getSaleType();
+		boolean reviewReceived = auctionId == null
+			? regularReviewKeys.contains(new ReviewProductKey(purchase.getBuyerId(), purchase.getProductId()))
+			: auctionReviewKeys.contains(new ReviewAuctionKey(purchase.getBuyerId(), auctionId));
+		boolean completed = purchase.getStatus() == PurchaseStatus.COMPLETED;
 		return new MySaleItemResponse(
 			purchase.getPurchaseId(),
 			purchase.getProductId(),
@@ -404,7 +550,15 @@ public class PurchaseService {
 			toWalletAmount(purchase.getPriceSnapshot()),
 			purchase.getStatus(),
 			toSeoulOffsetDateTime(purchase.getPurchasedAt()),
-			purchase.getChatRoomId()
+			purchase.getChatRoomId(),
+			productType,
+			auctionId,
+			purchase.getShippedAt() != null,
+			purchase.getBuyerCompletedAt() != null,
+			completed,
+			toSeoulOffsetDateTime(purchase.getShippedAt()),
+			toSeoulOffsetDateTime(purchase.getCompletedAt()),
+			reviewReceived
 		);
 	}
 
@@ -691,5 +845,11 @@ public class PurchaseService {
 			return null;
 		}
 		return dateTime.atZone(SEOUL_ZONE).toOffsetDateTime();
+	}
+
+	private record ReviewProductKey(Long reviewerId, Long productId) {
+	}
+
+	private record ReviewAuctionKey(Long reviewerId, Long auctionId) {
 	}
 }

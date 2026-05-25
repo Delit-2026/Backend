@@ -121,6 +121,9 @@ public class ReviewService {
 		if (!reviewerId.equals(auction.getWinnerId())) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the winning bidder can review this auction.");
 		}
+		if (!existsCompletedPurchase(product.getProductId(), product.getMemberId(), reviewerId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the completed buyer can review this auction.");
+		}
 		return new ReviewTarget(product, auction.getAuctionId(), product.getMemberId());
 	}
 
