@@ -23,10 +23,8 @@ public class SearchDocumentFactory {
 
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
-	private final CategoryRepository categoryRepository;
 	private final ProductThumbnailResolver productThumbnailResolver;
 	private final CategoryQueryService categoryQueryService;
-	private final ImageUrlService imageUrlService;
 
 	public SearchDocument regularProduct(Product product) {
 		return regularProduct(product, loadCategoryNodes());

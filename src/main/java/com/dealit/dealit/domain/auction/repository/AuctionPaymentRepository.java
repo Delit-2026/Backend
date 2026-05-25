@@ -28,7 +28,14 @@ public interface AuctionPaymentRepository extends JpaRepository<AuctionPayment, 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	Optional<AuctionPayment> findByPurchaseIdAndDeletedAtIsNull(Long purchaseId);
 
-	List<AuctionPayment> findAllByPurchaseIdInAndDeletedAtIsNull(Collection<Long> purchaseIds);
+	@Query("""
+		SELECT p
+		FROM AuctionPayment p
+		JOIN FETCH p.auction
+		WHERE p.purchaseId IN :purchaseIds
+		  AND p.deletedAt IS NULL
+	""")
+	List<AuctionPayment> findAllByPurchaseIdInAndDeletedAtIsNull(@Param("purchaseIds") Collection<Long> purchaseIds);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	Optional<AuctionPayment> findFirstByAuctionAuctionIdAndBidderIdAndSellerIdAndStatusInAndDeletedAtIsNullOrderByReservedAtDescAuctionPaymentIdDesc(
@@ -59,6 +66,7 @@ public interface AuctionPaymentRepository extends JpaRepository<AuctionPayment, 
 	@Query("""
 		SELECT p
 		FROM AuctionPayment p
+		JOIN FETCH p.auction
 		WHERE p.status = :status
 		  AND p.refundRequestedAt < :threshold
 		  AND p.deletedAt IS NULL
