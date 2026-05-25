@@ -93,6 +93,7 @@ public class AuctionService {
 	private final AuctionDraftRepository auctionDraftRepository;
 	private final BidRepository bidRepository;
 	private final CategoryRepository categoryRepository;
+	private final CategoryQueryService categoryQueryService;
 	private final MemberRepository memberRepository;
 	private final ProductRepository productRepository;
 	private final ProductImageRepository productImageRepository;
@@ -133,7 +134,7 @@ public class AuctionService {
 	}
 
 	public List<SearchCategoryOptionResponse> getSearchCategories() {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
 		List<CategoryNode> roots = connectCategoryNodes(categories, nodesById);
 		Set<Long> activeLeafCategoryIds = new LinkedHashSet<>(
@@ -768,18 +769,11 @@ public class AuctionService {
 			request.topCategoryId(),
 			request.imageUrls()
 		);
-		return new RecommendCategoryResponse(
-			result.categoryId(),
-			result.categoryName(),
-			result.categoryPathIds(),
-			result.categoryNames(),
-			result.confidence(),
-			result.reason()
-		);
+		return RecommendCategoryResponse.from(result);
 	}
 
 	public List<CategoryOptionResponse> getCategories() {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
 
 		for (Category category : categories) {
@@ -1216,7 +1210,7 @@ public class AuctionService {
 	}
 
 	private Set<Long> resolveSearchableCategoryIds(Category selectedCategory) {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
 		connectCategoryNodes(categories, nodesById);
 

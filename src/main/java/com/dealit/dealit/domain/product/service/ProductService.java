@@ -2,6 +2,7 @@ package com.dealit.dealit.domain.product.service;
 
 import com.dealit.dealit.domain.auction.entity.Category;
 import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.auction.service.CategoryQueryService;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
 import com.dealit.dealit.domain.category.dto.CategoryRecommendationResult;
 import com.dealit.dealit.domain.category.service.CategoryRecommendationService;
@@ -86,6 +87,7 @@ public class ProductService {
 	private final ProductImageRepository productImageRepository;
 	private final ProductDraftRepository productDraftRepository;
 	private final CategoryRepository categoryRepository;
+	private final CategoryQueryService categoryQueryService;
 	private final MemberRepository memberRepository;
 	private final MemberInterestCategoryRepository memberInterestCategoryRepository;
 	private final ProductImageStorage productImageStorage;
@@ -354,18 +356,11 @@ public class ProductService {
 			request.topCategoryId(),
 			request.imageUrls()
 		);
-		return new RecommendCategoryResponse(
-			result.categoryId(),
-			result.categoryName(),
-			result.categoryPathIds(),
-			result.categoryNames(),
-			result.confidence(),
-			result.reason()
-		);
+		return RecommendCategoryResponse.from(result);
 	}
 
 	public List<CategoryOptionResponse> getCategories() {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
 
 		for (Category category : categories) {
@@ -390,7 +385,7 @@ public class ProductService {
 	}
 
 	public List<SearchCategoryOptionResponse> getSearchCategories() {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
 		List<CategoryNode> roots = connectCategoryNodes(categories, nodesById);
 		Set<Long> activeLeafCategoryIds = new LinkedHashSet<>(
@@ -680,7 +675,7 @@ public class ProductService {
 	}
 
 	private Set<Long> resolveSearchableCategoryIds(Category selectedCategory) {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = buildCategoryNodesById(categories);
 		connectCategoryNodes(categories, nodesById);
 

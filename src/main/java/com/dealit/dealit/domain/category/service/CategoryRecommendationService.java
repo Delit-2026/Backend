@@ -1,7 +1,7 @@
 package com.dealit.dealit.domain.category.service;
 
 import com.dealit.dealit.domain.auction.entity.Category;
-import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.auction.service.CategoryQueryService;
 import com.dealit.dealit.domain.category.client.AiCategoryRecommendationClient;
 import com.dealit.dealit.domain.category.dto.AiCategoryCandidateRequest;
 import com.dealit.dealit.domain.category.dto.AiCategoryRecommendationAlternativeResponse;
@@ -32,7 +32,7 @@ public class CategoryRecommendationService {
 	private static final int LEAF_CATEGORY_DEPTH = 3;
 	private static final double RETRY_CONFIDENCE_THRESHOLD = 0.8;
 
-	private final CategoryRepository categoryRepository;
+	private final CategoryQueryService categoryQueryService;
 	private final AiCategoryRecommendationClient aiCategoryRecommendationClient;
 
 	public CategoryRecommendationResult recommend(
@@ -41,7 +41,7 @@ public class CategoryRecommendationService {
 		Long topCategoryId,
 		List<String> imageUrls
 	) {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, Category> categoriesById = toCategoriesById(categories);
 		Category topCategory = categoriesById.get(topCategoryId);
 		if (topCategory == null) {

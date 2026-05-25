@@ -3,7 +3,6 @@ package com.dealit.dealit.domain.category.client;
 import com.dealit.dealit.domain.category.dto.AiCategoryRecommendationRequest;
 import com.dealit.dealit.domain.category.dto.AiCategoryRecommendationResponse;
 import com.dealit.dealit.domain.category.exception.CategoryRecommendationException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -12,17 +11,22 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-@RequiredArgsConstructor
 public class AiCategoryRecommendationClient {
 
-	private final AiCategoryRecommendationProperties properties;
-	private final RestClient.Builder restClientBuilder;
+	private final RestClient restClient;
+
+	public AiCategoryRecommendationClient(
+		AiCategoryRecommendationProperties properties,
+		RestClient.Builder restClientBuilder
+	) {
+		this.restClient = restClientBuilder
+			.baseUrl(properties.normalizedBaseUrl())
+			.build();
+	}
 
 	public AiCategoryRecommendationResponse recommend(AiCategoryRecommendationRequest request) {
 		try {
-			AiCategoryRecommendationResponse response = restClientBuilder
-				.baseUrl(properties.normalizedBaseUrl())
-				.build()
+			AiCategoryRecommendationResponse response = restClient
 				.post()
 				.uri("/api/v1/recommendations/categories")
 				.contentType(MediaType.APPLICATION_JSON)

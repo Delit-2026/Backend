@@ -1,5 +1,6 @@
 package com.dealit.dealit.domain.product.dto;
 
+import com.dealit.dealit.domain.category.dto.CategoryRecommendationResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -24,4 +25,14 @@ public record RecommendCategoryResponse(
 	@Schema(description = "AI 추천 사유")
 	String reason
 ) {
+	public static RecommendCategoryResponse from(CategoryRecommendationResult result) {
+		return new RecommendCategoryResponse(
+			result.categoryId(),
+			result.categoryName(),
+			result.categoryPathIds(),
+			result.categoryNames(),
+			result.confidence(),
+			result.reason()
+		);
+	}
 }
