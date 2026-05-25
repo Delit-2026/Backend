@@ -2,7 +2,7 @@ package com.dealit.dealit.domain.search.service;
 
 import com.dealit.dealit.domain.auction.entity.Auction;
 import com.dealit.dealit.domain.auction.entity.Category;
-import com.dealit.dealit.domain.auction.repository.CategoryRepository;
+import com.dealit.dealit.domain.auction.service.CategoryQueryService;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.service.ProductThumbnailResolver;
 import com.dealit.dealit.domain.search.document.SearchDocument;
@@ -25,6 +25,8 @@ public class SearchDocumentFactory {
 
 	private final CategoryRepository categoryRepository;
 	private final ProductThumbnailResolver productThumbnailResolver;
+	private final CategoryQueryService categoryQueryService;
+	private final ImageUrlService imageUrlService;
 
 	public SearchDocument regularProduct(Product product) {
 		return regularProduct(product, loadCategoryNodes());
@@ -84,7 +86,7 @@ public class SearchDocumentFactory {
 	}
 
 	public Map<Long, CategoryNode> loadCategoryNodes() {
-		List<Category> categories = categoryRepository.findAllByOrderByDepthAscIdAsc();
+		List<Category> categories = categoryQueryService.findAllOrdered();
 		Map<Long, CategoryNode> nodesById = new LinkedHashMap<>();
 		for (Category category : categories) {
 			nodesById.put(category.getId(), new CategoryNode(category));

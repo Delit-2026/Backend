@@ -2,6 +2,7 @@ package com.dealit.dealit.global.error;
 
 import com.dealit.dealit.domain.auction.exception.AuctionException;
 import com.dealit.dealit.domain.auth.exception.InvalidCredentialsException;
+import com.dealit.dealit.domain.category.exception.CategoryRecommendationException;
 import com.dealit.dealit.domain.chat.exception.ChatForbiddenException;
 import com.dealit.dealit.domain.chat.exception.ChatMessageNotFoundException;
 import com.dealit.dealit.domain.chat.exception.ChatRoomNotFoundException;
@@ -123,6 +124,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(ProductException.class)
 	public ResponseEntity<ErrorResponse> handleProductException(ProductException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(CategoryRecommendationException.class)
+	public ResponseEntity<ErrorResponse> handleCategoryRecommendationException(CategoryRecommendationException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}
