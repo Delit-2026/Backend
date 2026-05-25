@@ -46,6 +46,22 @@ services:
       timeout: 5s
       retries: 20
 
+  ai:
+    build:
+      context: ../AI
+      dockerfile: Dockerfile
+    container_name: dealit-ai
+    env_file:
+      - ../AI/.env
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=5)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -55,6 +71,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ai:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -102,6 +120,7 @@ services:
       OPENSEARCH_AUTO_REINDEX_ON_STARTUP: ${OPENSEARCH_AUTO_REINDEX_ON_STARTUP:-true}
       OPENSEARCH_URI: ${OPENSEARCH_URI:-http://opensearch:9200}
       OPENSEARCH_INDEX_NAME: ${OPENSEARCH_INDEX_NAME:-dealit-search}
+      AI_CATEGORY_RECOMMENDATION_BASE_URL: ${AI_CATEGORY_RECOMMENDATION_BASE_URL:-http://ai:8000}
     ports:
       - "${SERVER_PORT:-8080}:8080"
     volumes:
