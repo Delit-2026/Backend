@@ -1,22 +1,4 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: dealit-postgres
-    environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_BIND_HOST:-127.0.0.1}:${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   redis:
     image: redis:7.4-alpine
     container_name: dealit-redis
@@ -69,16 +51,14 @@ services:
     image: ${BACKEND_IMAGE}
     container_name: dealit-backend
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       ai:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_HOST: postgres
-      DB_PORT: 5432
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -135,6 +115,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres-data:
   redis-data:
   opensearch-data:
