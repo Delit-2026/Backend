@@ -10,11 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class PopularProductIntegrationTest {
 
+	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -33,6 +36,9 @@ class PopularProductIntegrationTest {
 
 	@Autowired
 	private MemberRepository memberRepository;
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	private Member member;
 
@@ -57,6 +63,7 @@ class PopularProductIntegrationTest {
 	@Test
 	@DisplayName("실시간 인기 일반 상품 목록은 점수 순으로 반환하고 경매 상품은 제외한다")
 	void getPopularProductsReturnsRegularProductsSortedByScore() throws Exception {
+		LocalDateTime now = LocalDateTime.now(SEOUL_ZONE);
 		Product lowScoreProduct = productRepository.save(Product.create(
 			"오래된 인기 상품",
 			"낮은 점수 상품",
@@ -69,8 +76,7 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(lowScoreProduct, "createdAt", LocalDateTime.now().minusHours(10));
-		ReflectionTestUtils.setField(lowScoreProduct, "updatedAt", LocalDateTime.now().minusHours(10));
+		updateProductTimestamps(lowScoreProduct, now.minusHours(10));
 		for (int count = 0; count < 10; count++) {
 			lowScoreProduct.increaseViewCount();
 		}
@@ -88,8 +94,7 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(highScoreProduct, "createdAt", LocalDateTime.now().minusHours(2));
-		ReflectionTestUtils.setField(highScoreProduct, "updatedAt", LocalDateTime.now().minusHours(2));
+		updateProductTimestamps(highScoreProduct, now.minusHours(2));
 		for (int count = 0; count < 12; count++) {
 			highScoreProduct.increaseViewCount();
 		}
@@ -107,7 +112,7 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(auctionProduct, "createdAt", LocalDateTime.now().minusHours(1));
+		updateProductTimestamps(auctionProduct, now.minusHours(1));
 		auctionProduct.increaseViewCount();
 		productRepository.save(auctionProduct);
 
@@ -115,7 +120,16 @@ class PopularProductIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content", hasSize(2)))
 			.andExpect(jsonPath("$.content[0].name").value("최근 인기 상품"))
-			.andExpect(jsonPath("$.content[0].popularScore").value(12.0))
+			.andExpect(jsonPath("$.content[0].popularScore").value(6.0))
 			.andExpect(jsonPath("$.content[1].name").value("오래된 인기 상품"));
+	}
+
+	private void updateProductTimestamps(Product product, LocalDateTime timestamp) {
+		jdbcTemplate.update(
+			"update product set created_at = ?, updated_at = ? where product_id = ?",
+			timestamp,
+			timestamp,
+			product.getProductId()
+		);
 	}
 }
