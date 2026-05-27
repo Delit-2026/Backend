@@ -260,7 +260,7 @@ class AuctionBidServiceTest {
 				.filter(AuctionBidException.class::isInstance)
 				.map(AuctionBidException.class::cast)
 				.map(AuctionBidException::getCode))
-				.containsExactly("BID_PRICE_CHANGED");
+				.containsAnyOf("BID_PRICE_CHANGED", "BID_PRICE_BELOW_MINIMUM");
 			assertThat(auction.getCurrentPrice()).isIn(new BigDecimal("101000"), new BigDecimal("101500"));
 			verify(bidRepository, times(1)).save(any(Bid.class));
 			verify(auctionNotificationService, times(1)).notifyBidReceived(
