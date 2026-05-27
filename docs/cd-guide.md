@@ -41,9 +41,15 @@ APP_IMAGES_PUBLIC_BASE_URL=https://api.dealit.site
 JPA_DDL_AUTO=validate
 NGINX_PORT=80
 SERVER_PORT=8080
+DB_BIND_HOST=127.0.0.1
+REDIS_BIND_HOST=127.0.0.1
+OPENSEARCH_BIND_HOST=127.0.0.1
+BACKEND_BIND_HOST=127.0.0.1
 ```
 
 AI는 현재 서버 구성과 동일하게 `../AI` 디렉터리의 Dockerfile로 빌드합니다. 따라서 `DEPLOY_PATH`의 부모 디렉터리에 `AI` 디렉터리가 있어야 합니다.
+
+PostgreSQL, Redis, OpenSearch, backend는 컨테이너 간 Docker 내부 네트워크 또는 서버 로컬 health check로 접근하므로 운영 compose에서는 기본적으로 호스트의 `127.0.0.1`에만 바인딩합니다. 외부 접속이 필요하면 AWS Security Group과 서비스 인증 설정을 먼저 점검한 뒤 별도 값으로 열어야 합니다.
 
 ## 3. GitHub Secrets
 

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_BIND_HOST:-127.0.0.1}:${DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
     image: redis:7.4-alpine
     container_name: dealit-redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_BIND_HOST:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -39,7 +39,7 @@ services:
       DISABLE_SECURITY_PLUGIN: "true"
       OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
     ports:
-      - "${OPENSEARCH_PORT:-9200}:9200"
+      - "${OPENSEARCH_BIND_HOST:-127.0.0.1}:${OPENSEARCH_PORT:-9200}:9200"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     healthcheck:
@@ -123,7 +123,7 @@ services:
       OPENSEARCH_INDEX_NAME: ${OPENSEARCH_INDEX_NAME:-dealit-search}
       AI_CATEGORY_RECOMMENDATION_BASE_URL: ${AI_CATEGORY_RECOMMENDATION_BASE_URL:-http://ai:8000}
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8080}:8080"
     volumes:
       - ./secrets:/app/secrets:ro
       - ./uploads:/app/uploads
