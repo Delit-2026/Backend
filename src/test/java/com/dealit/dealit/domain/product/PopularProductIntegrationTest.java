@@ -71,7 +71,7 @@ class PopularProductIntegrationTest {
 		));
 		ReflectionTestUtils.setField(lowScoreProduct, "createdAt", LocalDateTime.now().minusHours(10));
 		ReflectionTestUtils.setField(lowScoreProduct, "updatedAt", LocalDateTime.now().minusHours(10));
-		for (int count = 0; count < 10; count++) {
+		for (int count = 0; count < 20; count++) {
 			lowScoreProduct.increaseViewCount();
 		}
 		productRepository.save(lowScoreProduct);
@@ -115,7 +115,7 @@ class PopularProductIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content", hasSize(2)))
 			.andExpect(jsonPath("$.content[0].name").value("최근 인기 상품"))
-			.andExpect(jsonPath("$.content[0].popularScore").value(12.0))
+			.andExpect(jsonPath("$.content[0].popularScore").value(6.0))
 			.andExpect(jsonPath("$.content[1].name").value("오래된 인기 상품"));
 	}
 }
