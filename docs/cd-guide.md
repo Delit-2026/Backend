@@ -15,8 +15,6 @@
 ```text
 .env
 docker-compose.prod.yml
-nginx/nginx.conf
-nginx/logs/
 secrets/
 uploads/
 ```
@@ -39,7 +37,6 @@ APP_CORS_ALLOWED_ORIGINS=https://your-frontend-domain.com
 APP_IMAGES_PUBLIC_BASE_URL=https://api.dealit.site
 
 JPA_DDL_AUTO=validate
-NGINX_PORT=80
 SERVER_PORT=8080
 DB_BIND_HOST=127.0.0.1
 REDIS_BIND_HOST=127.0.0.1
@@ -50,6 +47,8 @@ BACKEND_BIND_HOST=127.0.0.1
 AI는 현재 서버 구성과 동일하게 `../AI` 디렉터리의 Dockerfile로 빌드합니다. 따라서 `DEPLOY_PATH`의 부모 디렉터리에 `AI` 디렉터리가 있어야 합니다.
 
 PostgreSQL, Redis, OpenSearch, backend는 컨테이너 간 Docker 내부 네트워크 또는 서버 로컬 health check로 접근하므로 운영 compose에서는 기본적으로 호스트의 `127.0.0.1`에만 바인딩합니다. 외부 접속이 필요하면 AWS Security Group과 서비스 인증 설정을 먼저 점검한 뒤 별도 값으로 열어야 합니다.
+
+운영 HTTPS는 Docker nginx가 아니라 EC2 host nginx가 담당합니다. host nginx는 `api.dealit.site` 요청을 `http://127.0.0.1:8080`의 backend 컨테이너로 proxy합니다.
 
 ## 3. GitHub Secrets
 
@@ -71,10 +70,8 @@ GHCR push는 기본 `GITHUB_TOKEN`을 사용하므로 별도 token이 필요 없
 
 ```bash
 cd /home/ec2-user/Backend
-mkdir -p nginx/logs secrets uploads
+mkdir -p secrets uploads
 ```
-
-`nginx/nginx.conf`는 현재 repo의 파일을 서버에 복사해 둡니다.
 
 그 다음 GitHub Actions의 `Deploy backend` workflow를 수동 실행하거나, `develop` 브랜치에 merge하면 자동 배포됩니다.
 

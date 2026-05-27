@@ -106,6 +106,6 @@ jobs:
               printf '\nBACKEND_IMAGE=%s\n' "${BACKEND_IMAGE}" >> .env
             fi
             $COMPOSE -f docker-compose.prod.yml pull backend
-            $COMPOSE -f docker-compose.prod.yml up -d --build
+            $COMPOSE -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f
             curl --fail --silent --show-error http://localhost:${SERVER_PORT:-8080}/actuator/health
