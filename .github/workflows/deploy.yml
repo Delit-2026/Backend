@@ -81,12 +81,14 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          RDS_DB_HOST: ${{ secrets.RDS_DB_HOST }}
+          RDS_DB_PASSWORD: ${{ secrets.RDS_DB_PASSWORD }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          envs: BACKEND_IMAGE
+          envs: BACKEND_IMAGE,RDS_DB_HOST,RDS_DB_PASSWORD
           script: |
             set -e
             cd "${{ secrets.DEPLOY_PATH }}"
@@ -104,6 +106,16 @@ jobs:
               sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=${BACKEND_IMAGE}|" .env
             else
               printf '\nBACKEND_IMAGE=%s\n' "${BACKEND_IMAGE}" >> .env
+            fi
+            if grep -q '^DB_HOST=' .env; then
+              sed -i "s|^DB_HOST=.*|DB_HOST=${RDS_DB_HOST}|" .env
+            else
+              printf '\nDB_HOST=%s\n' "${RDS_DB_HOST}" >> .env
+            fi
+            if grep -q '^DB_PASSWORD=' .env; then
+              sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${RDS_DB_PASSWORD}|" .env
+            else
+              printf '\nDB_PASSWORD=%s\n' "${RDS_DB_PASSWORD}" >> .env
             fi
             $COMPOSE -f docker-compose.prod.yml pull backend
             $COMPOSE -f docker-compose.prod.yml up -d --build --remove-orphans
