@@ -91,13 +91,21 @@ jobs:
             set -e
             cd "${{ secrets.DEPLOY_PATH }}"
             touch .env
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE="docker-compose"
+            else
+              echo "Docker Compose is not installed. Install docker compose plugin or docker-compose."
+              exit 1
+            fi
             docker login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
             if grep -q '^BACKEND_IMAGE=' .env; then
               sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=${BACKEND_IMAGE}|" .env
             else
               printf '\nBACKEND_IMAGE=%s\n' "${BACKEND_IMAGE}" >> .env
             fi
-            docker compose -f docker-compose.prod.yml pull backend
-            docker compose -f docker-compose.prod.yml up -d --build
+            $COMPOSE -f docker-compose.prod.yml pull backend
+            $COMPOSE -f docker-compose.prod.yml up -d --build
             docker image prune -f
             curl --fail --silent --show-error http://localhost:${SERVER_PORT:-8080}/actuator/health
