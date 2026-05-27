@@ -14,6 +14,7 @@ import com.dealit.dealit.domain.member.exception.DuplicateMemberException;
 import com.dealit.dealit.domain.member.exception.DuplicateNicknameException;
 import com.dealit.dealit.domain.member.exception.MemberException;
 import com.dealit.dealit.domain.notification.exception.NotificationException;
+import com.dealit.dealit.domain.price.exception.PriceRecommendationException;
 import com.dealit.dealit.domain.product.exception.ProductException;
 import com.dealit.dealit.domain.purchase.exception.PurchaseException;
 import com.dealit.dealit.domain.wallet.exception.WalletException;
@@ -130,6 +131,12 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(CategoryRecommendationException.class)
 	public ResponseEntity<ErrorResponse> handleCategoryRecommendationException(CategoryRecommendationException exception) {
+		return ResponseEntity.status(exception.getStatus())
+			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
+	}
+
+	@ExceptionHandler(PriceRecommendationException.class)
+	public ResponseEntity<ErrorResponse> handlePriceRecommendationException(PriceRecommendationException exception) {
 		return ResponseEntity.status(exception.getStatus())
 			.body(ErrorResponse.of(exception.getStatus().value(), exception.getCode(), exception.getMessage(), List.of()));
 	}
