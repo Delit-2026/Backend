@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,6 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class PopularProductIntegrationTest {
+
+	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -69,8 +72,9 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(lowScoreProduct, "createdAt", LocalDateTime.now().minusHours(10));
-		ReflectionTestUtils.setField(lowScoreProduct, "updatedAt", LocalDateTime.now().minusHours(10));
+		LocalDateTime now = LocalDateTime.now(SEOUL_ZONE);
+		ReflectionTestUtils.setField(lowScoreProduct, "createdAt", now.minusHours(10));
+		ReflectionTestUtils.setField(lowScoreProduct, "updatedAt", now.minusHours(10));
 		for (int count = 0; count < 10; count++) {
 			lowScoreProduct.increaseViewCount();
 		}
@@ -88,8 +92,8 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(highScoreProduct, "createdAt", LocalDateTime.now().minusHours(2));
-		ReflectionTestUtils.setField(highScoreProduct, "updatedAt", LocalDateTime.now().minusHours(2));
+		ReflectionTestUtils.setField(highScoreProduct, "createdAt", now.minusHours(2));
+		ReflectionTestUtils.setField(highScoreProduct, "updatedAt", now.minusHours(2));
 		for (int count = 0; count < 12; count++) {
 			highScoreProduct.increaseViewCount();
 		}
@@ -107,7 +111,7 @@ class PopularProductIntegrationTest {
 			null,
 			ProductStatus.ON_SALE
 		));
-		ReflectionTestUtils.setField(auctionProduct, "createdAt", LocalDateTime.now().minusHours(1));
+		ReflectionTestUtils.setField(auctionProduct, "createdAt", now.minusHours(1));
 		auctionProduct.increaseViewCount();
 		productRepository.save(auctionProduct);
 
@@ -115,7 +119,7 @@ class PopularProductIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content", hasSize(2)))
 			.andExpect(jsonPath("$.content[0].name").value("최근 인기 상품"))
-			.andExpect(jsonPath("$.content[0].popularScore").isNumber())
+			.andExpect(jsonPath("$.content[0].popularScore").value(6.0))
 			.andExpect(jsonPath("$.content[1].name").value("오래된 인기 상품"));
 	}
 }
