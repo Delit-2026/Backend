@@ -210,9 +210,9 @@ class ProductIntegrationTest {
 			.getResponse()
 			.getContentAsString();
 
-		long productId = com.jayway.jsonpath.JsonPath.read(response, "$.productId");
+		Number productId = com.jayway.jsonpath.JsonPath.read(response, "$.productId");
 
-		mockMvc.perform(patch("/api/v1/products/{productId}", productId)
+		mockMvc.perform(patch("/api/v1/products/{productId}", productId.longValue())
 				.with(authentication(authenticatedMember()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""

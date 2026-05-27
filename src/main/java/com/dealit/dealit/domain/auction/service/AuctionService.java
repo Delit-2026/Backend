@@ -313,7 +313,7 @@ public class AuctionService {
 	public ReauctionResponse reauction(Long memberId, Long auctionId, CreateAuctionRequest request) {
 		validateReauctionRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		Auction sourceAuction = loadReauctionCandidate(memberId, auctionId);
 		Product sourceProduct = sourceAuction.getProduct();
 		OffsetDateTime now = OffsetDateTime.now(clock);
@@ -813,7 +813,7 @@ public class AuctionService {
 	public CreateAuctionResponse createAuction(Long memberId, CreateAuctionRequest request) {
 		validateRequestBySaleType(request);
 		validateCategorySelection(request.categoryId());
-		Member member = loadActiveMember(memberId);
+		Member member = loadVerifiedMember(memberId);
 		OffsetDateTime now = OffsetDateTime.now(clock);
 		AuctionPeriod auctionPeriod = resolveAuctionPeriod(request, now);
 		BigDecimal minimumBidAmount = resolveMinimumBidAmount(request.startPrice(), request.minimumBidAmount());

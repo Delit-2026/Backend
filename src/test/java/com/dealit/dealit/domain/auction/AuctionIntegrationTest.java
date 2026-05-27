@@ -144,7 +144,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.content[0].description").value("Includes dock and controller."))
 			.andExpect(jsonPath("$.content[0].categoryName").value("사무용노트북"))
 			.andExpect(jsonPath("$.content[0].thumbnailUrl").value("http://localhost:8080/uploads/auction/images/test-image.jpg"))
-			.andExpect(jsonPath("$.content[0].auctionStatus").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.content[0].auctionStatus").value("ONGOING"))
 			.andExpect(jsonPath("$.content[0].startPrice").value(180000))
 			.andExpect(jsonPath("$.content[0].minimumBidAmount").value(1800))
 			.andExpect(jsonPath("$.content[0].currentPrice").value(180000))
@@ -366,8 +366,8 @@ class AuctionIntegrationTest {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.productId").isNumber())
 			.andExpect(jsonPath("$.saleType").value("AUCTION"))
-			.andExpect(jsonPath("$.status").value("AUCTION_LIVE"))
-			.andExpect(jsonPath("$.auction.status").value("AUCTION_LIVE"))
+			.andExpect(jsonPath("$.status").value("ONGOING"))
+			.andExpect(jsonPath("$.auction.status").value("ONGOING"))
 			.andExpect(jsonPath("$.auction.startAt").value(notNullValue()))
 			.andExpect(jsonPath("$.auction.endAt").value(notNullValue()));
 	}
@@ -643,7 +643,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.startAt").value(notNullValue()))
 			.andExpect(jsonPath("$.endsAt").value(notNullValue()))
 			.andExpect(jsonPath("$.serverTime").value(notNullValue()))
-			.andExpect(jsonPath("$.status").value("AUCTION_LIVE"));
+			.andExpect(jsonPath("$.status").value("ONGOING"));
 	}
 
 	@Test
@@ -696,7 +696,7 @@ class AuctionIntegrationTest {
 					}
 					"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
+			.andExpect(jsonPath("$.code").value("BID_PRICE_BELOW_MINIMUM"))
 			.andExpect(jsonPath("$.message").value("최소 입찰 금액을 충족해야 합니다."));
 	}
 
@@ -728,7 +728,7 @@ class AuctionIntegrationTest {
 					""".formatted(uploadedImage.getImageId())))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
-			.andExpect(jsonPath("$.message").value("경매 판매에서는 진행 기간이 필수입니다."));
+			.andExpect(jsonPath("$.message").value("경매 판매에서는 진행 기간 또는 종료 시각이 필수입니다."));
 	}
 
 	private void deleteStoredImages() throws IOException {
