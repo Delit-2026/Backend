@@ -1,6 +1,6 @@
 # CD Guide
 
-이 문서는 `dev` 브랜치에 merge되면 GitHub Actions가 backend Docker 이미지를 빌드하고 AWS 서버에서 자동 배포하도록 구성하는 절차입니다.
+이 문서는 `develop` 브랜치에 merge되면 GitHub Actions가 backend Docker 이미지를 빌드하고 AWS 서버에서 자동 배포하도록 구성하는 절차입니다.
 
 ## 1. AWS 서버 준비
 
@@ -70,12 +70,12 @@ mkdir -p nginx/logs secrets uploads
 
 `nginx/nginx.conf`는 현재 repo의 파일을 서버에 복사해 둡니다.
 
-그 다음 GitHub Actions의 `Deploy backend` workflow를 수동 실행하거나, `dev` 브랜치에 merge하면 자동 배포됩니다.
+그 다음 GitHub Actions의 `Deploy backend` workflow를 수동 실행하거나, `develop` 브랜치에 merge하면 자동 배포됩니다.
 
 ## 5. 배포 흐름
 
 ```text
-dev push/merge
+develop push/merge
 -> ./gradlew test
 -> Docker image build
 -> ghcr.io/...:latest push
