@@ -407,7 +407,7 @@ class ProfileIntegrationTest {
 			.andExpect(jsonPath("$.profileImageUrl").value(startsWith("http://localhost:8080/uploads/profile/images/")));
 
 		Member updatedMember = memberRepository.findById(savedMember.getMemberId()).orElseThrow();
-		assertThat(updatedMember.getProfileImage()).endsWith(".jpg");
+		assertThat(updatedMember.getProfileImage()).endsWith(".png");
 	}
 
 	@Test
