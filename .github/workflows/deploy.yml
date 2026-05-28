@@ -64,8 +64,6 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}
             ${{ env.BACKEND_IMAGE_REPOSITORY }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Copy production compose file
         uses: appleboy/scp-action@v0.1.7
