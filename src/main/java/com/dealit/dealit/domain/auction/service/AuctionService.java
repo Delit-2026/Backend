@@ -47,6 +47,9 @@ import com.dealit.dealit.domain.category.dto.CategoryRecommendationResult;
 import com.dealit.dealit.domain.category.service.CategoryRecommendationService;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.price.client.AiPriceRecommendationClient;
+import com.dealit.dealit.domain.price.dto.AiPriceRecommendationRequest;
+import com.dealit.dealit.domain.price.dto.AiPriceRecommendationResponse;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
@@ -100,6 +103,7 @@ public class AuctionService {
 	private final AuctionImageStorage auctionImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final CategoryRecommendationService categoryRecommendationService;
+	private final AiPriceRecommendationClient aiPriceRecommendationClient;
 	private final ObjectMapper objectMapper;
 	private final AuctionRedisService auctionRedisService;
 	private final Clock clock;
@@ -800,10 +804,16 @@ public class AuctionService {
 	}
 
 	public RecommendPriceResponse recommendPrice(RecommendPriceRequest request) {
-		int textWeight = request.name().trim().length() * 10 + request.description().trim().length() * 2;
-		BigDecimal recommendedPrice = BigDecimal.valueOf(Math.max(10000, textWeight * 100L));
+		AiPriceRecommendationResponse response = aiPriceRecommendationClient.recommend(
+			AiPriceRecommendationRequest.of(
+				request.name().trim(),
+				request.description().trim(),
+				request.saleType().name()
+			)
+		);
+		BigDecimal recommendedPrice = BigDecimal.valueOf(response.suggestedPrice());
 		if (request.saleType() == ProductSaleType.AUCTION) {
-			BigDecimal startPrice = recommendedPrice.multiply(BigDecimal.valueOf(0.7)).setScale(0, RoundingMode.DOWN);
+			BigDecimal startPrice = BigDecimal.valueOf(response.suggestedPriceMin());
 			return new RecommendPriceResponse(recommendedPrice, startPrice);
 		}
 		return new RecommendPriceResponse(recommendedPrice, null);

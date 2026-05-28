@@ -10,6 +10,9 @@ import com.dealit.dealit.domain.member.entity.Member;
 import com.dealit.dealit.domain.member.exception.EmailNotVerifiedException;
 import com.dealit.dealit.domain.member.repository.MemberInterestCategoryRepository;
 import com.dealit.dealit.domain.member.repository.MemberRepository;
+import com.dealit.dealit.domain.price.client.AiPriceRecommendationClient;
+import com.dealit.dealit.domain.price.dto.AiPriceRecommendationRequest;
+import com.dealit.dealit.domain.price.dto.AiPriceRecommendationResponse;
 import com.dealit.dealit.domain.product.ProductSaleType;
 import com.dealit.dealit.domain.product.ProductStatus;
 import com.dealit.dealit.domain.product.dto.CategoryOptionResponse;
@@ -93,6 +96,7 @@ public class ProductService {
 	private final ProductImageStorage productImageStorage;
 	private final ImageUrlService imageUrlService;
 	private final CategoryRecommendationService categoryRecommendationService;
+	private final AiPriceRecommendationClient aiPriceRecommendationClient;
 	private final ObjectMapper objectMapper;
 	private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -434,9 +438,14 @@ public class ProductService {
 			throw new InvalidProductRequestException("일반 상품 가격 추천에서는 saleType이 REGULAR여야 합니다.");
 		}
 
-		int textWeight = request.name().trim().length() * 10 + request.description().trim().length() * 2;
-		BigDecimal recommendedPrice = BigDecimal.valueOf(Math.max(10000, textWeight * 100L));
-		return new RecommendPriceResponse(recommendedPrice);
+		AiPriceRecommendationResponse response = aiPriceRecommendationClient.recommend(
+			AiPriceRecommendationRequest.of(
+				request.name().trim(),
+				request.description().trim(),
+				request.saleType().name()
+			)
+		);
+		return new RecommendPriceResponse(BigDecimal.valueOf(response.suggestedPrice()));
 	}
 
 	@Transactional
