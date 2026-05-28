@@ -30,6 +30,8 @@ BACKEND_IMAGE=ghcr.io/OWNER/REPOSITORY:latest
 
 DB_NAME=dealit
 DB_USERNAME=dealit
+DB_HOST=your-rds-endpoint.ap-northeast-2.rds.amazonaws.com
+DB_PORT=5432
 DB_PASSWORD=change-me
 JWT_SECRET=change-me-to-long-random-secret
 
@@ -38,7 +40,6 @@ APP_IMAGES_PUBLIC_BASE_URL=https://api.dealit.site
 
 JPA_DDL_AUTO=validate
 SERVER_PORT=8080
-DB_BIND_HOST=127.0.0.1
 REDIS_BIND_HOST=127.0.0.1
 OPENSEARCH_BIND_HOST=127.0.0.1
 BACKEND_BIND_HOST=127.0.0.1
@@ -46,7 +47,9 @@ BACKEND_BIND_HOST=127.0.0.1
 
 AI는 현재 서버 구성과 동일하게 `../AI` 디렉터리의 Dockerfile로 빌드합니다. 따라서 `DEPLOY_PATH`의 부모 디렉터리에 `AI` 디렉터리가 있어야 합니다.
 
-PostgreSQL, Redis, OpenSearch, backend는 컨테이너 간 Docker 내부 네트워크 또는 서버 로컬 health check로 접근하므로 운영 compose에서는 기본적으로 호스트의 `127.0.0.1`에만 바인딩합니다. 외부 접속이 필요하면 AWS Security Group과 서비스 인증 설정을 먼저 점검한 뒤 별도 값으로 열어야 합니다.
+운영 PostgreSQL은 Docker Compose로 띄우지 않고 AWS RDS에 연결합니다. Redis, OpenSearch, backend는 컨테이너 간 Docker 내부 네트워크 또는 서버 로컬 health check로 접근하므로 운영 compose에서는 기본적으로 호스트의 `127.0.0.1`에만 바인딩합니다. 외부 접속이 필요하면 AWS Security Group과 서비스 인증 설정을 먼저 점검한 뒤 별도 값으로 열어야 합니다.
+
+RDS 보안 그룹은 EC2에서 RDS PostgreSQL 5432 포트로 접근할 수 있어야 합니다.
 
 운영 HTTPS는 Docker nginx가 아니라 EC2 host nginx가 담당합니다. host nginx는 `api.dealit.site` 요청을 `http://127.0.0.1:8080`의 backend 컨테이너로 proxy합니다.
 
@@ -60,6 +63,16 @@ DEPLOY_USER       # ec2-user
 DEPLOY_SSH_KEY    # private key 내용 전체
 DEPLOY_PORT       # 보통 22
 DEPLOY_PATH       # /home/ec2-user/Backend
+RDS_DB_HOST       # RDS endpoint
+RDS_DB_PASSWORD   # RDS database password
+```
+
+아래 secret은 선택 값입니다. 설정하면 배포 때 서버 `.env`의 동일한 DB 항목을 갱신합니다.
+
+```text
+RDS_DB_PORT       # 기본값 5432를 쓰면 생략 가능
+RDS_DB_NAME       # 서버 .env 값을 유지하면 생략 가능
+RDS_DB_USERNAME   # 서버 .env 값을 유지하면 생략 가능
 ```
 
 GHCR push는 기본 `GITHUB_TOKEN`을 사용하므로 별도 token이 필요 없습니다.
@@ -84,6 +97,7 @@ develop push/merge
 -> ghcr.io/...:latest push
 -> AWS 서버에 docker-compose.prod.yml 복사
 -> 서버 .env의 BACKEND_IMAGE 갱신
+-> 서버 .env의 DB_HOST, DB_PASSWORD 갱신
 -> docker compose pull backend
 -> docker compose up -d --build
 -> /actuator/health 확인
