@@ -33,11 +33,11 @@ services:
 
   ai:
     build:
-      context: ../AI
+      context: ${AI_BUILD_CONTEXT:-../AI}
       dockerfile: Dockerfile
     container_name: dealit-ai
     env_file:
-      - ../AI/.env
+      - ${AI_ENV_FILE:-../AI/.env}
     expose:
       - "8000"
     healthcheck:

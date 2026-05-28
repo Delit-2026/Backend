@@ -84,12 +84,13 @@ jobs:
           RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}
           RDS_DB_USERNAME: ${{ secrets.RDS_DB_USERNAME }}
           RDS_DB_PASSWORD: ${{ secrets.RDS_DB_PASSWORD }}
+          DEPLOY_AI_PATH: ${{ secrets.DEPLOY_AI_PATH }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          envs: BACKEND_IMAGE,RDS_DB_HOST,RDS_DB_PORT,RDS_DB_NAME,RDS_DB_USERNAME,RDS_DB_PASSWORD
+          envs: BACKEND_IMAGE,RDS_DB_HOST,RDS_DB_PORT,RDS_DB_NAME,RDS_DB_USERNAME,RDS_DB_PASSWORD,DEPLOY_AI_PATH
           script: |
             set -e
             cd "${{ secrets.DEPLOY_PATH }}"
@@ -132,7 +133,34 @@ jobs:
             set_env_var_if_present DB_PORT "$RDS_DB_PORT"
             set_env_var_if_present DB_NAME "$RDS_DB_NAME"
             set_env_var_if_present DB_USERNAME "$RDS_DB_USERNAME"
+            AI_PATH="${DEPLOY_AI_PATH:-../AI}"
+            if [ ! -d "$AI_PATH" ]; then
+              echo "AI directory does not exist: ${AI_PATH}"
+              exit 1
+            fi
+            if [ ! -f "$AI_PATH/Dockerfile" ]; then
+              echo "AI Dockerfile does not exist: ${AI_PATH}/Dockerfile"
+              exit 1
+            fi
+            if [ ! -f "$AI_PATH/.env" ]; then
+              echo "AI .env does not exist: ${AI_PATH}/.env"
+              exit 1
+            fi
+            if [ -d "$AI_PATH/.git" ]; then
+              git -C "$AI_PATH" pull --ff-only
+            fi
+            set_env_var AI_BUILD_CONTEXT "$AI_PATH"
+            set_env_var AI_ENV_FILE "$AI_PATH/.env"
             $COMPOSE -f docker-compose.prod.yml pull backend
             $COMPOSE -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f
-            curl --fail --silent --show-error http://localhost:${SERVER_PORT:-8080}/actuator/health
+            for i in $(seq 1 30); do
+              if curl --fail --silent --show-error "http://localhost:${SERVER_PORT:-8080}/actuator/health"; then
+                exit 0
+              fi
+              echo "Waiting for backend health check... (${i}/30)"
+              sleep 5
+            done
+            $COMPOSE -f docker-compose.prod.yml ps
+            $COMPOSE -f docker-compose.prod.yml logs --tail=200 backend
+            exit 1
