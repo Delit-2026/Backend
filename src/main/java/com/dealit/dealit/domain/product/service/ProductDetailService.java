@@ -93,9 +93,14 @@ public class ProductDetailService {
 	}
 
 	private ProductDetailResponse.SellerResponse toSellerResponse(Member seller, Product product) {
+		String profileImageUrl = seller.getProfileImage() == null || seller.getProfileImage().isBlank()
+			? null
+			: imageUrlService.toPublicUrl(seller.getProfileImage());
+
 		return new ProductDetailResponse.SellerResponse(
 			seller.getMemberId(),
 			seller.getNickname(),
+			profileImageUrl,
 			product.getLocation()
 		);
 	}

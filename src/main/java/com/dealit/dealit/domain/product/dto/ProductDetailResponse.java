@@ -75,6 +75,9 @@ public record ProductDetailResponse(
 		@Schema(description = "판매자 닉네임", example = "dealit-user-3")
 		String nickname,
 
+		@Schema(description = "판매자 프로필 이미지 URL", example = "https://api.dealit.site/uploads/profile/images/3-profile.png", nullable = true)
+		String profileImageUrl,
+
 		@Schema(description = "거래 위치", example = "서울 강남구")
 		String location
 	) {
