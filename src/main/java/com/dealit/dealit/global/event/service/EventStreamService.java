@@ -8,19 +8,30 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.Executor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
-@RequiredArgsConstructor
 public class EventStreamService {
 
     private static final long DEFAULT_TIMEOUT_MS = 30L * 60L * 1000L;
 
     private final EventStreamEmitterRepository emitterRepository;
     private final Optional<EventStreamRedisEventPublisher> redisEventPublisher;
+    private final Executor eventStreamTaskExecutor;
+
+    public EventStreamService(
+            EventStreamEmitterRepository emitterRepository,
+            Optional<EventStreamRedisEventPublisher> redisEventPublisher,
+            @Qualifier("eventStreamTaskExecutor") Executor eventStreamTaskExecutor
+    ) {
+        this.emitterRepository = emitterRepository;
+        this.redisEventPublisher = redisEventPublisher;
+        this.eventStreamTaskExecutor = eventStreamTaskExecutor;
+    }
 
     public SseEmitter subscribe(Long userId) {
         String emitterId = UUID.randomUUID().toString();
@@ -62,12 +73,18 @@ public class EventStreamService {
         for (Map.Entry<Long, Map<String, SseEmitter>> userEntry : emitterRepository.findAll().entrySet()) {
             Long userId = userEntry.getKey();
             for (Map.Entry<String, SseEmitter> emitterEntry : userEntry.getValue().entrySet()) {
-                try {
-                    emitterEntry.getValue().send(SseEmitter.event().comment("heartbeat"));
-                } catch (IOException | RuntimeException exception) {
-                    emitterRepository.remove(userId, emitterEntry.getKey());
-                }
+                String emitterId = emitterEntry.getKey();
+                SseEmitter emitter = emitterEntry.getValue();
+                eventStreamTaskExecutor.execute(() -> sendHeartbeat(userId, emitterId, emitter));
             }
+        }
+    }
+
+    private void sendHeartbeat(Long userId, String emitterId, SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().comment("heartbeat"));
+        } catch (IOException | RuntimeException exception) {
+            emitterRepository.remove(userId, emitterId);
         }
     }
 
