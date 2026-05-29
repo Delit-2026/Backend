@@ -41,6 +41,7 @@ import com.dealit.dealit.domain.purchase.entity.Purchase;
 import com.dealit.dealit.domain.purchase.entity.PurchaseStatus;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
+import com.dealit.dealit.global.service.ImageUrlService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -73,6 +74,7 @@ public class ChatService {
     private final EventStreamService eventStreamService;
     private final FcmNotificationService fcmNotificationService;
     private final AuctionNotificationService auctionNotificationService;
+    private final ImageUrlService imageUrlService;
     private final Clock clock;
 
     public CreateChatRoomResponse createChatRoom(CreateChatRoomRequest request, Long currentUserId) {
@@ -860,9 +862,16 @@ public class ChatService {
         return memberRepository.findByMemberIdAndDeletedAtIsNull(memberId)
                 .map(member -> new MemberSnapshot(
                         normalizeNickname(member),
-                        member.getProfileImage()
+                        toPublicImageUrl(member.getProfileImage())
                 ))
                 .orElse(new MemberSnapshot("User#" + memberId, null));
+    }
+
+    private String toPublicImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        return imageUrlService.toPublicUrl(imageUrl);
     }
 
     private String normalizeNickname(Member member) {

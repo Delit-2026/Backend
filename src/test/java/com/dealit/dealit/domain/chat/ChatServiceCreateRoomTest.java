@@ -32,6 +32,7 @@ import com.dealit.dealit.domain.notification.service.FcmNotificationService;
 import com.dealit.dealit.domain.wallet.service.WalletService;
 import com.dealit.dealit.domain.purchase.repository.PurchaseRepository;
 import com.dealit.dealit.global.event.service.EventStreamService;
+import com.dealit.dealit.global.service.ImageUrlService;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -74,6 +75,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.systemUTC()
         );
 
@@ -120,6 +122,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.systemUTC()
         );
 
@@ -190,6 +193,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -256,6 +260,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -322,6 +327,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -387,6 +393,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.fixed(OffsetDateTime.parse("2026-05-10T13:00:00Z").toInstant(), java.time.ZoneOffset.UTC)
         );
 
@@ -431,6 +438,7 @@ class ChatServiceCreateRoomTest {
                 eventStreamService,
                 fcmNotificationService,
                 auctionNotificationService,
+                mock(ImageUrlService.class),
                 Clock.systemUTC()
         );
 

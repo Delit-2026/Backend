@@ -24,6 +24,8 @@ public class CorsConfig {
 			.toList());
 		allowedOriginPatterns.add("http://*:3000");
 		allowedOriginPatterns.add("http://*:80");
+		allowedOriginPatterns.add("https://www.dealit.site");
+		allowedOriginPatterns.add("https://dealit.site");
 
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOriginPatterns(allowedOriginPatterns);

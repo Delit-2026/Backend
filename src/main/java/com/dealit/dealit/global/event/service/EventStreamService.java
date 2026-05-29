@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -54,6 +55,20 @@ public class EventStreamService {
 
     public void publish(Long userId, String eventName, Object payload) {
         publishToUser(userId, eventName, payload);
+    }
+
+    @Scheduled(fixedDelayString = "${app.events.sse.heartbeat-interval-ms:25000}")
+    public void sendHeartbeat() {
+        for (Map.Entry<Long, Map<String, SseEmitter>> userEntry : emitterRepository.findAll().entrySet()) {
+            Long userId = userEntry.getKey();
+            for (Map.Entry<String, SseEmitter> emitterEntry : userEntry.getValue().entrySet()) {
+                try {
+                    emitterEntry.getValue().send(SseEmitter.event().comment("heartbeat"));
+                } catch (IOException | RuntimeException exception) {
+                    emitterRepository.remove(userId, emitterEntry.getKey());
+                }
+            }
+        }
     }
 
     private void publishToUser(Long userId, String eventName, Object payload) {
