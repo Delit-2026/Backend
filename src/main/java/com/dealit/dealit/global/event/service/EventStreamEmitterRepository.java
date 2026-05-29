@@ -21,6 +21,10 @@ public class EventStreamEmitterRepository {
         return emittersByUser.getOrDefault(userId, Map.of());
     }
 
+    public Map<Long, Map<String, SseEmitter>> findAll() {
+        return Map.copyOf(emittersByUser);
+    }
+
     public void remove(Long userId, String emitterId) {
         Map<String, SseEmitter> emitters = emittersByUser.get(userId);
         if (emitters == null) {

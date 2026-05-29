@@ -5,13 +5,24 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriUtils;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ImageUrlService {
 
 	private static final String LEGACY_CDN_BASE_URL = "https://cdn.dealit.local";
+	private static final List<String> MANAGED_IMAGE_PATH_PREFIXES = List.of(
+		ImageProperties.AUCTION_IMAGE_PATH_PREFIX,
+		ImageProperties.PRODUCT_IMAGE_PATH_PREFIX,
+		ImageProperties.PROFILE_IMAGE_PATH_PREFIX,
+		ImageProperties.LEGACY_AUCTION_IMAGE_PATH_PREFIX,
+		ImageProperties.LEGACY_PRODUCT_IMAGE_PATH_PREFIX,
+		ImageProperties.LEGACY_PROFILE_IMAGE_PATH_PREFIX
+	);
 
 	private final ImageProperties imageProperties;
 
@@ -70,9 +81,30 @@ public class ImageUrlService {
 			if (imagePathOrUrl.startsWith(LEGACY_CDN_BASE_URL)) {
 				return imagePathOrUrl.substring(LEGACY_CDN_BASE_URL.length());
 			}
+			String managedImagePath = extractManagedImagePath(imagePathOrUrl);
+			if (managedImagePath != null) {
+				return managedImagePath;
+			}
 			return imagePathOrUrl;
 		}
 
 		return imagePathOrUrl.startsWith("/") ? imagePathOrUrl : "/" + imagePathOrUrl;
+	}
+
+	private String extractManagedImagePath(String imageUrl) {
+		try {
+			URI uri = new URI(imageUrl);
+			String path = uri.getPath();
+			if (path == null || path.isBlank()) {
+				return null;
+			}
+			return isManagedImagePath(path) ? path : null;
+		} catch (URISyntaxException exception) {
+			return null;
+		}
+	}
+
+	private boolean isManagedImagePath(String path) {
+		return MANAGED_IMAGE_PATH_PREFIXES.stream().anyMatch(path::startsWith);
 	}
 }

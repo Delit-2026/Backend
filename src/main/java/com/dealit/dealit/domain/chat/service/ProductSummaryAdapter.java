@@ -1,6 +1,7 @@
 package com.dealit.dealit.domain.chat.service;
 
 import com.dealit.dealit.domain.chat.exception.ProductNotFoundException;
+import com.dealit.dealit.global.service.ImageUrlService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 public class ProductSummaryAdapter implements ProductSummaryPort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final ImageUrlService imageUrlService;
 
     @Override
     public ProductSummary getSummaryByProductId(Long productId) {
@@ -48,7 +50,7 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
                         return new ProductSummary(
                                 rs.getLong("product_id"),
                                 rs.getString("name"),
-                                rs.getString("thumbnail_url"),
+                                toPublicImageUrl(rs.getString("thumbnail_url")),
                                 rs.getString("sale_type"),
                                 rs.getObject("auction_id", Long.class)
                         );
@@ -57,5 +59,12 @@ public class ProductSummaryAdapter implements ProductSummaryPort {
         } catch (DataAccessException e) {
             throw new ProductNotFoundException("유효한 상품을 찾을 수 없습니다. productId=" + productId);
         }
+    }
+
+    private String toPublicImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        return imageUrlService.toPublicUrl(imageUrl);
     }
 }
