@@ -111,6 +111,9 @@ public class ProductDetailService {
 
 	private double getSellerRating(Long sellerId) {
 		ReviewRatingSummaryResponse summary = reviewRepository.getRatingSummaryByRevieweeId(sellerId);
+		if (summary == null) {
+			return 0.0;
+		}
 		return Math.round(summary.averageRating() * 10.0) / 10.0;
 	}
 
