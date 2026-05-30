@@ -6,6 +6,8 @@ import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.review.entity.Review;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.global.security.AuthenticatedMember;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,11 +44,15 @@ class ProductDetailIntegrationTest {
 	@Autowired
 	private MemberRepository memberRepository;
 
+	@Autowired
+	private ReviewRepository reviewRepository;
+
 	private Member seller;
 	private Member viewer;
 
 	@BeforeEach
 	void setUp() {
+		reviewRepository.deleteAll();
 		productImageRepository.deleteAll();
 		productRepository.deleteAll();
 		memberRepository.deleteAll();
@@ -95,6 +101,7 @@ class ProductDetailIntegrationTest {
 			.andExpect(jsonPath("$.seller.memberId").value(seller.getMemberId()))
 			.andExpect(jsonPath("$.seller.nickname").value(seller.getNickname()))
 			.andExpect(jsonPath("$.seller.location").value("Seoul Gangnam"))
+			.andExpect(jsonPath("$.seller.rating").value(0.0))
 			.andExpect(jsonPath("$.generalSale.price").value(12000))
 			.andExpect(jsonPath("$.generalSale.viewCount").value(1))
 			.andExpect(jsonPath("$.generalSale.favoriteCount").value(0))
@@ -104,6 +111,41 @@ class ProductDetailIntegrationTest {
 			.andExpect(jsonPath("$.canPurchase").value(true))
 			.andExpect(jsonPath("$.purchaseBlockedReason").doesNotExist())
 			.andExpect(jsonPath("$.canFavorite").value(true));
+	}
+
+	@Test
+	@DisplayName("상품 상세 조회 시 판매자가 받은 리뷰 평균 평점을 반환한다")
+	void getRegularProductDetailReturnsSellerRating() throws Exception {
+		Product product = saveRegularProduct();
+		Member anotherBuyer = memberRepository.save(Member.create(
+			"detail-another-buyer",
+			"password",
+			"another-buyer@example.com",
+			null,
+			"Detail Another Buyer",
+			true
+		));
+		reviewRepository.save(Review.create(
+			viewer.getMemberId(),
+			seller.getMemberId(),
+			product.getProductId(),
+			null,
+			BigDecimal.valueOf(5.0),
+			"Great transaction."
+		));
+		reviewRepository.save(Review.create(
+			anotherBuyer.getMemberId(),
+			seller.getMemberId(),
+			product.getProductId(),
+			null,
+			BigDecimal.valueOf(4.0),
+			"Good transaction."
+		));
+
+		mockMvc.perform(get("/api/v1/products/{productId}", product.getProductId())
+				.with(authentication(authenticatedMember(viewer))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.seller.rating").value(4.5));
 	}
 
 	@Test

@@ -13,6 +13,8 @@ import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.exception.ProductNotFoundException;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
 import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
+import com.dealit.dealit.domain.review.dto.ReviewRatingSummaryResponse;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.global.service.ImageUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class ProductDetailService {
 	private final MemberRepository memberRepository;
 	private final ImageUrlService imageUrlService;
 	private final RecentProductService recentProductService;
+	private final ReviewRepository reviewRepository;
 
 	@Transactional
 	public ProductDetailResponse getProductDetail(Long memberId, Long productId) {
@@ -101,8 +104,14 @@ public class ProductDetailService {
 			seller.getMemberId(),
 			seller.getNickname(),
 			profileImageUrl,
-			product.getLocation()
+			product.getLocation(),
+			getSellerRating(seller.getMemberId())
 		);
+	}
+
+	private double getSellerRating(Long sellerId) {
+		ReviewRatingSummaryResponse summary = reviewRepository.getRatingSummaryByRevieweeId(sellerId);
+		return Math.round(summary.averageRating() * 10.0) / 10.0;
 	}
 
 	private List<String> toImageUrls(Product product) {

@@ -79,7 +79,10 @@ public record ProductDetailResponse(
 		String profileImageUrl,
 
 		@Schema(description = "거래 위치", example = "서울 강남구")
-		String location
+		String location,
+
+		@Schema(description = "판매자 평균 평점", example = "4.5")
+		double rating
 	) {
 	}
 
