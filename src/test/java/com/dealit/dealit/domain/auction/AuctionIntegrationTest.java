@@ -95,6 +95,12 @@ class AuctionIntegrationTest {
 		);
 		Member savedMember = memberRepository.save(member);
 		savedMember.assignDefaultNickname();
+		savedMember.updateProfile(
+			savedMember.getName(),
+			savedMember.getNickname(),
+			"Auction seller bio.",
+			savedMember.getProfileImage()
+		);
 		savedMember.verifyEmail();
 		savedMember = memberRepository.save(savedMember);
 		accessToken = jwtService.generateAccessToken(savedMember);
@@ -662,6 +668,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.images[0].sortOrder").value(1))
 			.andExpect(jsonPath("$.seller.memberId").isNumber())
 			.andExpect(jsonPath("$.seller.nickname").value(startsWith("Dealit#")))
+			.andExpect(jsonPath("$.seller.bio").value("Auction seller bio."))
 			.andExpect(jsonPath("$.seller.rating").value(4.5))
 			.andExpect(jsonPath("$.startPrice").value(180000))
 			.andExpect(jsonPath("$.currentPrice").value(180000))

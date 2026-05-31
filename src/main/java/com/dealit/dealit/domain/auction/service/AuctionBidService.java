@@ -407,7 +407,13 @@ public class AuctionBidService {
 		String profileImageUrl = seller.getProfileImage() == null || seller.getProfileImage().isBlank()
 			? null
 			: imageUrlService.toPublicUrl(seller.getProfileImage());
-		return new SellerResponse(seller.getMemberId(), seller.getNickname(), profileImageUrl, getSellerRating(seller.getMemberId()));
+		return new SellerResponse(
+			seller.getMemberId(),
+			seller.getNickname(),
+			profileImageUrl,
+			seller.getIntro(),
+			getSellerRating(seller.getMemberId())
+		);
 	}
 
 	private double getSellerRating(Long sellerId) {

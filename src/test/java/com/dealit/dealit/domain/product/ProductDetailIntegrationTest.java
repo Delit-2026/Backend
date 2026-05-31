@@ -66,6 +66,7 @@ class ProductDetailIntegrationTest {
 			true
 		));
 		seller.assignDefaultNickname();
+		seller.updateProfile(seller.getName(), seller.getNickname(), "Detail seller bio.", seller.getProfileImage());
 		seller.updateLocation("Seoul Gangnam");
 		seller = memberRepository.save(seller);
 
@@ -100,6 +101,7 @@ class ProductDetailIntegrationTest {
 			.andExpect(jsonPath("$.status").value("ON_SALE"))
 			.andExpect(jsonPath("$.seller.memberId").value(seller.getMemberId()))
 			.andExpect(jsonPath("$.seller.nickname").value(seller.getNickname()))
+			.andExpect(jsonPath("$.seller.bio").value("Detail seller bio."))
 			.andExpect(jsonPath("$.seller.location").value("Seoul Gangnam"))
 			.andExpect(jsonPath("$.seller.rating").value(0.0))
 			.andExpect(jsonPath("$.generalSale.price").value(12000))
