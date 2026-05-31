@@ -104,6 +104,7 @@ public class ProductDetailService {
 			seller.getMemberId(),
 			seller.getNickname(),
 			profileImageUrl,
+			seller.getIntro(),
 			product.getLocation(),
 			getSellerRating(seller.getMemberId())
 		);

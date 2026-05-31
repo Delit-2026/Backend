@@ -35,6 +35,8 @@ import com.dealit.dealit.domain.product.entity.Product;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.purchase.service.PurchaseService;
 import com.dealit.dealit.domain.recentproduct.service.RecentProductService;
+import com.dealit.dealit.domain.review.dto.ReviewRatingSummaryResponse;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.domain.search.event.AuctionSearchDeleteRequestedEvent;
 import com.dealit.dealit.domain.search.event.AuctionSearchIndexRequestedEvent;
 import com.dealit.dealit.domain.wallet.service.WalletService;
@@ -76,6 +78,7 @@ public class AuctionBidService {
 	private final WishlistService wishlistService;
 	private final ImageUrlService imageUrlService;
 	private final RecentProductService recentProductService;
+	private final ReviewRepository reviewRepository;
 	private final Clock clock;
 
 	public AuctionDetailResponse getAuction(Long auctionId) {
@@ -404,7 +407,21 @@ public class AuctionBidService {
 		String profileImageUrl = seller.getProfileImage() == null || seller.getProfileImage().isBlank()
 			? null
 			: imageUrlService.toPublicUrl(seller.getProfileImage());
-		return new SellerResponse(seller.getMemberId(), seller.getNickname(), profileImageUrl);
+		return new SellerResponse(
+			seller.getMemberId(),
+			seller.getNickname(),
+			profileImageUrl,
+			seller.getIntro(),
+			getSellerRating(seller.getMemberId())
+		);
+	}
+
+	private double getSellerRating(Long sellerId) {
+		ReviewRatingSummaryResponse summary = reviewRepository.getRatingSummaryByRevieweeId(sellerId);
+		if (summary == null) {
+			return 0.0;
+		}
+		return Math.round(summary.averageRating() * 10.0) / 10.0;
 	}
 
 	private String resolveBidderNickname(Member bidder, Long bidderId) {

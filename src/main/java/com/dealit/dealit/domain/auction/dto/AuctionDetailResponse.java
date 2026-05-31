@@ -38,7 +38,9 @@ public record AuctionDetailResponse(
 	public record SellerResponse(
 		Long memberId,
 		String nickname,
-		String profileImageUrl
+		String profileImageUrl,
+		String bio,
+		double rating
 	) {
 	}
 }
