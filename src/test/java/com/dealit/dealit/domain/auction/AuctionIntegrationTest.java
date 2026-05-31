@@ -6,6 +6,8 @@ import com.dealit.dealit.domain.member.repository.MemberRepository;
 import com.dealit.dealit.domain.product.entity.ProductImage;
 import com.dealit.dealit.domain.product.repository.ProductImageRepository;
 import com.dealit.dealit.domain.product.repository.ProductRepository;
+import com.dealit.dealit.domain.review.entity.Review;
+import com.dealit.dealit.domain.review.repository.ReviewRepository;
 import com.dealit.dealit.global.security.jwt.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -60,6 +63,9 @@ class AuctionIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private ReviewRepository reviewRepository;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -73,6 +79,7 @@ class AuctionIntegrationTest {
 
 	@BeforeEach
 	void setUp() throws IOException {
+		reviewRepository.deleteAll();
 		auctionRepository.deleteAll();
 		productImageRepository.deleteAll();
 		productRepository.deleteAll();
@@ -617,6 +624,27 @@ class AuctionIntegrationTest {
 			.andExpect(status().isCreated());
 
 		Long auctionId = auctionRepository.findAll().getFirst().getAuctionId();
+		var product = productRepository.findAll().getFirst();
+		Long productId = product.getProductId();
+		Long sellerId = product.getMemberId();
+		Member firstReviewer = saveReviewMember("auction-reviewer-one", "auction-reviewer-one@dealit.com");
+		Member secondReviewer = saveReviewMember("auction-reviewer-two", "auction-reviewer-two@dealit.com");
+		reviewRepository.save(Review.create(
+			firstReviewer.getMemberId(),
+			sellerId,
+			productId,
+			auctionId,
+			BigDecimal.valueOf(5.0),
+			"Great auction transaction."
+		));
+		reviewRepository.save(Review.create(
+			secondReviewer.getMemberId(),
+			sellerId,
+			productId,
+			auctionId,
+			BigDecimal.valueOf(4.0),
+			"Good auction transaction."
+		));
 
 		mockMvc.perform(get("/api/v1/auctions/{auctionId}", auctionId)
 				.header("Authorization", "Bearer " + accessToken))
@@ -634,6 +662,7 @@ class AuctionIntegrationTest {
 			.andExpect(jsonPath("$.images[0].sortOrder").value(1))
 			.andExpect(jsonPath("$.seller.memberId").isNumber())
 			.andExpect(jsonPath("$.seller.nickname").value(startsWith("Dealit#")))
+			.andExpect(jsonPath("$.seller.rating").value(4.5))
 			.andExpect(jsonPath("$.startPrice").value(180000))
 			.andExpect(jsonPath("$.currentPrice").value(180000))
 			.andExpect(jsonPath("$.minimumBidAmount").value(1800))
@@ -729,6 +758,19 @@ class AuctionIntegrationTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_AUCTION_REQUEST"))
 			.andExpect(jsonPath("$.message").value("경매 판매에서는 진행 기간 또는 종료 시각이 필수입니다."));
+	}
+
+	private Member saveReviewMember(String loginId, String email) {
+		Member member = Member.create(
+			loginId,
+			passwordEncoder.encode("Password123!"),
+			email,
+			null,
+			loginId
+		);
+		Member saved = memberRepository.save(member);
+		saved.assignDefaultNickname();
+		return memberRepository.save(saved);
 	}
 
 	private void deleteStoredImages() throws IOException {
